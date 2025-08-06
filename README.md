@@ -109,6 +109,8 @@ _This project was made with:
 I admit it – I didn’t code this all by myself. Almost every line was the result of long conversations with AI, lots of copy-paste, and me occasionally screaming at my screen. My only true contribution? Endless chats with artificial intelligence and the patience to deal with its quirks.
 So please: have mercy if your feature requests take time, or don’t land exactly how you imagined! If you still feel like buying me a coffee, you’re welcome to do so – it helps keep the AI arguments development going. ☕️😉
 
+<a href="https://www.buymeacoffee.com/bobimneuland" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+
 Enjoy, fellow automation nerds!
 
 ---
