@@ -1,105 +1,91 @@
-import requests
 import logging
+import aiohttp
 
 _LOGGER = logging.getLogger(__name__)
 
 class PortainerAPI:
     def __init__(self, host, username=None, password=None, api_key=None):
-        self.host = host.rstrip("/")  # Host inkl. http:// oder https://
+        self.base_url = host.rstrip("/")
         self.username = username
         self.password = password
         self.api_key = api_key
-        self.jwt = None
+        self.token = None
+        self.session = aiohttp.ClientSession()
         self.headers = {}
 
-        if api_key:
-            _LOGGER.debug("Using API Key for Portainer auth")
+    async def initialize(self):
+        if self.api_key:
             self.headers = {
-                "X-API-Key": api_key,
-                "Content-Type": "application/json"
+                "X-API-Key": self.api_key,
+                "Content-Type": "application/json",
             }
+        elif self.username and self.password:
+            await self.authenticate()
         else:
-            self.authenticate()
+            _LOGGER.error("[PortainerAPI] No credentials provided.")
 
-    def authenticate(self):
-        """Authenticate using username/password to get JWT token."""
-        url = f"{self.host}/api/auth"
+    async def authenticate(self):
+        url = f"{self.base_url}/api/auth"
+        payload = {"Username": self.username, "Password": self.password}
         try:
-            _LOGGER.debug("Authenticating with Portainer at %s", url)
-            resp = requests.post(url, json={
-                "Username": self.username,
-                "Password": self.password
-            }, timeout=10)
-            resp.raise_for_status()
-            self.jwt = resp.json()["jwt"]
-            self.headers = {
-                "Authorization": f"Bearer {self.jwt}",
-                "Content-Type": "application/json"
-            }
-            _LOGGER.info("Successfully authenticated with Portainer")
-        except requests.exceptions.RequestException as e:
-            _LOGGER.error("Portainer authentication failed: %s", e)
-            raise
+            async with self.session.post(url, json=payload, ssl=False) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    self.token = data.get("jwt")
+                    self.headers = {
+                        "Authorization": f"Bearer {self.token}",
+                        "Content-Type": "application/json",
+                    }
+                    _LOGGER.info("[PortainerAPI] Authentifiziert.")
+                else:
+                    _LOGGER.error("[PortainerAPI] Authentifizierung fehlgeschlagen: %s", resp.status)
+        except Exception as e:
+            _LOGGER.exception("[PortainerAPI] Fehler bei Authentifizierung: %s", e)
 
-    def get_containers(self, endpoint_id):
-        """Get list of containers from a specific endpoint."""
-        url = f"{self.host}/api/endpoints/{endpoint_id}/docker/containers/json?all=1"
+    async def get_containers(self, endpoint_id):
+        url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/json?all=1"
         try:
-            _LOGGER.debug("Requesting container list from %s", url)
-            resp = requests.get(url, headers=self.headers, timeout=10)
-            resp.raise_for_status()
-            containers = resp.json()
-            _LOGGER.debug("Received %d containers", len(containers))
-            for c in containers:
-                _LOGGER.debug("→ %s", c.get("Names", ["<kein Name>"]))
-            return containers
-        except requests.exceptions.RequestException as e:
-            _LOGGER.error("Failed to get containers: %s", e)
+            async with self.session.get(url, headers=self.headers, ssl=False) as resp:
+                if resp.status == 200:
+                    return await resp.json()
+                else:
+                    _LOGGER.error("[PortainerAPI] Fehler beim Abruf der Container: %s", resp.status)
+                    return []
+        except Exception as e:
+            _LOGGER.exception("[PortainerAPI] Fehler beim Abrufen der Container: %s", e)
             return []
 
-    def restart_container(self, endpoint_id, container_id):
-        url = f"{self.host}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/restart"
+    async def restart_container(self, endpoint_id, container_id):
+        url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/restart"
         try:
-            _LOGGER.debug("Restarting container: %s", container_id)
-            resp = requests.post(url, headers=self.headers, timeout=10)
-            success = resp.status_code == 204
-            _LOGGER.info("Restart container %s: %s", container_id, "OK" if success else f"FAILED ({resp.status_code})")
-            return success
-        except requests.exceptions.RequestException as e:
-            _LOGGER.error("Restart failed: %s", e)
+            async with self.session.post(url, headers=self.headers, ssl=False) as resp:
+                return resp.status == 204
+        except Exception as e:
+            _LOGGER.exception("[PortainerAPI] Fehler beim Neustart von Container %s: %s", container_id, e)
             return False
 
-    def start_container(self, endpoint_id, container_id):
-        url = f"{self.host}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/start"
+    async def inspect_container(self, endpoint_id, container_id):
+        url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/json"
         try:
-            _LOGGER.debug("Starting container: %s", container_id)
-            resp = requests.post(url, headers=self.headers, timeout=10)
-            success = resp.status_code == 204
-            _LOGGER.info("Start container %s: %s", container_id, "OK" if success else f"FAILED ({resp.status_code})")
-            return success
-        except requests.exceptions.RequestException as e:
-            _LOGGER.error("Start failed: %s", e)
-            return False
+            async with self.session.get(url, headers=self.headers, ssl=False) as resp:
+                if resp.status == 200:
+                    return await resp.json()
+                else:
+                    _LOGGER.error("[PortainerAPI] Fehler bei Inspect von Container: %s", resp.status)
+                    return {}
+        except Exception as e:
+            _LOGGER.exception("[PortainerAPI] Fehler bei Inspect: %s", e)
+            return {}
 
-    def stop_container(self, endpoint_id, container_id):
-        url = f"{self.host}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/stop"
+    async def get_container_stats(self, endpoint_id, container_id):
+        url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/stats?stream=false"
         try:
-            _LOGGER.debug("Stopping container: %s", container_id)
-            resp = requests.post(url, headers=self.headers, timeout=10)
-            success = resp.status_code == 204
-            _LOGGER.info("Stop container %s: %s", container_id, "OK" if success else f"FAILED ({resp.status_code})")
-            return success
-        except requests.exceptions.RequestException as e:
-            _LOGGER.error("Stop failed: %s", e)
-            return False
-
-    def inspect_container(self, endpoint_id, container_id):
-        url = f"{self.host}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/json"
-        try:
-            _LOGGER.debug("Inspecting container: %s", container_id)
-            resp = requests.get(url, headers=self.headers, timeout=10)
-            resp.raise_for_status()
-            return resp.json()
-        except requests.exceptions.RequestException as e:
-            _LOGGER.error("Inspect failed: %s", e)
+            async with self.session.get(url, headers=self.headers, ssl=False) as resp:
+                if resp.status == 200:
+                    return await resp.json()
+                else:
+                    _LOGGER.error("[PortainerAPI] Failed to get stats: %s", resp.status)
+                    return {}
+        except Exception as e:
+            _LOGGER.exception("[PortainerAPI] Exception getting stats: %s", e)
             return {}
