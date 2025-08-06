@@ -1,0 +1,13 @@
+{
+  "domain": "ha_portainer_link",
+  "name": "HA Portainer Link",
+  "version": "0.1.0",
+  "documentation": "https://github.com/rob0r7/ha_portainer_link",
+  "dependencies": [],
+  "codeowners": ["@rob0r7"],
+  "requirements": ["requests"],
+  "iot_class": "local_polling",
+  "integration_type": "hub",
+  "platforms": ["sensor", "switch"]
+
+}
