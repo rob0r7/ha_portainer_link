@@ -8,6 +8,6 @@
   "requirements": ["requests"],
   "iot_class": "local_polling",
   "integration_type": "hub",
-  "platforms": ["sensor", "switch"]
+  "platforms": ["sensor", "switch", "button"]
 
 }

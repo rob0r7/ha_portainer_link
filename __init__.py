@@ -1,14 +1,13 @@
 import logging
-_LOGGER = logging.getLogger(__name__)
-_LOGGER.warning("HA_Portainer_Link __init__.py wurde geladen")
 from homeassistant.helpers.discovery import async_load_platform
-
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+_LOGGER.warning("HA_Portainer_Link __init__.py wurde geladen")
+
+PLATFORMS = ["sensor", "switch", "button"]
 
 async def async_setup(hass, config):
-    """Set up ha_portainer_link integration from configuration.yaml."""
     conf = config.get(DOMAIN)
     if conf is None:
         _LOGGER.error("No configuration found for ha_portainer_link")
@@ -16,11 +15,10 @@ async def async_setup(hass, config):
 
     hass.data[DOMAIN] = conf
 
-    hass.async_create_task(
-        async_load_platform(hass, "sensor", DOMAIN, {}, config)
-    )
-    hass.async_create_task(
-        async_load_platform(hass, "switch", DOMAIN, {}, config)
-    )
+    for platform in PLATFORMS:
+        _LOGGER.debug("Lade Plattform: %s", platform)
+        hass.async_create_task(
+            async_load_platform(hass, platform, DOMAIN, {}, config)
+        )
 
     return True
