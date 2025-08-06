@@ -4,10 +4,8 @@ from homeassistant.const import STATE_UNKNOWN
 from .const import DOMAIN
 from .portainer_api import PortainerAPI
 
-
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.warning("Portainer sensor.py wurde erfolgreich geladen")
-
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     """Set up Portainer container sensors."""
@@ -25,11 +23,17 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     api = PortainerAPI(host, username, password, api_key)
     containers = api.get_containers(endpoint_id)
 
+    _LOGGER.warning("→ Containeranzahl: %d", len(containers))
+
     entities = []
     for container in containers:
-        if not container.get("Names"):
+        name_list = container.get("Names")
+        if not name_list:
+            _LOGGER.warning("→ Container ohne Namen: %s", container.get("Id"))
             continue
-        name = container["Names"][0].strip("/")
+
+        _LOGGER.warning("→ Verarbeiteter Container: %s", name_list[0])
+        name = name_list[0].strip("/")
         state = container.get("State", "unknown")
         entities.append(ContainerStatusSensor(name, state))
 
