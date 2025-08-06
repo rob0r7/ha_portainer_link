@@ -6,12 +6,8 @@ from .portainer_api import PortainerAPI
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.warning("Portainer button.py wurde erfolgreich geladen")
 
-async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
-    conf = hass.data.get(DOMAIN)
-    if not conf:
-        _LOGGER.error("No config data available in button")
-        return
-
+async def async_setup_entry(hass, entry, async_add_entities):
+    conf = entry.data
     host = conf["host"]
     username = conf.get("username")
     password = conf.get("password")
@@ -28,23 +24,39 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
             continue
         name = container["Names"][0].strip("/")
         container_id = container["Id"]
-        _LOGGER.warning("→ Restart-Button für Container: /%s", name)
-        buttons.append(PortainerRestartButton(name, container_id, api, endpoint_id))
+        buttons.append(RestartContainerButton(name, api, endpoint_id, container_id))
 
     async_add_entities(buttons)
 
-class PortainerRestartButton(ButtonEntity):
-    def __init__(self, name, container_id, api, endpoint_id):
-        self._attr_name = f"{name}_restart"
-        self._container_id = container_id
+class RestartContainerButton(ButtonEntity):
+    def __init__(self, name, api, endpoint_id, container_id):
+        self._name = f"{name}_restart"
+        self._container_name = name
         self._api = api
         self._endpoint_id = endpoint_id
-        self._attr_unique_id = f"restart_{container_id}"
-        self._attr_icon = "mdi:restart"
+        self._container_id = container_id
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def unique_id(self):
+        return f"button_{self._name}"
+
+    @property
+    def icon(self):
+        return "mdi:restart"
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, self._container_id)},
+            "name": self._container_name,
+            "manufacturer": "Docker via Portainer",
+            "model": "Docker Container",
+            "configuration_url": f"{self._api.base_url}/#!/containers/{self._container_id}/details",
+        }
 
     async def async_press(self) -> None:
-        success = await self._api.restart_container(self._endpoint_id, self._container_id)
-        if success:
-            _LOGGER.info("Container %s erfolgreich neugestartet", self._container_id)
-        else:
-            _LOGGER.error("Fehler beim Neustart von Container %s", self._container_id)
+        await self._api.restart_container(self._endpoint_id, self._container_id)

@@ -1,24 +1,30 @@
 import logging
-from homeassistant.helpers.discovery import async_load_platform
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
-_LOGGER.warning("HA_Portainer_Link __init__.py wurde geladen")
 
 PLATFORMS = ["sensor", "switch", "button"]
 
-async def async_setup(hass, config):
-    conf = config.get(DOMAIN)
-    if conf is None:
-        _LOGGER.error("No configuration found for ha_portainer_link")
-        return True
+async def async_setup(hass: HomeAssistant, config: dict):
+    """Set up HA Portainer Link from YAML."""
+    return True
 
-    hass.data[DOMAIN] = conf
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
+    """Set up HA Portainer Link from a config entry."""
+    hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN][entry.entry_id] = entry.data
 
-    for platform in PLATFORMS:
-        _LOGGER.debug("Lade Plattform: %s", platform)
-        hass.async_create_task(
-            async_load_platform(hass, platform, DOMAIN, {}, config)
-        )
+    # ✅ Richtiger Aufruf!
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
+    """Unload the config entry and its platforms."""
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok:
+        hass.data[DOMAIN].pop(entry.entry_id, None)
+    return unload_ok

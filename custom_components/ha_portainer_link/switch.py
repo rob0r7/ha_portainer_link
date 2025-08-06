@@ -6,13 +6,8 @@ from .portainer_api import PortainerAPI
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.warning("Portainer switch.py wurde erfolgreich geladen")
 
-async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
-    """Set up Portainer switches for containers."""
-    conf = hass.data.get(DOMAIN)
-    if not conf:
-        _LOGGER.error("No config data available in switch")
-        return
-
+async def async_setup_entry(hass, entry, async_add_entities):
+    conf = entry.data
     host = conf["host"]
     username = conf.get("username")
     password = conf.get("password")
@@ -30,44 +25,53 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
         name = container["Names"][0].strip("/")
         container_id = container["Id"]
         state = container.get("State", "unknown")
-        _LOGGER.warning("→ Switch erstellt für Container: /%s", name)
-        switches.append(PortainerContainerSwitch(name, container_id, state, api, endpoint_id))
+        switches.append(ContainerSwitch(name, state, api, endpoint_id, container_id))
 
     async_add_entities(switches, update_before_add=True)
 
-class PortainerContainerSwitch(SwitchEntity):
-    def __init__(self, name, container_id, state, api, endpoint_id):
-        self._name = name
-        self._container_id = container_id
-        self._state = state
+class ContainerSwitch(SwitchEntity):
+    def __init__(self, name, state, api, endpoint_id, container_id):
+        self._name = f"{name}_switch"
+        self._container_name = name
+        self._state = state == "running"
         self._api = api
         self._endpoint_id = endpoint_id
+        self._container_id = container_id
 
     @property
     def name(self):
-        return f"{self._name}_switch"
-
-    @property
-    def unique_id(self):
-        return f"switch_{self._container_id}"
+        return self._name
 
     @property
     def is_on(self):
-        return self._state == "running"
+        return self._state
+
+    @property
+    def unique_id(self):
+        return f"switch_{self._name}"
+
+    @property
+    def icon(self):
+        return "mdi:power"
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, self._container_id)},
+            "name": self._container_name,
+            "manufacturer": "Docker via Portainer",
+            "model": "Docker Container",
+            "configuration_url": f"{self._api.base_url}/#!/containers/{self._container_id}/details",
+        }
 
     async def async_turn_on(self, **kwargs):
         success = await self._api.start_container(self._endpoint_id, self._container_id)
         if success:
-            self._state = "running"
+            self._state = True
             self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs):
         success = await self._api.stop_container(self._endpoint_id, self._container_id)
         if success:
-            self._state = "exited"
+            self._state = False
             self.async_write_ha_state()
-
-    async def async_update(self):
-        container_info = await self._api.inspect_container(self._endpoint_id, self._container_id)
-        if container_info:
-            self._state = container_info.get("State", {}).get("Status", "unknown")
