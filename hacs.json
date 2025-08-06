@@ -1,0 +1,8 @@
+{
+  "name": "HA Portainer Link",
+  "content_in_root": false,
+  "domains": ["ha_portainer_link"],
+  "country": "global",
+  "homeassistant": "2023.6.0",
+  "iot_class": "cloud_polling"
+}
