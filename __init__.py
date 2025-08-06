@@ -1,25 +1,24 @@
-from .const import DOMAIN, CONF_HOST, CONF_USERNAME, CONF_PASSWORD, CONF_API_KEY, CONF_ENDPOINT_ID
-from .portainer_api import PortainerAPI
+import logging
+from homeassistant.helpers.discovery import async_load_platform
+
+from .const import DOMAIN
+
+_LOGGER = logging.getLogger(__name__)
 
 async def async_setup(hass, config):
-    """Set up HA Portainer Link from configuration.yaml."""
+    """Set up ha_portainer_link integration from configuration.yaml."""
     conf = config.get(DOMAIN)
     if conf is None:
+        _LOGGER.error("No configuration found for ha_portainer_link")
         return True
 
-    host = conf[CONF_HOST]
-    username = conf.get(CONF_USERNAME)
-    password = conf.get(CONF_PASSWORD)
-    api_key = conf.get(CONF_API_KEY)
-    endpoint_id = conf[CONF_ENDPOINT_ID]
+    hass.data[DOMAIN] = conf
 
-    api = PortainerAPI(host, username, password, api_key)
-    containers = api.get_containers(endpoint_id)
-
-    for container in containers:
-        hass.states.async_set(
-            f"{DOMAIN}.{container['Names'][0].strip('/')}",
-            container["State"]
-        )
+    hass.async_create_task(
+        async_load_platform(hass, "sensor", DOMAIN, {}, config)
+    )
+    hass.async_create_task(
+        async_load_platform(hass, "switch", DOMAIN, {}, config)
+    )
 
     return True
