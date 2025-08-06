@@ -4,9 +4,10 @@ from .const import DOMAIN
 from .portainer_api import PortainerAPI
 
 _LOGGER = logging.getLogger(__name__)
+_LOGGER.warning("Portainer switch.py wurde erfolgreich geladen")
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
-    """Set up Portainer container switches."""
+    """Set up Portainer switches for containers."""
     conf = hass.data.get(DOMAIN)
     if not conf:
         _LOGGER.error("No config data available in switch")
@@ -19,30 +20,32 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     endpoint_id = conf["endpoint_id"]
 
     api = PortainerAPI(host, username, password, api_key)
-    containers = api.get_containers(endpoint_id)
+    await api.initialize()
+    containers = await api.get_containers(endpoint_id)
 
-    entities = []
+    switches = []
     for container in containers:
         if not container.get("Names"):
             continue
         name = container["Names"][0].strip("/")
         container_id = container["Id"]
-        state = container["State"]
-        entities.append(DockerContainerSwitch(name, container_id, endpoint_id, api, state))
+        state = container.get("State", "unknown")
+        _LOGGER.warning("→ Switch erstellt für Container: /%s", name)
+        switches.append(PortainerContainerSwitch(name, container_id, state, api, endpoint_id))
 
-    async_add_entities(entities, update_before_add=True)
+    async_add_entities(switches, update_before_add=True)
 
-class DockerContainerSwitch(SwitchEntity):
-    def __init__(self, name, container_id, endpoint_id, api: PortainerAPI, state):
+class PortainerContainerSwitch(SwitchEntity):
+    def __init__(self, name, container_id, state, api, endpoint_id):
         self._name = name
         self._container_id = container_id
-        self._endpoint_id = endpoint_id
+        self._state = state
         self._api = api
-        self._is_on = state == "running"
+        self._endpoint_id = endpoint_id
 
     @property
     def name(self):
-        return f"{self._name}"
+        return f"{self._name}_switch"
 
     @property
     def unique_id(self):
@@ -50,21 +53,21 @@ class DockerContainerSwitch(SwitchEntity):
 
     @property
     def is_on(self):
-        return self._is_on
+        return self._state == "running"
 
-    @property
-    def icon(self):
-        return "mdi:docker"
+    async def async_turn_on(self, **kwargs):
+        success = await self._api.start_container(self._endpoint_id, self._container_id)
+        if success:
+            self._state = "running"
+            self.async_write_ha_state()
 
-    def turn_on(self, **kwargs):
-        if self._api.start_container(self._endpoint_id, self._container_id):
-            self._is_on = True
+    async def async_turn_off(self, **kwargs):
+        success = await self._api.stop_container(self._endpoint_id, self._container_id)
+        if success:
+            self._state = "exited"
+            self.async_write_ha_state()
 
-    def turn_off(self, **kwargs):
-        if self._api.stop_container(self._endpoint_id, self._container_id):
-            self._is_on = False
-
-    def update(self):
-        data = self._api.inspect_container(self._endpoint_id, self._container_id)
-        if data:
-            self._is_on = data.get("State", {}).get("Running", False)
+    async def async_update(self):
+        container_info = await self._api.inspect_container(self._endpoint_id, self._container_id)
+        if container_info:
+            self._state = container_info.get("State", {}).get("Status", "unknown")

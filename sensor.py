@@ -21,20 +21,18 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     endpoint_id = conf["endpoint_id"]
 
     api = PortainerAPI(host, username, password, api_key)
-    containers = api.get_containers(endpoint_id)
+    await api.initialize()
+    containers = await api.get_containers(endpoint_id)
 
     _LOGGER.warning("→ Containeranzahl: %d", len(containers))
 
     entities = []
     for container in containers:
-        name_list = container.get("Names")
-        if not name_list:
-            _LOGGER.warning("→ Container ohne Namen: %s", container.get("Id"))
+        if not container.get("Names"):
             continue
-
-        _LOGGER.warning("→ Verarbeiteter Container: %s", name_list[0])
-        name = name_list[0].strip("/")
+        name = container["Names"][0].strip("/")
         state = container.get("State", "unknown")
+        _LOGGER.warning("→ Verarbeiteter Container: /%s", name)
         entities.append(ContainerStatusSensor(name, state))
 
     async_add_entities(entities, update_before_add=True)

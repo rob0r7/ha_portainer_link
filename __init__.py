@@ -1,4 +1,6 @@
 import logging
+_LOGGER = logging.getLogger(__name__)
+_LOGGER.warning("HA_Portainer_Link __init__.py wurde geladen")
 from homeassistant.helpers.discovery import async_load_platform
 
 from .const import DOMAIN
