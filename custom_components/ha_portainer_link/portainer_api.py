@@ -89,3 +89,21 @@ class PortainerAPI:
         except Exception as e:
             _LOGGER.exception("[PortainerAPI] Exception getting stats: %s", e)
             return {}
+        
+    async def start_container(self, endpoint_id, container_id):
+        url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/start"
+        try:
+            async with self.session.post(url, headers=self.headers, ssl=False) as resp:
+                return resp.status == 204
+        except Exception as e:
+            _LOGGER.exception("Exception while starting container %s: %s", container_id, e)
+            return False
+
+    async def stop_container(self, endpoint_id, container_id):
+        url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/stop"
+        try:
+            async with self.session.post(url, headers=self.headers, ssl=False) as resp:
+                return resp.status == 204
+        except Exception as e:
+            _LOGGER.exception("Exception while stopping container %s: %s", container_id, e)
+            return False

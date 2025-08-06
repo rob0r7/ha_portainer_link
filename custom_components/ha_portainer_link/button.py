@@ -4,7 +4,7 @@ from .const import DOMAIN
 from .portainer_api import PortainerAPI
 
 _LOGGER = logging.getLogger(__name__)
-_LOGGER.warning("Portainer button.py wurde erfolgreich geladen")
+_LOGGER.info("Loaded Portainer button integration.")
 
 async def async_setup_entry(hass, entry, async_add_entities):
     conf = entry.data
@@ -20,29 +20,22 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     buttons = []
     for container in containers:
-        if not container.get("Names"):
-            continue
-        name = container["Names"][0].strip("/")
+        name = container.get("Names", ["unknown"])[0].strip("/")
         container_id = container["Id"]
         buttons.append(RestartContainerButton(name, api, endpoint_id, container_id))
 
     async_add_entities(buttons)
 
 class RestartContainerButton(ButtonEntity):
+    """Button to restart a Docker container."""
+
     def __init__(self, name, api, endpoint_id, container_id):
-        self._name = f"{name}_restart"
+        self._attr_name = f"{name} Restart"
         self._container_name = name
         self._api = api
         self._endpoint_id = endpoint_id
         self._container_id = container_id
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def unique_id(self):
-        return f"button_{self._name}"
+        self._attr_unique_id = f"{container_id}_restart"
 
     @property
     def icon(self):
@@ -59,4 +52,5 @@ class RestartContainerButton(ButtonEntity):
         }
 
     async def async_press(self) -> None:
+        """Restart the Docker container."""
         await self._api.restart_container(self._endpoint_id, self._container_id)
