@@ -1,227 +1,98 @@
 import logging
-import hashlib
-from homeassistant.helpers.entity import Entity
 from homeassistant.const import STATE_UNKNOWN
+from homeassistant.components.sensor import SensorEntity
+
 from .const import DOMAIN
-from .portainer_api import PortainerAPI
+from .entity import BaseContainerEntity
+from .coordinator import PortainerDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.info("Loaded Portainer sensor integration.")
 
-def _get_host_display_name(base_url):
-    """Extract a clean host name from the base URL for display purposes."""
-    # Remove protocol and common ports
-    host = base_url.replace("https://", "").replace("http://", "")
-    # Remove trailing slash if present
-    host = host.rstrip("/")
-    # Remove common ports
-    for port in [":9000", ":9443", ":80", ":443"]:
-        if host.endswith(port):
-            host = host[:-len(port)]
-    
-    # If the host is an IP address, keep it as is
-    # If it's a domain, try to extract a meaningful name
-    if host.replace('.', '').replace('-', '').replace('_', '').isdigit():
-        # It's an IP address, keep as is
-        return host
-    else:
-        # It's a domain, extract the main part
-        parts = host.split('.')
-        if len(parts) >= 2:
-            # Use the main domain part (e.g., "portainer" from "portainer.example.com")
-            return parts[0]
-        else:
-            return host
-
-def _get_host_hash(base_url):
-    """Generate a short hash of the host URL for unique identification."""
-    return hashlib.md5(base_url.encode()).hexdigest()[:8]
-
-def _get_simple_device_id(entry_id, endpoint_id, host_name, container_or_stack_name):
-    """Generate a simple, predictable device ID."""
-    # Use a simple format: entry_endpoint_host_container
-    sanitized_host = host_name.replace('.', '_').replace(':', '_').replace('-', '_')
-    sanitized_name = container_or_stack_name.replace('-', '_').replace(' ', '_')
-    return f"{entry_id}_{endpoint_id}_{sanitized_host}_{sanitized_name}"
-
-def _get_stable_entity_id(entry_id, endpoint_id, container_name, stack_info, entity_type):
-    """Generate a stable entity ID that doesn't change when container is recreated."""
-    # For stack containers, use stack_name + service_name
-    if stack_info.get("is_stack_container"):
-        stack_name = stack_info.get("stack_name", "unknown")
-        service_name = stack_info.get("service_name", container_name)
-        # Use stack and service name for stability
-        stable_id = f"{stack_name}_{service_name}"
-    else:
-        # For standalone containers, use container name
-        stable_id = container_name
-    
-    # Sanitize the stable ID
-    sanitized_id = stable_id.replace('-', '_').replace(' ', '_').replace('/', '_')
-    return f"entry_{entry_id}_endpoint_{endpoint_id}_{sanitized_id}_{entity_type}"
-
 async def async_setup_entry(hass, entry, async_add_entities):
     config = entry.data
-    host = config["host"]
-    username = config.get("username")
-    password = config.get("password")
-    api_key = config.get("api_key")
     endpoint_id = config["endpoint_id"]
     entry_id = entry.entry_id
 
     _LOGGER.info("🚀 Setting up HA Portainer Link sensors for entry %s (endpoint %s)", entry_id, endpoint_id)
-    _LOGGER.info("📍 Portainer host: %s", host)
     
-    # Log the extracted host name for debugging
-    host_display_name = _get_host_display_name(host)
-    _LOGGER.info("🏷️ Extracted host display name: %s", host_display_name)
-
-    api = PortainerAPI(host, username, password, api_key)
-    await api.initialize()
-    containers = await api.get_containers(endpoint_id)
-
-    _LOGGER.info("📦 Found %d containers to process", len(containers))
+    # Get coordinator
+    coordinator = hass.data[DOMAIN][f"{entry_id}_coordinator"]
+    
+    # Wait for initial data
+    await coordinator.async_config_entry_first_refresh()
 
     entities = []
-    stack_containers_count = 0
-    standalone_containers_count = 0
     
-    for container in containers:
-        name = container.get("Names", ["unknown"])[0].strip("/")
-        container_id = container["Id"]
-        state = container.get("State", STATE_UNKNOWN)
+    # Create sensors for all containers
+    for container_id, container_data in coordinator.containers.items():
+        container_name = container_data.get("Names", ["unknown"])[0].strip("/")
         
-        _LOGGER.debug("🔍 Processing container: %s (ID: %s, State: %s)", name, container_id, state)
+        # Get stack information
+        stack_info = coordinator.get_container_stack_info(container_data)
         
-        # Get container inspection data to determine if it's part of a stack
-        container_info = await api.inspect_container(endpoint_id, container_id)
-        stack_info = api.get_container_stack_info(container_info) if container_info else {"is_stack_container": False}
+        _LOGGER.debug("🔍 Processing container: %s (ID: %s)", container_name, container_id)
         
-        if stack_info.get("is_stack_container"):
-            stack_containers_count += 1
-            _LOGGER.info("📋 Container %s is part of stack: %s", name, stack_info.get("stack_name"))
-        else:
-            standalone_containers_count += 1
-            _LOGGER.info("📦 Container %s is standalone", name)
+        # Create sensors for this container
+        entities.append(ContainerStatusSensor(coordinator, entry_id, container_id, container_name, stack_info))
+        entities.append(ContainerCPUSensor(coordinator, entry_id, container_id, container_name, stack_info))
+        entities.append(ContainerMemorySensor(coordinator, entry_id, container_id, container_name, stack_info))
+        entities.append(ContainerUptimeSensor(coordinator, entry_id, container_id, container_name, stack_info))
+        entities.append(ContainerImageSensor(coordinator, entry_id, container_id, container_name, stack_info))
+        entities.append(ContainerCurrentVersionSensor(coordinator, entry_id, container_id, container_name, stack_info))
+        entities.append(ContainerAvailableVersionSensor(coordinator, entry_id, container_id, container_name, stack_info))
 
-        # Create sensors for all containers - they will all belong to the same stack device if they're in a stack
-        entities.append(ContainerStatusSensor(name, container_id, api, endpoint_id, stack_info, entry_id))
-        entities.append(ContainerCPUSensor(name, container_id, api, endpoint_id, stack_info, entry_id))
-        entities.append(ContainerMemorySensor(name, container_id, api, endpoint_id, stack_info, entry_id))
-        entities.append(ContainerUptimeSensor(name, container_id, api, endpoint_id, stack_info, entry_id))
-        entities.append(ContainerImageSensor(name, container_id, api, endpoint_id, stack_info, entry_id))
-        entities.append(ContainerCurrentVersionSensor(name, container_id, api, endpoint_id, stack_info, entry_id))
-        entities.append(ContainerAvailableVersionSensor(name, container_id, api, endpoint_id, stack_info, entry_id))
-
-    _LOGGER.info("✅ Created %d entities (%d stack containers, %d standalone containers)", 
-                len(entities), stack_containers_count, standalone_containers_count)
-
+    _LOGGER.info("✅ Created %d sensor entities", len(entities))
     async_add_entities(entities, update_before_add=True)
 
-class BaseContainerSensor(Entity):
-    """Base class for all container sensors."""
-
-    def __init__(self, container_name, container_id, api, endpoint_id, stack_info, entry_id):
-        self._container_name = container_name
-        self._container_id = container_id
-        self._api = api
-        self._endpoint_id = endpoint_id
-        self._stack_info = stack_info
-        self._entry_id = entry_id
-
-    def update_container_id(self, new_container_id):
-        """Update the container ID when container is recreated."""
-        if new_container_id != self._container_id:
-            _LOGGER.info("🔄 Updating container ID for %s: %s -> %s", 
-                        self._container_name, self._container_id[:12], new_container_id[:12])
-            self._container_id = new_container_id
-
-    @property
-    def device_info(self):
-        host_name = _get_host_display_name(self._api.base_url)
-        
-        if self._stack_info.get("is_stack_container"):
-            # For stack containers, use the stack as the device
-            stack_name = self._stack_info.get("stack_name", "unknown_stack")
-            device_id = _get_simple_device_id(self._entry_id, self._endpoint_id, host_name, f"stack_{stack_name}")
-            _LOGGER.debug("🏗️ Creating stack device: %s (ID: %s) for host: %s", 
-                        stack_name, device_id, host_name)
-            return {
-                "identifiers": {(DOMAIN, device_id)},
-                "name": f"Stack: {stack_name} ({host_name})",
-                "manufacturer": "Docker via Portainer",
-                "model": "Docker Stack",
-                "configuration_url": f"{self._api.base_url}/#!/stacks/{stack_name}",
-            }
-        else:
-            # For standalone containers, use the container as the device
-            device_id = _get_simple_device_id(self._entry_id, self._endpoint_id, host_name, self._container_name)
-            _LOGGER.debug("🏗️ Creating standalone container device: %s (ID: %s) for host: %s", 
-                        self._container_name, device_id, host_name)
-            return {
-                "identifiers": {(DOMAIN, device_id)},
-                "name": f"{self._container_name} ({host_name})",
-                "manufacturer": "Docker via Portainer",
-                "model": "Docker Container",
-                "configuration_url": f"{self._api.base_url}/#!/containers/{self._container_id}/details",
-            }
-
-class ContainerStatusSensor(BaseContainerSensor):
+class ContainerStatusSensor(BaseContainerEntity, SensorEntity):
     """Sensor for container status."""
 
-    def __init__(self, container_name, container_id, api, endpoint_id, stack_info, entry_id):
-        super().__init__(container_name, container_id, api, endpoint_id, stack_info, entry_id)
-        self._attr_unique_id = _get_stable_entity_id(entry_id, endpoint_id, container_name, stack_info, "status")
-        self._state = STATE_UNKNOWN
-        # Improve naming for stack containers
-        if stack_info.get("is_stack_container"):
-            stack_name = stack_info.get("stack_name", "unknown")
-            service_name = stack_info.get("service_name", container_name)
-            self._attr_name = f"Status {service_name} ({stack_name})"
-        else:
-            self._attr_name = f"Status {container_name}"
+    @property
+    def entity_type(self) -> str:
+        return "status"
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        display_name = self._get_container_name_display()
+        return f"Status {display_name}"
 
     @property
     def state(self):
-        return self._state or STATE_UNKNOWN
+        """Return the state of the sensor."""
+        container_data = self._get_container_data()
+        if container_data:
+            return container_data.get("State", STATE_UNKNOWN)
+        return STATE_UNKNOWN
 
     @property
     def icon(self):
+        """Return the icon of the sensor."""
         return {
             "running": "mdi:docker",
             "exited": "mdi:close-circle",
             "paused": "mdi:pause-circle",
-        }.get(self._state, "mdi:help-circle")
+        }.get(self.state, "mdi:help-circle")
 
-    async def async_update(self):
-        """Update the container status."""
-        try:
-            container_info = await self._api.get_container_info(self._endpoint_id, self._container_id)
-            if container_info:
-                self._state = container_info.get("State", {}).get("Status", STATE_UNKNOWN)
-            else:
-                self._state = STATE_UNKNOWN
-        except Exception as e:
-            _LOGGER.warning("Failed to get status for %s: %s", self._attr_name, e)
-            self._state = STATE_UNKNOWN
-
-class ContainerCPUSensor(BaseContainerSensor):
+class ContainerCPUSensor(BaseContainerEntity, SensorEntity):
     """Sensor for container CPU usage."""
 
-    def __init__(self, container_name, container_id, api, endpoint_id, stack_info, entry_id):
-        super().__init__(container_name, container_id, api, endpoint_id, stack_info, entry_id)
-        self._attr_unique_id = _get_stable_entity_id(entry_id, endpoint_id, container_name, stack_info, "cpu_usage")
-        # Improve naming for stack containers
-        if stack_info.get("is_stack_container"):
-            stack_name = stack_info.get("stack_name", "unknown")
-            service_name = stack_info.get("service_name", container_name)
-            self._attr_name = f"CPU {service_name} ({stack_name})"
-        else:
-            self._attr_name = f"CPU {container_name}"
+    @property
+    def entity_type(self) -> str:
+        return "cpu_usage"
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        display_name = self._get_container_name_display()
+        return f"CPU {display_name}"
 
     @property
     def state(self):
-        return self._state
+        """Return the state of the sensor."""
+        # This will be updated by the coordinator
+        return getattr(self, '_state', STATE_UNKNOWN)
 
     @property
     def unit_of_measurement(self):
@@ -232,40 +103,44 @@ class ContainerCPUSensor(BaseContainerSensor):
         return "mdi:cpu-64-bit"
 
     async def async_update(self):
-        stats = await self._api.get_container_stats(self._endpoint_id, self._container_id)
+        """Update the sensor state."""
         try:
-            cpu_usage = stats["cpu_stats"]["cpu_usage"]["total_usage"]
-            precpu_usage = stats["precpu_stats"]["cpu_usage"]["total_usage"]
-            system_cpu = stats["cpu_stats"]["system_cpu_usage"]
-            pre_system_cpu = stats["precpu_stats"]["system_cpu_usage"]
+            stats = await self.coordinator.api.get_container_stats(self.coordinator.endpoint_id, self.container_id)
+            if stats:
+                cpu_usage = stats["cpu_stats"]["cpu_usage"]["total_usage"]
+                precpu_usage = stats["precpu_stats"]["cpu_usage"]["total_usage"]
+                system_cpu = stats["cpu_stats"]["system_cpu_usage"]
+                pre_system_cpu = stats["precpu_stats"]["system_cpu_usage"]
 
-            cpu_delta = cpu_usage - precpu_usage
-            system_delta = system_cpu - pre_system_cpu
-            cpu_count = stats.get("cpu_stats", {}).get("online_cpus", 1)
+                cpu_delta = cpu_usage - precpu_usage
+                system_delta = system_cpu - pre_system_cpu
+                cpu_count = stats.get("cpu_stats", {}).get("online_cpus", 1)
 
-            usage = (cpu_delta / system_delta) * cpu_count * 100.0 if system_delta > 0 else 0
-            self._state = round(usage, 2)
+                usage = (cpu_delta / system_delta) * cpu_count * 100.0 if system_delta > 0 else 0
+                self._state = round(usage, 2)
+            else:
+                self._state = STATE_UNKNOWN
         except Exception as e:
-            _LOGGER.warning("Failed to parse CPU stats for %s: %s", self._attr_name, e)
+            _LOGGER.warning("Failed to parse CPU stats for %s: %s", self.name, e)
             self._state = STATE_UNKNOWN
 
-class ContainerMemorySensor(BaseContainerSensor):
+class ContainerMemorySensor(BaseContainerEntity, SensorEntity):
     """Sensor for container memory usage."""
 
-    def __init__(self, container_name, container_id, api, endpoint_id, stack_info, entry_id):
-        super().__init__(container_name, container_id, api, endpoint_id, stack_info, entry_id)
-        self._attr_unique_id = _get_stable_entity_id(entry_id, endpoint_id, container_name, stack_info, "memory_usage")
-        # Improve naming for stack containers
-        if stack_info.get("is_stack_container"):
-            stack_name = stack_info.get("stack_name", "unknown")
-            service_name = stack_info.get("service_name", container_name)
-            self._attr_name = f"Memory {service_name} ({stack_name})"
-        else:
-            self._attr_name = f"Memory {container_name}"
+    @property
+    def entity_type(self) -> str:
+        return "memory_usage"
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        display_name = self._get_container_name_display()
+        return f"Memory {display_name}"
 
     @property
     def state(self):
-        return self._state
+        """Return the state of the sensor."""
+        return getattr(self, '_state', STATE_UNKNOWN)
 
     @property
     def unit_of_measurement(self):
@@ -276,136 +151,144 @@ class ContainerMemorySensor(BaseContainerSensor):
         return "mdi:memory"
 
     async def async_update(self):
-        stats = await self._api.get_container_stats(self._endpoint_id, self._container_id)
+        """Update the sensor state."""
         try:
-            mem_bytes = stats["memory_stats"]["usage"]
-            self._state = round(mem_bytes / (1024 * 1024), 2)
+            stats = await self.coordinator.api.get_container_stats(self.coordinator.endpoint_id, self.container_id)
+            if stats:
+                mem_bytes = stats["memory_stats"]["usage"]
+                self._state = round(mem_bytes / (1024 * 1024), 2)
+            else:
+                self._state = STATE_UNKNOWN
         except Exception as e:
-            _LOGGER.warning("Failed to parse memory stats for %s: %s", self._attr_name, e)
+            _LOGGER.warning("Failed to parse memory stats for %s: %s", self.name, e)
             self._state = STATE_UNKNOWN
 
-class ContainerUptimeSensor(BaseContainerSensor):
+class ContainerUptimeSensor(BaseContainerEntity, SensorEntity):
     """Sensor for container uptime."""
 
-    def __init__(self, container_name, container_id, api, endpoint_id, stack_info, entry_id):
-        super().__init__(container_name, container_id, api, endpoint_id, stack_info, entry_id)
-        self._attr_unique_id = _get_stable_entity_id(entry_id, endpoint_id, container_name, stack_info, "uptime")
-        # Improve naming for stack containers
-        if stack_info.get("is_stack_container"):
-            stack_name = stack_info.get("stack_name", "unknown")
-            service_name = stack_info.get("service_name", container_name)
-            self._attr_name = f"Uptime {service_name} ({stack_name})"
-        else:
-            self._attr_name = f"Uptime {container_name}"
+    @property
+    def entity_type(self) -> str:
+        return "uptime"
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        display_name = self._get_container_name_display()
+        return f"Uptime {display_name}"
 
     @property
     def state(self):
-        return self._state
+        """Return the state of the sensor."""
+        return getattr(self, '_state', STATE_UNKNOWN)
 
     @property
     def icon(self):
         return "mdi:clock-outline"
 
     async def async_update(self):
-        container_info = await self._api.get_container_info(self._endpoint_id, self._container_id)
+        """Update the sensor state."""
         try:
-            started_at = container_info["State"]["StartedAt"]
-            if started_at and started_at != "0001-01-01T00:00:00Z":
-                # Convert ISO timestamp to human readable format
-                from datetime import datetime
-                try:
-                    dt = datetime.fromisoformat(started_at.replace('Z', '+00:00'))
-                    # Format as relative time (e.g., "2 days ago")
-                    from datetime import timezone
-                    now = datetime.now(timezone.utc)
-                    diff = now - dt.replace(tzinfo=timezone.utc)
-                    
-                    if diff.days > 0:
-                        self._state = f"{diff.days} days ago"
-                    elif diff.seconds > 3600:
-                        hours = diff.seconds // 3600
-                        self._state = f"{hours} hours ago"
-                    elif diff.seconds > 60:
-                        minutes = diff.seconds // 60
-                        self._state = f"{minutes} minutes ago"
-                    else:
-                        self._state = "Just started"
-                except:
-                    # Fallback to original format if parsing fails
-                    self._state = started_at
+            container_info = await self.coordinator.api.get_container_info(self.coordinator.endpoint_id, self.container_id)
+            if container_info:
+                started_at = container_info["State"]["StartedAt"]
+                if started_at and started_at != "0001-01-01T00:00:00Z":
+                    # Convert ISO timestamp to human readable format
+                    from datetime import datetime
+                    try:
+                        dt = datetime.fromisoformat(started_at.replace('Z', '+00:00'))
+                        # Format as relative time (e.g., "2 days ago")
+                        from datetime import timezone
+                        now = datetime.now(timezone.utc)
+                        diff = now - dt.replace(tzinfo=timezone.utc)
+                        
+                        if diff.days > 0:
+                            self._state = f"{diff.days} days ago"
+                        elif diff.seconds > 3600:
+                            hours = diff.seconds // 3600
+                            self._state = f"{hours} hours ago"
+                        elif diff.seconds > 60:
+                            minutes = diff.seconds // 60
+                            self._state = f"{minutes} minutes ago"
+                        else:
+                            self._state = "Just started"
+                    except:
+                        # Fallback to original format if parsing fails
+                        self._state = started_at
+                else:
+                    self._state = "Not started"
             else:
-                self._state = "Not started"
+                self._state = STATE_UNKNOWN
         except Exception as e:
-            _LOGGER.warning("Failed to get uptime for %s: %s", self._attr_name, e)
+            _LOGGER.warning("Failed to get uptime for %s: %s", self.name, e)
             self._state = STATE_UNKNOWN
 
-class ContainerImageSensor(BaseContainerSensor):
+class ContainerImageSensor(BaseContainerEntity, SensorEntity):
     """Sensor for container image."""
 
-    def __init__(self, container_name, container_id, api, endpoint_id, stack_info, entry_id):
-        super().__init__(container_name, container_id, api, endpoint_id, stack_info, entry_id)
-        self._attr_unique_id = _get_stable_entity_id(entry_id, endpoint_id, container_name, stack_info, "image")
-        # Improve naming for stack containers
-        if stack_info.get("is_stack_container"):
-            stack_name = stack_info.get("stack_name", "unknown")
-            service_name = stack_info.get("service_name", container_name)
-            self._attr_name = f"Image {service_name} ({stack_name})"
-        else:
-            self._attr_name = f"Image {container_name}"
+    @property
+    def entity_type(self) -> str:
+        return "image"
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        display_name = self._get_container_name_display()
+        return f"Image {display_name}"
 
     @property
     def state(self):
-        return self._state
+        """Return the state of the sensor."""
+        return getattr(self, '_state', STATE_UNKNOWN)
 
     @property
     def icon(self):
         return "mdi:docker"
 
     async def async_update(self):
-        """Update the container image information."""
+        """Update the sensor state."""
         try:
-            container_info = await self._api.get_container_info(self._endpoint_id, self._container_id)
+            container_info = await self.coordinator.api.get_container_info(self.coordinator.endpoint_id, self.container_id)
             if container_info:
                 self._state = container_info.get("Config", {}).get("Image", STATE_UNKNOWN)
             else:
                 self._state = STATE_UNKNOWN
         except Exception as e:
-            _LOGGER.warning("Failed to get image for %s: %s", self._attr_name, e)
+            _LOGGER.warning("Failed to get image for %s: %s", self.name, e)
             self._state = STATE_UNKNOWN
 
-
-class ContainerCurrentVersionSensor(BaseContainerSensor):
+class ContainerCurrentVersionSensor(BaseContainerEntity, SensorEntity):
     """Sensor for container current version."""
 
-    def __init__(self, container_name, container_id, api, endpoint_id, stack_info, entry_id):
-        super().__init__(container_name, container_id, api, endpoint_id, stack_info, entry_id)
-        self._attr_unique_id = _get_stable_entity_id(entry_id, endpoint_id, container_name, stack_info, "current_version")
-        # Improve naming for stack containers
-        if stack_info.get("is_stack_container"):
-            stack_name = stack_info.get("stack_name", "unknown")
-            service_name = stack_info.get("service_name", container_name)
-            self._attr_name = f"Version {service_name} ({stack_name})"
-        else:
-            self._attr_name = f"Version {container_name}"
+    @property
+    def entity_type(self) -> str:
+        return "current_version"
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        display_name = self._get_container_name_display()
+        return f"Version {display_name}"
 
     @property
     def state(self):
-        return self._state
+        """Return the state of the sensor."""
+        return getattr(self, '_state', STATE_UNKNOWN)
 
     @property
     def icon(self):
         return "mdi:tag-text"
 
     async def async_update(self):
+        """Update the sensor state."""
         try:
-            container_info = await self._api.get_container_info(self._endpoint_id, self._container_id)
+            container_info = await self.coordinator.api.get_container_info(self.coordinator.endpoint_id, self.container_id)
             if container_info:
                 image_id = container_info.get("Image")
                 if image_id:
                     # Get image details to extract version info
-                    image_data = await self._api.get_image_info(self._endpoint_id, image_id)
+                    image_data = await self.coordinator.api.get_image_info(self.coordinator.endpoint_id, image_id)
                     if image_data:
-                        version = self._api.extract_version_from_image(image_data)
+                        version = self.coordinator.api.extract_version_from_image(image_data)
                         self._state = version
                     else:
                         self._state = STATE_UNKNOWN
@@ -414,45 +297,45 @@ class ContainerCurrentVersionSensor(BaseContainerSensor):
             else:
                 self._state = STATE_UNKNOWN
         except Exception as e:
-            _LOGGER.warning("Failed to get current version for %s: %s", self._attr_name, e)
+            _LOGGER.warning("Failed to get current version for %s: %s", self.name, e)
             self._state = STATE_UNKNOWN
 
-
-class ContainerAvailableVersionSensor(BaseContainerSensor):
+class ContainerAvailableVersionSensor(BaseContainerEntity, SensorEntity):
     """Sensor for container available version."""
 
-    def __init__(self, container_name, container_id, api, endpoint_id, stack_info, entry_id):
-        super().__init__(container_name, container_id, api, endpoint_id, stack_info, entry_id)
-        self._attr_unique_id = _get_stable_entity_id(entry_id, endpoint_id, container_name, stack_info, "available_version")
-        # Improve naming for stack containers
-        if stack_info.get("is_stack_container"):
-            stack_name = stack_info.get("stack_name", "unknown")
-            service_name = stack_info.get("service_name", container_name)
-            self._attr_name = f"Available {service_name} ({stack_name})"
-        else:
-            self._attr_name = f"Available {container_name}"
+    @property
+    def entity_type(self) -> str:
+        return "available_version"
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        display_name = self._get_container_name_display()
+        return f"Available {display_name}"
 
     @property
     def state(self):
-        return self._state
+        """Return the state of the sensor."""
+        return getattr(self, '_state', STATE_UNKNOWN)
 
     @property
     def icon(self):
         return "mdi:tag-plus"
 
     async def async_update(self):
+        """Update the sensor state."""
         try:
-            container_info = await self._api.get_container_info(self._endpoint_id, self._container_id)
+            container_info = await self.coordinator.api.get_container_info(self.coordinator.endpoint_id, self.container_id)
             if container_info:
                 image_name = container_info.get("Config", {}).get("Image")
                 if image_name:
                     # Get available version from registry
-                    available_version = await self._api.get_available_version(self._endpoint_id, image_name)
+                    available_version = await self.coordinator.api.get_available_version(self.coordinator.endpoint_id, image_name)
                     self._state = available_version
                 else:
                     self._state = STATE_UNKNOWN
             else:
                 self._state = STATE_UNKNOWN
         except Exception as e:
-            _LOGGER.warning("Failed to get available version for %s: %s", self._attr_name, e)
+            _LOGGER.warning("Failed to get available version for %s: %s", self.name, e)
             self._state = STATE_UNKNOWN
