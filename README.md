@@ -5,20 +5,25 @@ A Home Assistant custom integration to manage Docker containers via Portainer AP
 ## Features
 
 - **Container Status Monitoring**: Real-time status, CPU, memory, and uptime sensors
-- **Update Management**: Detect available updates and pull new images
-- **Container Control**: Start, stop, and restart containers
+- **Container Control**: Start, stop, and restart containers with automatic state synchronization
 - **Stack Management**: Manage Docker Compose stacks with dedicated controls (start, stop, force update)
+- **Stack Clustering**: Automatic grouping of stack containers under unified devices
 - **Version Tracking**: Monitor current and available versions of container images
+- **Update Detection**: Smart update availability detection with conservative rate limiting
 - **Multi-Instance Support**: Manage multiple Portainer instances from a single Home Assistant installation
+- **Rate Limit Protection**: Smart caching and API call optimization to avoid Docker Hub rate limits
 
-### Stack Force Update
-The integration now includes a "Stack Force Update" button that performs a complete stack update with:
-- Force pulling of latest images from the registry
-- Redeployment of all containers in the stack
-- Cleanup of unused images (prune)
-- Proper handling of Docker Compose stack lifecycle
+### Stack Clustering
+The integration automatically detects and groups containers that belong to Docker Compose stacks:
+- **Stack Containers**: Grouped under a single "Stack: StackName" device
+- **Standalone Containers**: Each container gets its own device
+- **Automatic Detection**: Uses Docker Compose labels to identify stack membership
+- **Stable Entity IDs**: Entities maintain their identity even when containers are recreated
 
-This feature is particularly useful for stacks that need to be updated with the latest images without manual intervention.
+### Container State Synchronization
+- **Real-time Updates**: Container switches automatically reflect current state
+- **Stack Operations**: Starting/stopping stacks updates all related container switches
+- **Coordinator Pattern**: Efficient data fetching and caching for optimal performance
 
 ## Installation
 
@@ -39,17 +44,16 @@ This feature is particularly useful for stacks that need to be updated with the 
 
 ## Troubleshooting
 
-### Duplicate Stack Devices
-If you see duplicate stack devices (e.g., "Stack: wekan (192.168.0.105)" appearing twice), this usually indicates you have multiple configuration entries for the same Portainer instance.
+### Docker Hub Rate Limits
+The integration includes built-in protection against Docker Hub rate limits:
+- **Conservative Rate Limiting**: Maximum 50 checks per 6 hours (well under the 100 limit for anonymous users)
+- **Smart Caching**: Results are cached for 6 hours to minimize API calls
+- **Update Detection**: Re-enabled with proper rate limiting and caching
+- **Automatic Fallback**: Uses cached results when rate limits are reached
+- **Manual Updates**: Pull update buttons still work when manually triggered
 
-**Solution:**
-1. Go to **Settings** → **Devices & Services**
-2. Look for multiple "HA Portainer Link" entries
-3. Remove the duplicate configuration entries, keeping only one per Portainer instance
-4. Restart Home Assistant
-
-### Containers Appearing as Standalone When They Should Be in Stacks
-If containers that are part of a Docker Compose stack are appearing as standalone devices instead of being grouped under a stack device, this indicates a stack detection issue.
+### Stack Clustering Issues
+If containers that are part of a Docker Compose stack are appearing as standalone devices:
 
 **Diagnosis:**
 1. Enable debug logging for the integration:
@@ -73,6 +77,22 @@ If containers that are part of a Docker Compose stack are appearing as standalon
 2. Check that containers are properly deployed via Docker Compose
 3. Ensure the `com.docker.compose.project` label is present on stack containers
 
+### Container State Not Updating
+If container switches don't reflect the current state after stack operations:
+
+**Solution:**
+1. The integration now automatically refreshes data after operations
+2. Small delays are built-in to ensure data propagation
+3. Check logs for coordinator refresh messages
+
+### Duplicate Stack Devices
+If you see duplicate stack devices, this usually indicates multiple configuration entries for the same Portainer instance.
+
+**Solution:**
+1. Go to **Settings** → **Devices & Services**
+2. Look for multiple "HA Portainer Link" entries
+3. Remove the duplicate configuration entries, keeping only one per Portainer instance
+4. Restart Home Assistant
 
 To enable detailed logging, add to your `configuration.yaml`:
 ```yaml
@@ -82,12 +102,25 @@ logger:
 
 ## Roadmap
 
+- [ ] Docker Hub API integration for update detection
 - [ ] Additional sensors (disk usage, network statistics)
 - [ ] Service calls for container management
 - [ ] Auto dashboard creation
 - [ ] HACS default store integration
 
 ## Recent Updates
+
+### Version 0.3.0 (Current)
+- ✅ **Major Architectural Refactoring**: Implemented Home Assistant DataUpdateCoordinator pattern
+- ✅ **Modular API Design**: Split monolithic API into specialized classes (Auth, Container, Stack, Image)
+- ✅ **Base Entity Classes**: Reduced code duplication with shared base classes
+- ✅ **Improved Stack Clustering**: Enhanced stack detection and device grouping
+- ✅ **Conservative Rate Limiting**: Smart rate limiting with 50 checks per 6 hours (well under Docker Hub limits)
+- ✅ **Update Detection Re-enabled**: Update availability sensors now work with proper rate limiting
+- ✅ **Container State Synchronization**: Automatic state updates after stack operations
+- ✅ **Enhanced Error Handling**: Better validation and user feedback
+- ✅ **Optimized Update Frequency**: 5-minute intervals for good balance between responsiveness and rate limiting
+- ✅ **6-Hour Caching**: Extended cache duration to minimize API calls
 
 ### Version 0.2.10
 - ✅ **Re-enabled Update Detection**: Binary sensors for update availability are now active again

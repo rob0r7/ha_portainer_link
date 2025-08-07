@@ -69,6 +69,7 @@ class ContainerUpdateAvailableSensor(BaseContainerEntity, BinarySensorEntity):
     async def async_update(self):
         """Update the update availability status."""
         try:
+            # Now enabled with conservative rate limiting (max 50 checks per 6 hours)
             has_update = await self.coordinator.api.check_image_updates(self.coordinator.endpoint_id, self.container_id)
             self._attr_is_on = has_update
         except Exception as e:

@@ -18,7 +18,7 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
             hass,
             _LOGGER,
             name=f"portainer_data_{endpoint_id}",
-            update_interval=timedelta(seconds=30),
+            update_interval=timedelta(minutes=5),  # 5 minutes - good balance between responsiveness and rate limiting
         )
         self.api = api
         self.endpoint_id = endpoint_id

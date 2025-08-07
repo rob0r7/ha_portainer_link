@@ -1,6 +1,7 @@
 import logging
 import aiohttp
 from typing import Optional, Dict, Any
+import time
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -13,7 +14,7 @@ class PortainerImageAPI:
         self.auth = auth
 
     async def check_image_updates(self, endpoint_id: int, container_id: str) -> bool:
-        """Check if a container's image has updates available by actually pulling from registry."""
+        """Check if a container's image has updates available with conservative rate limiting."""
         try:
             # Get container inspection data
             container_info = await self._get_container_info(endpoint_id, container_id)
@@ -46,11 +47,43 @@ class PortainerImageAPI:
             
             _LOGGER.debug("Current image digest: %s", current_digest[:12] if current_digest else "unknown")
             
-            # Try to pull the latest image from registry
+            # Check if we have a cached result for this image
+            cache_key = f"{image_name}_{current_digest[:12]}"
+            if hasattr(self, '_update_cache') and cache_key in self._update_cache:
+                cached_result, cache_time = self._update_cache[cache_key]
+                # Cache for 6 hours to stay well under rate limits (conservative approach)
+                if (time.time() - cache_time) < 21600:  # 6 hours
+                    _LOGGER.debug("Using cached update check result for %s: %s", image_name, cached_result)
+                    return cached_result
+            
+            # Check if we've made too many API calls recently (rate limiting)
+            if hasattr(self, '_last_update_check') and hasattr(self, '_update_check_count'):
+                current_time = time.time()
+                # Reset counter if 6 hours have passed
+                if (current_time - self._last_update_check) > 21600:  # 6 hours
+                    self._update_check_count = 0
+                    self._last_update_check = current_time
+                
+                # Conservative limit: max 50 checks per 6 hours (well under 100 limit)
+                if self._update_check_count >= 50:
+                    _LOGGER.debug("Rate limit reached for update checks, using cached result for %s", image_name)
+                    # Return cached result or False if no cache
+                    if cache_key in self._update_cache:
+                        return self._update_cache[cache_key][0]
+                    return False
+            else:
+                # Initialize rate limiting
+                self._last_update_check = time.time()
+                self._update_check_count = 0
+            
+            # Increment counter
+            self._update_check_count += 1
+            
+            # Try to pull the latest image from registry (this is the rate-limited operation)
             pull_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/create"
             params = {"fromImage": image_name}
             
-            _LOGGER.debug("📥 Pulling latest image from registry: %s", image_name)
+            _LOGGER.debug("📥 Pulling latest image from registry: %s (check #%d)", image_name, self._update_check_count)
             async with self.auth.session.post(pull_url, headers=self.auth.get_headers(), params=params, ssl=False) as resp:
                 if resp.status == 200:
                     _LOGGER.debug("✅ Successfully pulled image from registry")
@@ -74,20 +107,21 @@ class PortainerImageAPI:
                                                current_digest[:12] if current_digest else "unknown",
                                                new_digest[:12] if new_digest else "unknown")
                                     
-                                    # If we found a different digest, there's an update
-                                    if has_update:
-                                        _LOGGER.info("✅ Update available for %s: digest changed from %s to %s", 
-                                                   image_name, 
-                                                   current_digest[:12] if current_digest else "unknown",
-                                                   new_digest[:12] if new_digest else "unknown")
-                                    else:
-                                        _LOGGER.info("ℹ️ No update available for %s: same digest %s", 
-                                                   image_name, 
-                                                   current_digest[:12] if current_digest else "unknown")
+                                    # Cache the result for 6 hours
+                                    if not hasattr(self, '_update_cache'):
+                                        self._update_cache = {}
+                                    self._update_cache[cache_key] = (has_update, time.time())
                                     
                                     return has_update
                     
                     _LOGGER.warning("⚠️ Could not find image %s after pull", image_name)
+                    return False
+                elif resp.status == 429:
+                    _LOGGER.warning("⚠️ Rate limit exceeded for registry %s - will cache False result", image_name.split('/')[0])
+                    # Cache False result for 6 hours when rate limited
+                    if not hasattr(self, '_update_cache'):
+                        self._update_cache = {}
+                    self._update_cache[cache_key] = (False, time.time())
                     return False
                 elif resp.status == 401:
                     _LOGGER.warning("⚠️ Authentication required for registry %s", image_name.split('/')[0])
@@ -97,9 +131,6 @@ class PortainerImageAPI:
                     return False
                 elif resp.status == 404:
                     _LOGGER.warning("⚠️ Image %s not found in registry", image_name)
-                    return False
-                elif resp.status == 429:
-                    _LOGGER.warning("⚠️ Rate limit exceeded for registry %s", image_name.split('/')[0])
                     return False
                 elif resp.status == 500:
                     _LOGGER.warning("⚠️ Registry server error for %s", image_name)
@@ -201,9 +232,41 @@ class PortainerImageAPI:
             return "unknown"
 
     async def get_available_version(self, endpoint_id: int, image_name: str) -> str:
-        """Get the available version from the registry."""
+        """Get the available version from the registry with conservative rate limiting."""
         try:
             _LOGGER.debug("🔍 Checking available version for %s", image_name)
+            
+            # Check if we have a cached result for this image
+            cache_key = f"version_{image_name}"
+            if hasattr(self, '_version_cache') and cache_key in self._version_cache:
+                cached_result, cache_time = self._version_cache[cache_key]
+                # Cache for 6 hours to stay well under rate limits (conservative approach)
+                if (time.time() - cache_time) < 21600:  # 6 hours
+                    _LOGGER.debug("Using cached version result for %s: %s", image_name, cached_result)
+                    return cached_result
+            
+            # Check if we've made too many API calls recently (rate limiting)
+            if hasattr(self, '_last_version_check') and hasattr(self, '_version_check_count'):
+                current_time = time.time()
+                # Reset counter if 6 hours have passed
+                if (current_time - self._last_version_check) > 21600:  # 6 hours
+                    self._version_check_count = 0
+                    self._last_version_check = current_time
+                
+                # Conservative limit: max 50 checks per 6 hours (well under 100 limit)
+                if self._version_check_count >= 50:
+                    _LOGGER.debug("Rate limit reached for version checks, using cached result for %s", image_name)
+                    # Return cached result or "unknown" if no cache
+                    if cache_key in self._version_cache:
+                        return self._version_cache[cache_key][0]
+                    return "unknown (rate limited)"
+            else:
+                # Initialize rate limiting
+                self._last_version_check = time.time()
+                self._version_check_count = 0
+            
+            # Increment counter
+            self._version_check_count += 1
             
             # First, try to get the current image info without pulling
             images_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/json"
@@ -216,10 +279,16 @@ class PortainerImageAPI:
                         if image_name in repo_tags:
                             version = self.extract_version_from_image(image)
                             _LOGGER.debug("✅ Found existing image %s: %s", image_name, version)
+                            
+                            # Cache the result for 6 hours
+                            if not hasattr(self, '_version_cache'):
+                                self._version_cache = {}
+                            self._version_cache[cache_key] = (version, time.time())
+                            
                             return version
             
-            # If not found locally, try to pull from registry
-            _LOGGER.debug("🔄 Image %s not found locally, pulling from registry", image_name)
+            # If not found locally, try to pull from registry (rate-limited operation)
+            _LOGGER.debug("🔄 Image %s not found locally, pulling from registry (check #%d)", image_name, self._version_check_count)
             pull_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/create"
             params = {"fromImage": image_name}
             
@@ -237,34 +306,42 @@ class PortainerImageAPI:
                                 if image_name in repo_tags:
                                     version = self.extract_version_from_image(image)
                                     _LOGGER.debug("✅ Available version for %s: %s", image_name, version)
+                                    
+                                    # Cache the result for 6 hours
+                                    if not hasattr(self, '_version_cache'):
+                                        self._version_cache = {}
+                                    self._version_cache[cache_key] = (version, time.time())
+                                    
                                     return version
                     
                     _LOGGER.warning("⚠️ Could not find image %s after pull", image_name)
-                    return "unknown (not found after pull)"
+                    result = "unknown (not found after pull)"
+                elif resp.status == 429:
+                    _LOGGER.warning("⚠️ Rate limit exceeded for registry %s - will cache unknown result", image_name.split('/')[0])
+                    result = "unknown (rate limited)"
                 elif resp.status == 401:
                     _LOGGER.warning("⚠️ Authentication required for registry %s", image_name.split('/')[0])
-                    return "unknown (auth required)"
+                    result = "unknown (auth required)"
                 elif resp.status == 403:
                     _LOGGER.warning("⚠️ Access forbidden for registry %s", image_name.split('/')[0])
-                    return "unknown (access forbidden)"
+                    result = "unknown (access forbidden)"
                 elif resp.status == 404:
                     _LOGGER.warning("⚠️ Image %s not found in registry", image_name)
-                    return "unknown (not in registry)"
-                elif resp.status == 429:
-                    _LOGGER.warning("⚠️ Rate limit exceeded for registry %s", image_name.split('/')[0])
-                    return "unknown (rate limited)"
+                    result = "unknown (not in registry)"
                 elif resp.status == 500:
                     _LOGGER.warning("⚠️ Registry server error for %s", image_name)
-                    return "unknown (registry error)"
+                    result = "unknown (registry error)"
                 else:
                     _LOGGER.warning("⚠️ Failed to pull image %s: HTTP %s", image_name, resp.status)
-                    return f"unknown (HTTP {resp.status})"
-        except aiohttp.ClientConnectorError as e:
-            _LOGGER.warning("⚠️ Network error connecting to registry for %s: %s", image_name, e)
-            return "unknown (network error)"
-        except aiohttp.ClientTimeout as e:
-            _LOGGER.warning("⚠️ Timeout connecting to registry for %s: %s", image_name, e)
-            return "unknown (timeout)"
+                    result = f"unknown (HTTP {resp.status})"
+            
+            # Cache the result for 6 hours
+            if not hasattr(self, '_version_cache'):
+                self._version_cache = {}
+            self._version_cache[cache_key] = (result, time.time())
+            
+            return result
+            
         except Exception as e:
             _LOGGER.warning("⚠️ Error getting available version for %s: %s", image_name, e)
             return "unknown (error)"
