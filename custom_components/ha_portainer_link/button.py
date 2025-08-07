@@ -32,10 +32,15 @@ async def async_setup_entry(hass, entry, async_add_entities):
     for container_id, container_data in coordinator.containers.items():
         container_name = container_data.get("Names", ["unknown"])[0].strip("/")
         
-        # Get stack information
-        stack_info = coordinator.get_container_stack_info(container_data)
+        # Get detailed stack information from coordinator's processed data
+        stack_info = coordinator.get_container_stack_info(container_id) or {
+            "stack_name": None,
+            "service_name": None,
+            "container_number": None,
+            "is_stack_container": False
+        }
         
-        _LOGGER.debug("🔍 Processing container: %s (ID: %s)", container_name, container_id)
+        _LOGGER.debug("🔍 Processing container: %s (ID: %s, Stack: %s)", container_name, container_id, stack_info.get("stack_name"))
         
         # Create individual container buttons for all containers
         buttons.append(RestartContainerButton(coordinator, entry_id, container_id, container_name, stack_info))
@@ -77,7 +82,15 @@ class RestartContainerButton(BaseContainerEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Restart the Docker container."""
-        await self.coordinator.api.restart_container(self.coordinator.endpoint_id, self.container_id)
+        try:
+            success = await self.coordinator.api.restart_container(self.coordinator.endpoint_id, self.container_id)
+            if success:
+                # Trigger coordinator refresh to update all entities
+                await self.coordinator.async_request_refresh()
+                # Small delay to ensure data is updated
+                await asyncio.sleep(1)
+        except Exception as e:
+            _LOGGER.error("Failed to restart container %s: %s", self.container_name, e)
 
     async def async_update(self):
         """Update the button status."""
@@ -144,23 +157,10 @@ class PullUpdateButton(BaseContainerEntity, ButtonEntity):
                     _LOGGER.info("✅ Container recreated successfully to use new image")
                     await self._send_notification("✅ Update Complete", f"Successfully updated and recreated {self.container_name}")
                     
-                    # Wait longer for the container to fully start and Docker to update image info
-                    _LOGGER.info("⏳ Waiting for container to fully start and image info to update...")
-                    await asyncio.sleep(10)
+                    # Trigger coordinator refresh to update all entities
+                    await self.coordinator.async_request_refresh()
                     
-                    # First refresh attempt
-                    _LOGGER.info("🔄 First sensor refresh attempt...")
-                    await self._refresh_all_sensors()
-                    
-                    # Wait a bit more and refresh again to ensure we get the latest data
-                    _LOGGER.info("⏳ Waiting additional time for Docker to update container info...")
-                    await asyncio.sleep(5)
-                    
-                    # Second refresh attempt
-                    _LOGGER.info("🔄 Second sensor refresh attempt...")
-                    await self._refresh_all_sensors()
-                    
-                    _LOGGER.info("✅ All sensor refresh attempts completed for %s", self.container_name)
+                    _LOGGER.info("✅ All entities updated for %s", self.container_name)
                 else:
                     _LOGGER.warning("⚠️ Image pulled but container recreation failed")
                     await self._send_notification("⚠️ Update Partial", f"Image pulled for {self.container_name} but recreation failed")
@@ -335,6 +335,10 @@ class StackStopButton(BaseStackEntity, ButtonEntity):
             if success:
                 _LOGGER.info("✅ SUCCESS: Successfully stopped stack %s", self.stack_name)
                 await self._send_notification("✅ Stack Stopped", f"Successfully stopped stack {self.stack_name}")
+                # Trigger coordinator refresh to update all container switches
+                await self.coordinator.async_request_refresh()
+                # Small delay to ensure data is updated
+                await asyncio.sleep(2)
             else:
                 _LOGGER.error("❌ FAILED: Failed to stop stack %s", self.stack_name)
                 await self._send_notification("❌ Stack Stop Failed", f"Failed to stop stack {self.stack_name}")
@@ -406,6 +410,10 @@ class StackStartButton(BaseStackEntity, ButtonEntity):
             if success:
                 _LOGGER.info("✅ SUCCESS: Successfully started stack %s", self.stack_name)
                 await self._send_notification("✅ Stack Started", f"Successfully started stack {self.stack_name}")
+                # Trigger coordinator refresh to update all container switches
+                await self.coordinator.async_request_refresh()
+                # Small delay to ensure data is updated
+                await asyncio.sleep(2)
             else:
                 _LOGGER.error("❌ FAILED: Failed to start stack %s", self.stack_name)
                 await self._send_notification("❌ Stack Start Failed", f"Failed to start stack {self.stack_name}")
@@ -480,6 +488,10 @@ class StackUpdateButton(BaseStackEntity, ButtonEntity):
             if success:
                 _LOGGER.info("✅ SUCCESS: Successfully force updated stack %s", self.stack_name)
                 await self._send_notification("✅ Stack Force Updated", f"Successfully force updated stack {self.stack_name} with image pulling and redeployment")
+                # Trigger coordinator refresh to update all container switches
+                await self.coordinator.async_request_refresh()
+                # Small delay to ensure data is updated
+                await asyncio.sleep(2)
             else:
                 _LOGGER.error("❌ FAILED: Failed to force update stack %s", self.stack_name)
                 await self._send_notification("❌ Stack Force Update Failed", f"Failed to force update stack {self.stack_name}. Check Home Assistant logs for details.")

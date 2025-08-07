@@ -27,10 +27,15 @@ async def async_setup_entry(hass, entry, async_add_entities):
     for container_id, container_data in coordinator.containers.items():
         container_name = container_data.get("Names", ["unknown"])[0].strip("/")
         
-        # Get stack information
-        stack_info = coordinator.get_container_stack_info(container_data)
+        # Get detailed stack information from coordinator's processed data
+        stack_info = coordinator.get_container_stack_info(container_id) or {
+            "stack_name": None,
+            "service_name": None,
+            "container_number": None,
+            "is_stack_container": False
+        }
         
-        _LOGGER.debug("🔍 Processing container: %s (ID: %s)", container_name, container_id)
+        _LOGGER.debug("🔍 Processing container: %s (ID: %s, Stack: %s)", container_name, container_id, stack_info.get("stack_name"))
         
         # Create binary sensor for this container
         entities.append(ContainerUpdateAvailableSensor(coordinator, entry_id, container_id, container_name, stack_info))

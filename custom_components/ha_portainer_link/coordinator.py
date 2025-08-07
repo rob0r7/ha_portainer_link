@@ -25,6 +25,7 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
         self.containers: Dict[str, Dict[str, Any]] = {}
         self.stacks: Dict[str, Dict[str, Any]] = {}
         self.container_stack_map: Dict[str, str] = {}  # container_id -> stack_name
+        self.container_stack_info: Dict[str, Dict[str, Any]] = {}  # container_id -> detailed stack info
 
     async def _async_update_data(self) -> Dict[str, Any]:
         """Update container and stack data."""
@@ -40,25 +41,47 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
             # Process containers
             self.containers = {}
             self.container_stack_map = {}
+            self.container_stack_info = {}
+            
+            stack_containers_count = 0
+            standalone_containers_count = 0
             
             for container in containers:
                 container_id = container["Id"]
+                container_name = container.get("Names", ["unknown"])[0].strip("/")
                 self.containers[container_id] = container
                 
                 # Get stack information for each container
                 container_info = await self.api.inspect_container(self.endpoint_id, container_id)
                 if container_info:
                     stack_info = self.api.get_container_stack_info(container_info)
+                    self.container_stack_info[container_id] = stack_info
+                    
                     if stack_info.get("is_stack_container"):
                         stack_name = stack_info.get("stack_name")
+                        service_name = stack_info.get("service_name")
                         if stack_name:
                             self.container_stack_map[container_id] = stack_name
+                            stack_containers_count += 1
+                            _LOGGER.debug("✅ Container %s is part of stack %s (service: %s)", 
+                                         container_name, stack_name, service_name)
+                        else:
+                            _LOGGER.warning("⚠️ Container %s has stack labels but no stack name", container_name)
+                    else:
+                        standalone_containers_count += 1
+                        _LOGGER.debug("ℹ️ Container %s is standalone", container_name)
+                else:
+                    _LOGGER.warning("⚠️ Could not inspect container %s", container_name)
             
             # Process stacks
             self.stacks = {stack["Name"]: stack for stack in stacks}
             
-            _LOGGER.debug("✅ Updated data: %d containers, %d stacks", 
-                         len(self.containers), len(self.stacks))
+            _LOGGER.info("✅ Updated data: %d containers (%d stack containers, %d standalone), %d stacks", 
+                         len(self.containers), stack_containers_count, standalone_containers_count, len(self.stacks))
+            
+            # Log stack mapping for debugging
+            if self.container_stack_map:
+                _LOGGER.info("📋 Stack mapping: %s", self.container_stack_map)
             
             return {
                 "containers": containers,
@@ -81,6 +104,10 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
     def get_container_stack(self, container_id: str) -> Optional[str]:
         """Get stack name for a container."""
         return self.container_stack_map.get(container_id)
+
+    def get_container_stack_info(self, container_id: str) -> Optional[Dict[str, Any]]:
+        """Get detailed stack information for a container."""
+        return self.container_stack_info.get(container_id)
 
     def get_stack_containers(self, stack_name: str) -> List[Dict[str, Any]]:
         """Get all containers belonging to a stack."""

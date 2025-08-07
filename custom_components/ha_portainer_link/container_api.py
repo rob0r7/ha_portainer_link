@@ -118,7 +118,12 @@ class PortainerContainerAPI:
             stack_service = labels.get("com.docker.compose.service")
             stack_container_number = labels.get("com.docker.compose.container-number")
             
-            _LOGGER.debug("🔍 Stack detection for container: stack_name=%s, service=%s, number=%s", 
+            # Log all labels for debugging
+            compose_labels = {k: v for k, v in labels.items() if k.startswith("com.docker.compose")}
+            if compose_labels:
+                _LOGGER.debug("🔍 Found compose labels: %s", compose_labels)
+            
+            _LOGGER.debug("🔍 Stack detection: stack_name=%s, service=%s, number=%s", 
                          stack_name, stack_service, stack_container_number)
             
             if stack_name:

@@ -1,5 +1,6 @@
 import logging
 from homeassistant.components.switch import SwitchEntity
+import asyncio
 
 from .const import DOMAIN
 from .entity import BaseContainerEntity
@@ -28,10 +29,15 @@ async def async_setup_entry(hass, entry, async_add_entities):
         container_name = container_data.get("Names", ["unknown"])[0].strip("/")
         state = container_data.get("State", "unknown")
         
-        # Get stack information
-        stack_info = coordinator.get_container_stack_info(container_data)
+        # Get detailed stack information from coordinator's processed data
+        stack_info = coordinator.get_container_stack_info(container_id) or {
+            "stack_name": None,
+            "service_name": None,
+            "container_number": None,
+            "is_stack_container": False
+        }
         
-        _LOGGER.debug("🔍 Processing container: %s (ID: %s, State: %s)", container_name, container_id, state)
+        _LOGGER.debug("🔍 Processing container: %s (ID: %s, State: %s, Stack: %s)", container_name, container_id, state, stack_info.get("stack_name"))
         
         # Create switch for this container
         switches.append(ContainerSwitch(coordinator, entry_id, container_id, container_name, state, stack_info))
@@ -45,7 +51,6 @@ class ContainerSwitch(BaseContainerEntity, SwitchEntity):
     def __init__(self, coordinator, entry_id, container_id, container_name, state, stack_info):
         """Initialize the container switch."""
         super().__init__(coordinator, entry_id, container_id, container_name, stack_info)
-        self._state = state == "running"
         self._available = True
 
     @property
@@ -61,7 +66,13 @@ class ContainerSwitch(BaseContainerEntity, SwitchEntity):
     @property
     def is_on(self) -> bool:
         """Return True if the switch is on."""
-        return self._state is True
+        container_data = self._get_container_data()
+        if container_data:
+            is_running = container_data.get("State") == "running"
+            _LOGGER.debug("🔍 Switch %s state: %s (running: %s)", self.name, container_data.get("State"), is_running)
+            return is_running
+        _LOGGER.debug("🔍 Switch %s: no container data available", self.name)
+        return False
 
     @property
     def available(self) -> bool:
@@ -75,35 +86,32 @@ class ContainerSwitch(BaseContainerEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs):
         """Start the Docker container."""
-        success = await self.coordinator.api.start_container(self.coordinator.endpoint_id, self.container_id)
-        if success:
-            self._state = True
-            self._available = True
-        else:
+        try:
+            success = await self.coordinator.api.start_container(self.coordinator.endpoint_id, self.container_id)
+            if success:
+                self._available = True
+                # Trigger coordinator refresh to update all entities
+                await self.coordinator.async_request_refresh()
+                # Small delay to ensure data is updated
+                await asyncio.sleep(1)
+            else:
+                self._available = False
+        except Exception as e:
+            _LOGGER.error("Failed to start container %s: %s", self.container_name, e)
             self._available = False
-        self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs):
         """Stop the Docker container."""
-        success = await self.coordinator.api.stop_container(self.coordinator.endpoint_id, self.container_id)
-        if success:
-            self._state = False
-            self._available = True
-        else:
-            self._available = False
-        self.async_write_ha_state()
-
-    async def async_update(self):
-        """Update the current status of the container."""
         try:
-            containers = await self.coordinator.api.get_containers(self.coordinator.endpoint_id)
-            for container in containers:
-                if container["Id"] == self.container_id:
-                    self._state = container.get("State") == "running"
-                    self._available = True
-                    return
-            self._state = False
-            self._available = False
+            success = await self.coordinator.api.stop_container(self.coordinator.endpoint_id, self.container_id)
+            if success:
+                self._available = True
+                # Trigger coordinator refresh to update all entities
+                await self.coordinator.async_request_refresh()
+                # Small delay to ensure data is updated
+                await asyncio.sleep(1)
+            else:
+                self._available = False
         except Exception as e:
-            _LOGGER.error("Failed to update status for %s: %s", self.container_name, e)
+            _LOGGER.error("Failed to stop container %s: %s", self.container_name, e)
             self._available = False
