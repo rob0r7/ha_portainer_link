@@ -70,12 +70,14 @@ class PortainerAPI:
         try:
             async with self.session.get(url, headers=self.headers, ssl=False) as resp:
                 if resp.status == 200:
-                    return await resp.json()
+                    container_data = await resp.json()
+                    _LOGGER.debug("✅ Successfully inspected container %s", container_id)
+                    return container_data
                 else:
-                    _LOGGER.error("[PortainerAPI] Fehler bei Inspect von Container: %s", resp.status)
+                    _LOGGER.error("❌ Failed to inspect container %s: HTTP %s", container_id, resp.status)
                     return {}
         except Exception as e:
-            _LOGGER.exception("[PortainerAPI] Fehler bei Inspect: %s", e)
+            _LOGGER.exception("❌ Exception inspecting container %s: %s", container_id, e)
             return {}
 
     async def get_container_stats(self, endpoint_id, container_id):
@@ -542,7 +544,21 @@ class PortainerAPI:
         try:
             _LOGGER.debug("🔍 Checking available version for %s", image_name)
             
-            # Pull the latest image to get registry info
+            # First, try to get the current image info without pulling
+            images_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/json"
+            async with self.session.get(images_url, headers=self.headers, ssl=False) as resp:
+                if resp.status == 200:
+                    images_data = await resp.json()
+                    # Find the image with the same name
+                    for image in images_data:
+                        repo_tags = image.get("RepoTags", [])
+                        if image_name in repo_tags:
+                            version = self.extract_version_from_image(image)
+                            _LOGGER.debug("✅ Found existing image %s: %s", image_name, version)
+                            return version
+            
+            # If not found locally, try to pull from registry
+            _LOGGER.debug("🔄 Image %s not found locally, pulling from registry", image_name)
             pull_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/create"
             params = {"fromImage": image_name}
             
@@ -551,7 +567,6 @@ class PortainerAPI:
                     _LOGGER.debug("✅ Successfully pulled image %s from registry", image_name)
                     
                     # Get the newly pulled image info
-                    images_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/json"
                     async with self.session.get(images_url, headers=self.headers, ssl=False) as resp2:
                         if resp2.status == 200:
                             images_data = await resp2.json()
@@ -592,3 +607,160 @@ class PortainerAPI:
         except Exception as e:
             _LOGGER.warning("⚠️ Error getting available version for %s: %s", image_name, e)
             return "unknown (error)"
+
+    async def get_stacks(self):
+        """Get all stacks from Portainer."""
+        try:
+            stacks_url = f"{self.base_url}/api/stacks"
+            async with self.session.get(stacks_url, headers=self.headers, ssl=False) as resp:
+                if resp.status == 200:
+                    return await resp.json()
+                else:
+                    _LOGGER.error("Could not get stacks list: %s", resp.status)
+                    return []
+        except Exception as e:
+            _LOGGER.exception("Error getting stacks: %s", e)
+            return []
+
+    def get_container_stack_info(self, container_info):
+        """Extract stack information from container info."""
+        try:
+            if not container_info:
+                _LOGGER.warning("⚠️ Container info is empty, cannot determine stack info")
+                return {
+                    "stack_name": None,
+                    "service_name": None,
+                    "container_number": None,
+                    "is_stack_container": False
+                }
+            
+            labels = container_info.get("Config", {}).get("Labels", {})
+            stack_name = labels.get("com.docker.compose.project")
+            stack_service = labels.get("com.docker.compose.service")
+            stack_container_number = labels.get("com.docker.compose.container-number")
+            
+            _LOGGER.debug("🔍 Stack detection for container: stack_name=%s, service=%s, number=%s", 
+                         stack_name, stack_service, stack_container_number)
+            
+            if stack_name:
+                _LOGGER.info("✅ Container is part of stack: %s (service: %s)", stack_name, stack_service)
+                return {
+                    "stack_name": stack_name,
+                    "service_name": stack_service,
+                    "container_number": stack_container_number,
+                    "is_stack_container": True
+                }
+            else:
+                _LOGGER.debug("ℹ️ Container is standalone (no stack labels found)")
+                return {
+                    "stack_name": None,
+                    "service_name": None,
+                    "container_number": None,
+                    "is_stack_container": False
+                }
+        except Exception as e:
+            _LOGGER.exception("❌ Error extracting stack info from container: %s", e)
+            return {
+                "stack_name": None,
+                "service_name": None,
+                "container_number": None,
+                "is_stack_container": False
+            }
+
+    async def stop_stack(self, endpoint_id, stack_name):
+        """Stop all containers in a stack."""
+        try:
+            _LOGGER.info("🛑 Stopping stack %s", stack_name)
+            
+            # Get all containers in the stack
+            containers_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/json?all=1"
+            async with self.session.get(containers_url, headers=self.headers, ssl=False) as resp:
+                if resp.status != 200:
+                    _LOGGER.error("Could not get containers list: %s", resp.status)
+                    return False
+                
+                containers_data = await resp.json()
+                stack_containers = []
+                
+                # Find all containers belonging to this stack
+                for container in containers_data:
+                    labels = container.get("Labels", {})
+                    if labels.get("com.docker.compose.project") == stack_name:
+                        stack_containers.append(container["Id"])
+                
+                if not stack_containers:
+                    _LOGGER.warning("No containers found for stack %s", stack_name)
+                    return False
+                
+                _LOGGER.info("Found %d containers in stack %s", len(stack_containers), stack_name)
+                
+                # Stop each container in the stack
+                success_count = 0
+                for container_id in stack_containers:
+                    try:
+                        stop_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/stop"
+                        async with self.session.post(stop_url, headers=self.headers, ssl=False) as stop_resp:
+                            if stop_resp.status == 204:
+                                success_count += 1
+                                _LOGGER.debug("✅ Stopped container %s", container_id)
+                            else:
+                                _LOGGER.warning("⚠️ Failed to stop container %s: %s", container_id, stop_resp.status)
+                    except Exception as e:
+                        _LOGGER.warning("⚠️ Error stopping container %s: %s", container_id, e)
+                
+                _LOGGER.info("✅ Successfully stopped %d/%d containers in stack %s", 
+                           success_count, len(stack_containers), stack_name)
+                return success_count > 0
+                
+        except Exception as e:
+            _LOGGER.exception("❌ Error stopping stack %s: %s", stack_name, e)
+            return False
+
+    async def start_stack(self, endpoint_id, stack_name):
+        """Start all containers in a stack."""
+        try:
+            _LOGGER.info("▶️ Starting stack %s", stack_name)
+            
+            # Get all containers in the stack
+            containers_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/json?all=1"
+            async with self.session.get(containers_url, headers=self.headers, ssl=False) as resp:
+                if resp.status != 200:
+                    _LOGGER.error("Could not get containers list: %s", resp.status)
+                    return False
+                
+                containers_data = await resp.json()
+                stack_containers = []
+                
+                # Find all containers belonging to this stack
+                for container in containers_data:
+                    labels = container.get("Labels", {})
+                    if labels.get("com.docker.compose.project") == stack_name:
+                        stack_containers.append(container["Id"])
+                
+                if not stack_containers:
+                    _LOGGER.warning("No containers found for stack %s", stack_name)
+                    return False
+                
+                _LOGGER.info("Found %d containers in stack %s", len(stack_containers), stack_name)
+                
+                # Start each container in the stack
+                success_count = 0
+                for container_id in stack_containers:
+                    try:
+                        start_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/start"
+                        async with self.session.post(start_url, headers=self.headers, ssl=False) as start_resp:
+                            if start_resp.status == 204:
+                                success_count += 1
+                                _LOGGER.debug("✅ Started container %s", container_id)
+                            else:
+                                _LOGGER.warning("⚠️ Failed to start container %s: %s", container_id, start_resp.status)
+                    except Exception as e:
+                        _LOGGER.warning("⚠️ Error starting container %s: %s", container_id, e)
+                
+                _LOGGER.info("✅ Successfully started %d/%d containers in stack %s", 
+                           success_count, len(stack_containers), stack_name)
+                return success_count > 0
+                
+        except Exception as e:
+            _LOGGER.exception("❌ Error starting stack %s: %s", stack_name, e)
+            return False

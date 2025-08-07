@@ -1,7 +1,7 @@
 {
   "domain": "ha_portainer_link",
   "name": "HA Portainer Link",
-  "version": "0.4.7",
+  "version": "0.5.7",
   "documentation": "https://github.com/rob0r7/ha_portainer_link",
   "dependencies": [],
   "codeowners": ["@rob0r7"],
@@ -10,5 +10,4 @@
   "integration_type": "hub",
   "config_flow": true,
   "platforms": ["sensor", "binary_sensor", "switch", "button"]
-
 }
