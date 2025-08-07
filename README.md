@@ -73,12 +73,6 @@ If containers that are part of a Docker Compose stack are appearing as standalon
 2. Check that containers are properly deployed via Docker Compose
 3. Ensure the `com.docker.compose.project` label is present on stack containers
 
-### Enhanced Logging
-Version 0.5.6 includes enhanced logging to help diagnose issues:
-- Container processing details
-- Stack detection results
-- Device creation information
-- API call success/failure status
 
 To enable detailed logging, add to your `configuration.yaml`:
 ```yaml
