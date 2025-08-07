@@ -20,6 +20,8 @@ Just pure, point-and-click magic — with restart buttons! 😎
 | 🚦 Container status sensor   | ✅     |
 | 🧠 CPU / RAM usage sensor    | ✅     |
 | 🎯 Container image info      | ✅     |
+| 🔄 Update available sensor   | ✅     |
+| 📥 Pull update button        | ✅     |
 | ⏯ Start/Stop/Restart button | ✅     |
 | 🌐 Multiple Portainer hosts  | ✅     |
 | 🛠 Configurable via UI       | ✅     |
@@ -82,6 +84,7 @@ So I made a bridge — and now, you can have it too.
 
 - [ ] More sensors (disk/network)
 - [ ] Service call: Pull image / recreate
+- [ ] Docker stack support
 - [ ] Option to auto-create a dashboard for all containers
 - [ ] HACS default store (maybe!)
 

@@ -6,7 +6,7 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = ["sensor", "switch", "button"]
+PLATFORMS = ["sensor", "binary_sensor", "switch", "button"]
 
 async def async_setup(hass: HomeAssistant, config: dict):
     """Set up HA Portainer Link from YAML."""
