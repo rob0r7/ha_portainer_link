@@ -70,12 +70,14 @@ class PortainerAPI:
         try:
             async with self.session.get(url, headers=self.headers, ssl=False) as resp:
                 if resp.status == 200:
-                    return await resp.json()
+                    container_data = await resp.json()
+                    _LOGGER.debug("✅ Successfully inspected container %s", container_id)
+                    return container_data
                 else:
-                    _LOGGER.error("[PortainerAPI] Fehler bei Inspect von Container: %s", resp.status)
+                    _LOGGER.error("❌ Failed to inspect container %s: HTTP %s", container_id, resp.status)
                     return {}
         except Exception as e:
-            _LOGGER.exception("[PortainerAPI] Fehler bei Inspect: %s", e)
+            _LOGGER.exception("❌ Exception inspecting container %s: %s", container_id, e)
             return {}
 
     async def get_container_stats(self, endpoint_id, container_id):
@@ -542,7 +544,21 @@ class PortainerAPI:
         try:
             _LOGGER.debug("🔍 Checking available version for %s", image_name)
             
-            # Pull the latest image to get registry info
+            # First, try to get the current image info without pulling
+            images_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/json"
+            async with self.session.get(images_url, headers=self.headers, ssl=False) as resp:
+                if resp.status == 200:
+                    images_data = await resp.json()
+                    # Find the image with the same name
+                    for image in images_data:
+                        repo_tags = image.get("RepoTags", [])
+                        if image_name in repo_tags:
+                            version = self.extract_version_from_image(image)
+                            _LOGGER.debug("✅ Found existing image %s: %s", image_name, version)
+                            return version
+            
+            # If not found locally, try to pull from registry
+            _LOGGER.debug("🔄 Image %s not found locally, pulling from registry", image_name)
             pull_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/create"
             params = {"fromImage": image_name}
             
@@ -551,7 +567,6 @@ class PortainerAPI:
                     _LOGGER.debug("✅ Successfully pulled image %s from registry", image_name)
                     
                     # Get the newly pulled image info
-                    images_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/json"
                     async with self.session.get(images_url, headers=self.headers, ssl=False) as resp2:
                         if resp2.status == 200:
                             images_data = await resp2.json()
@@ -592,8 +607,6 @@ class PortainerAPI:
         except Exception as e:
             _LOGGER.warning("⚠️ Error getting available version for %s: %s", image_name, e)
             return "unknown (error)"
-<<<<<<< Updated upstream
-=======
 
     async def get_stacks(self, endpoint_id):
         """Get all stacks from Portainer for a specific endpoint."""
@@ -900,4 +913,3 @@ class PortainerAPI:
         except Exception as e:
             _LOGGER.exception("❌ Error force updating stack %s: %s", stack_name, e)
             return False
->>>>>>> Stashed changes

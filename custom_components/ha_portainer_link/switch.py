@@ -1,4 +1,5 @@
 import logging
+import hashlib
 from homeassistant.components.switch import SwitchEntity
 from .const import DOMAIN
 from .portainer_api import PortainerAPI
@@ -6,8 +7,6 @@ from .portainer_api import PortainerAPI
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.info("Loaded Portainer switch integration.")
 
-<<<<<<< Updated upstream
-=======
 def _get_host_display_name(base_url):
     """Extract a clean host name from the base URL for display purposes."""
     # Remove protocol and common ports
@@ -44,7 +43,22 @@ def _get_simple_device_id(entry_id, endpoint_id, host_name, container_or_stack_n
     sanitized_name = container_or_stack_name.replace('-', '_').replace(' ', '_')
     return f"{entry_id}_{endpoint_id}_{sanitized_host}_{sanitized_name}"
 
->>>>>>> Stashed changes
+def _get_stable_entity_id(entry_id, endpoint_id, container_name, stack_info, entity_type):
+    """Generate a stable entity ID that doesn't change when container is recreated."""
+    # For stack containers, use stack_name + service_name
+    if stack_info.get("is_stack_container"):
+        stack_name = stack_info.get("stack_name", "unknown")
+        service_name = stack_info.get("service_name", container_name)
+        # Use stack and service name for stability
+        stable_id = f"{stack_name}_{service_name}"
+    else:
+        # For standalone containers, use container name
+        stable_id = container_name
+    
+    # Sanitize the stable ID
+    sanitized_id = stable_id.replace('-', '_').replace(' ', '_').replace('/', '_')
+    return f"entry_{entry_id}_endpoint_{endpoint_id}_{sanitized_id}_{entity_type}"
+
 async def async_setup_entry(hass, entry, async_add_entities):
     conf = entry.data
     host = conf["host"]
@@ -52,6 +66,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     password = conf.get("password")
     api_key = conf.get("api_key")
     endpoint_id = conf["endpoint_id"]
+    entry_id = entry.entry_id
 
     api = PortainerAPI(host, username, password, api_key)
     await api.initialize()
@@ -62,22 +77,43 @@ async def async_setup_entry(hass, entry, async_add_entities):
         name = container.get("Names", ["unknown"])[0].strip("/")
         container_id = container["Id"]
         state = container.get("State", "unknown")
-        switches.append(ContainerSwitch(name, state, api, endpoint_id, container_id))
+        
+        # Get container inspection data to determine if it's part of a stack
+        container_info = await api.inspect_container(endpoint_id, container_id)
+        stack_info = api.get_container_stack_info(container_info) if container_info else {"is_stack_container": False}
+        
+        # Create switches for all containers - they will all belong to the same stack device if they're in a stack
+        switches.append(ContainerSwitch(name, state, api, endpoint_id, container_id, stack_info, entry_id))
 
     async_add_entities(switches, update_before_add=True)
 
 class ContainerSwitch(SwitchEntity):
     """Switch to start/stop a Docker container."""
 
-    def __init__(self, name, state, api, endpoint_id, container_id):
-        self._attr_name = f"{name} Switch"
+    def __init__(self, name, state, api, endpoint_id, container_id, stack_info, entry_id):
+        # Improve naming for stack containers
+        if stack_info.get("is_stack_container"):
+            stack_name = stack_info.get("stack_name", "unknown")
+            service_name = stack_info.get("service_name", name)
+            self._attr_name = f"Power {service_name} ({stack_name})"
+        else:
+            self._attr_name = f"Power {name}"
         self._container_name = name
         self._state = state == "running"
         self._api = api
         self._endpoint_id = endpoint_id
         self._container_id = container_id
-        self._attr_unique_id = f"{container_id}_switch"
+        self._stack_info = stack_info
+        self._entry_id = entry_id
+        self._attr_unique_id = _get_stable_entity_id(entry_id, endpoint_id, name, stack_info, "switch")
         self._available = True
+
+    def update_container_id(self, new_container_id):
+        """Update the container ID when container is recreated."""
+        if new_container_id != self._container_id:
+            _LOGGER.info("🔄 Updating container ID for %s: %s -> %s", 
+                        self._container_name, self._container_id[:12], new_container_id[:12])
+            self._container_id = new_container_id
 
     @property
     def is_on(self):
@@ -93,15 +129,6 @@ class ContainerSwitch(SwitchEntity):
 
     @property
     def device_info(self):
-<<<<<<< Updated upstream
-        return {
-            "identifiers": {(DOMAIN, self._container_id)},
-            "name": self._container_name,
-            "manufacturer": "Docker via Portainer",
-            "model": "Docker Container",
-            "configuration_url": f"{self._api.base_url}/#!/containers/{self._container_id}/details",
-        }
-=======
         host_name = _get_host_display_name(self._api.base_url)
         
         if self._stack_info.get("is_stack_container"):
@@ -129,7 +156,6 @@ class ContainerSwitch(SwitchEntity):
                 "model": "Docker Container",
                 "configuration_url": f"{self._api.base_url}/#!/containers/{self._container_id}/details",
             }
->>>>>>> Stashed changes
 
     async def async_turn_on(self, **kwargs):
         """Start the Docker container."""
