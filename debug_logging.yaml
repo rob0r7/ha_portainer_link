@@ -1,4 +1,0 @@
-# Add this to your configuration.yaml to enable debug logging
-logger:
-  custom_components.ha_portainer_link: debug
-  homeassistant.components.ha_portainer_link: debug
