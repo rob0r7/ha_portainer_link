@@ -8,12 +8,14 @@ class PortainerAuth:
     """Handle Portainer authentication."""
 
     def __init__(self, base_url: str, username: Optional[str] = None, 
-                 password: Optional[str] = None, api_key: Optional[str] = None):
+                 password: Optional[str] = None, api_key: Optional[str] = None,
+                 ssl_verify: bool = True):
         """Initialize authentication."""
         self.base_url = base_url.rstrip("/")
         self.username = username
         self.password = password
         self.api_key = api_key
+        self.ssl_verify = ssl_verify
         self.token: Optional[str] = None
         self.session: Optional[aiohttp.ClientSession] = None
         self.headers: Dict[str, str] = {}
@@ -45,7 +47,7 @@ class PortainerAuth:
         payload = {"Username": self.username, "Password": self.password}
         
         try:
-            async with self.session.post(url, json=payload, ssl=False) as resp:
+            async with self.session.post(url, json=payload, ssl=self.ssl_verify) as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     self.token = data.get("jwt")

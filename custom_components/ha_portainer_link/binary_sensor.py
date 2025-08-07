@@ -1,7 +1,7 @@
 import logging
 from homeassistant.components.binary_sensor import BinarySensorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, CONF_ENABLE_UPDATE_SENSORS, DEFAULT_ENABLE_UPDATE_SENSORS
 from .entity import BaseContainerEntity
 from .coordinator import PortainerDataUpdateCoordinator
 
@@ -23,6 +23,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     entities = []
     
+    # Check if update sensors are enabled
+    update_sensors_enabled = config.get(CONF_ENABLE_UPDATE_SENSORS, DEFAULT_ENABLE_UPDATE_SENSORS)
+    
+    _LOGGER.info("📊 Binary sensor configuration: Update sensors=%s", update_sensors_enabled)
+    
     # Create binary sensors for all containers
     for container_id, container_data in coordinator.containers.items():
         container_name = container_data.get("Names", ["unknown"])[0].strip("/")
@@ -37,14 +42,16 @@ async def async_setup_entry(hass, entry, async_add_entities):
         
         _LOGGER.debug("🔍 Processing container: %s (ID: %s, Stack: %s)", container_name, container_id, stack_info.get("stack_name"))
         
-        # Create binary sensor for this container
-        entities.append(ContainerUpdateAvailableSensor(coordinator, entry_id, container_id, container_name, stack_info))
+        # Create update sensors only if enabled
+        if update_sensors_enabled:
+            entities.append(ContainerUpdateAvailableSensor(coordinator, entry_id, container_id, container_name, stack_info))
 
-    _LOGGER.info("✅ Created %d binary sensor entities", len(entities))
+    _LOGGER.info("✅ Created %d binary sensor entities (Update sensors: %s)", 
+                 len(entities), update_sensors_enabled)
     async_add_entities(entities, update_before_add=True)
 
 class ContainerUpdateAvailableSensor(BaseContainerEntity, BinarySensorEntity):
-    """Binary sensor representing if a container has updates available."""
+    """Binary sensor for container update availability."""
 
     @property
     def entity_type(self) -> str:
@@ -52,25 +59,35 @@ class ContainerUpdateAvailableSensor(BaseContainerEntity, BinarySensorEntity):
 
     @property
     def name(self) -> str:
-        """Return the name of the binary sensor."""
+        """Return the name of the sensor."""
         display_name = self._get_container_name_display()
-        return f"Update {display_name}"
+        return f"Update Available {display_name}"
 
     @property
-    def is_on(self) -> bool:
-        """Return True if the binary sensor is on."""
-        return getattr(self, '_attr_is_on', False)
+    def is_on(self):
+        """Return true if the binary sensor is on."""
+        # This will be updated by the coordinator
+        return getattr(self, '_state', False)
 
     @property
     def icon(self):
-        """Return the icon of the binary sensor."""
+        """Return the icon of the sensor."""
         return "mdi:update" if self.is_on else "mdi:update-disabled"
 
     async def async_update(self):
-        """Update the update availability status."""
+        """Update the sensor."""
         try:
-            # Now enabled with conservative rate limiting (max 50 checks per 6 hours)
-            has_update = await self.coordinator.api.check_image_updates(self.coordinator.endpoint_id, self.container_id)
-            self._attr_is_on = has_update
+            container_data = self._get_container_data()
+            if not container_data:
+                self._state = False
+                return
+
+            # Check if updates are available for this container
+            has_updates = await self.coordinator.api.check_image_updates(
+                self.coordinator.endpoint_id, self.container_id
+            )
+            self._state = has_updates
+            
         except Exception as e:
-            _LOGGER.warning("Failed to check update availability for %s: %s", self.name, e)
+            _LOGGER.error("❌ Error updating update sensor for container %s: %s", self.container_id, e)
+            self._state = False

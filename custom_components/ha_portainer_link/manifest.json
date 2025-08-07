@@ -1,13 +1,11 @@
 {
   "domain": "ha_portainer_link",
   "name": "HA Portainer Link",
-  "version": "0.3.0",
-  "documentation": "https://github.com/rob0r7/ha_portainer_link",
+  "documentation": "https://github.com/your-username/ha_portainer_link",
   "dependencies": [],
-  "codeowners": ["@rob0r7"],
+  "codeowners": ["@your-username"],
   "requirements": ["aiohttp>=3.8.0"],
-  "iot_class": "local_polling",
-  "integration_type": "hub",
+  "version": "0.3.3",
   "config_flow": true,
-  "platforms": ["sensor", "binary_sensor", "switch", "button"]
+  "iot_class": "local_polling"
 }

@@ -23,6 +23,50 @@
 
 ---
 
+## Phase 1.5: Configuration Flexibility ✅ COMPLETED
+
+### Goals
+- Add flexible hostname/port configuration
+- Implement configurable rate limiting parameters
+- Add SSL/TLS configuration options
+- Create options flow for runtime configuration changes
+- Support multiple Portainer instances with different settings
+
+### Completed Features
+- ✅ **Flexible Host Configuration**: Support for hostname, port, and full URL input
+- ✅ **SSL/TLS Configuration**: Configurable SSL verification for different environments
+- ✅ **Configurable Rate Limiting**: User-adjustable cache duration, rate limits, and periods
+- ✅ **Options Flow**: Runtime configuration changes without re-installation
+- ✅ **Advanced Settings**: Update intervals, monitoring toggles, and performance tuning
+- ✅ **Multi-Instance Support**: Different configurations per Portainer instance
+- ✅ **Validation**: Comprehensive input validation with helpful error messages
+
+---
+
+## Phase 1.6: Integration Modes ✅ COMPLETED
+
+### Goals
+- Implement different integration modes for different use cases
+- Add feature toggles for selective functionality
+- Create lightweight mode for performance-sensitive environments
+- Support custom mode for advanced users
+- Optimize resource usage based on selected mode
+
+### Completed Features
+- ✅ **Integration Modes**: Lightweight, Standard, Full, and Custom modes
+- ✅ **Feature Toggles**: Granular control over sensors, buttons, and functionality
+- ✅ **Lightweight Mode**: Minimal functionality for performance-sensitive environments
+- ✅ **Standard Mode**: Balanced functionality for most common use cases
+- ✅ **Full Mode**: Complete functionality with all features enabled
+- ✅ **Custom Mode**: User-defined feature selection
+- ✅ **Resource Optimization**: Reduced API calls and entity count in lightweight mode
+- ✅ **Stack View Toggle**: Optional stack clustering and management
+- ✅ **Sensor Toggles**: Optional resource, version, and update sensors
+- ✅ **Button Toggles**: Optional container and stack control buttons
+- ✅ **Bulk Operations**: Optional bulk start/stop functionality
+
+---
+
 ## Phase 2: Advanced Features & User Experience
 
 ### Goals
@@ -107,10 +151,81 @@
 ## Current Status
 
 - **Phase 1**: ✅ **COMPLETED** (Version 0.3.0)
+- **Phase 1.5**: ✅ **COMPLETED** (Configuration Flexibility)
+- **Phase 1.6**: ✅ **COMPLETED** (Integration Modes)
 - **Phase 2**: 🔄 **IN PROGRESS** (Next priority)
 - **Phase 3**: ⏳ **PLANNED**
 - **Phase 4**: ⏳ **PLANNED**
 - **Phase 5**: ⏳ **PLANNED**
+
+## Integration Modes Summary
+
+### **Lightweight Mode**
+- **Description**: Minimal functionality - basic container control only
+- **Features**: Container status sensors, basic start/stop switches
+- **Performance**: 10-minute update intervals, no resource monitoring
+- **Use Cases**: Performance-sensitive environments, basic monitoring needs
+
+### **Standard Mode**
+- **Description**: Balanced functionality - most common features
+- **Features**: Stack view, resource sensors, version tracking, update checks
+- **Performance**: 5-minute update intervals, moderate resource usage
+- **Use Cases**: Most common deployments, balanced functionality
+
+### **Full Mode**
+- **Description**: Complete functionality - all features enabled
+- **Features**: Everything including container logs, bulk operations
+- **Performance**: 3-minute update intervals, comprehensive monitoring
+- **Use Cases**: Advanced users, complete management needs
+
+### **Custom Mode**
+- **Description**: User-defined feature selection
+- **Features**: Granular control over every feature toggle
+- **Performance**: Configurable update intervals and feature sets
+- **Use Cases**: Advanced users with specific requirements
+
+## Feature Toggles
+
+### **Core Features** (Always Available)
+- Container status sensors
+- Basic container control switches
+
+### **Optional Features**
+- **Stack View**: Stack clustering and management
+- **Resource Sensors**: CPU, memory, uptime monitoring
+- **Version Sensors**: Current and available version tracking
+- **Update Sensors**: Update availability detection
+- **Container Buttons**: Restart and pull update buttons
+- **Stack Buttons**: Stack control buttons
+- **Bulk Operations**: Start/stop all containers
+- **Container Logs**: Log viewing functionality
+
+## Configuration Improvements Summary
+
+### **Hostname/Port Flexibility**
+- **Before**: Only full URLs supported
+- **Now**: Support for hostname, port, and full URL input
+- **Examples**: `192.168.1.100`, `portainer.local`, `https://portainer:9000`
+
+### **SSL/TLS Configuration**
+- **Before**: Hardcoded SSL verification
+- **Now**: Configurable SSL verification per instance
+- **Use Cases**: Self-signed certificates, internal networks, reverse proxies
+
+### **Configurable Rate Limiting**
+- **Before**: Hardcoded 6-hour cache, 50 checks per 6 hours
+- **Now**: User-adjustable cache duration (1-24 hours), rate limits (10-100 checks), and periods (1-24 hours)
+- **Benefits**: Optimize for different environments and usage patterns
+
+### **Runtime Configuration**
+- **Before**: No options flow
+- **Now**: Full options flow for changing settings without re-installation
+- **Features**: Update intervals, monitoring toggles, performance tuning
+
+### **Multi-Instance Support**
+- **Before**: Single configuration approach
+- **Now**: Per-instance configuration with different settings
+- **Use Cases**: Multiple Portainer instances, different environments
 
 ## Notes
 
@@ -118,3 +233,5 @@
 - Phases may be adjusted based on user feedback and priorities
 - Some features may be moved between phases as needed
 - Rate limiting and performance considerations are ongoing concerns
+- Configuration flexibility enables better deployment in diverse environments
+- Integration modes provide optimal performance for different use cases

@@ -5,18 +5,19 @@ from typing import List, Dict, Any, Optional
 _LOGGER = logging.getLogger(__name__)
 
 class PortainerContainerAPI:
-    """Handle Portainer container operations."""
+    """Handles all container-specific API operations."""
 
-    def __init__(self, base_url: str, auth):
-        """Initialize container API."""
+    def __init__(self, base_url: str, auth, ssl_verify: bool = True):
+        """Initialize the container API."""
         self.base_url = base_url
         self.auth = auth
+        self.ssl_verify = ssl_verify
 
     async def get_containers(self, endpoint_id: int) -> List[Dict[str, Any]]:
         """Get all containers for an endpoint."""
         url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/json?all=1"
         try:
-            async with self.auth.session.get(url, headers=self.auth.get_headers(), ssl=False) as resp:
+            async with self.auth.session.get(url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
                 if resp.status == 200:
                     return await resp.json()
                 else:
@@ -30,7 +31,7 @@ class PortainerContainerAPI:
         """Inspect a specific container."""
         url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/json"
         try:
-            async with self.auth.session.get(url, headers=self.auth.get_headers(), ssl=False) as resp:
+            async with self.auth.session.get(url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
                 if resp.status == 200:
                     container_data = await resp.json()
                     _LOGGER.debug("✅ Successfully inspected container %s", container_id)
@@ -46,7 +47,7 @@ class PortainerContainerAPI:
         """Get container statistics."""
         url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/stats?stream=false"
         try:
-            async with self.auth.session.get(url, headers=self.auth.get_headers(), ssl=False) as resp:
+            async with self.auth.session.get(url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
                 if resp.status == 200:
                     return await resp.json()
                 else:
@@ -60,7 +61,7 @@ class PortainerContainerAPI:
         """Start a container."""
         url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/start"
         try:
-            async with self.auth.session.post(url, headers=self.auth.get_headers(), ssl=False) as resp:
+            async with self.auth.session.post(url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
                 success = resp.status == 204
                 if success:
                     _LOGGER.info("✅ Successfully started container %s", container_id)
@@ -75,7 +76,7 @@ class PortainerContainerAPI:
         """Stop a container."""
         url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/stop"
         try:
-            async with self.auth.session.post(url, headers=self.auth.get_headers(), ssl=False) as resp:
+            async with self.auth.session.post(url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
                 success = resp.status == 204
                 if success:
                     _LOGGER.info("✅ Successfully stopped container %s", container_id)
@@ -90,7 +91,7 @@ class PortainerContainerAPI:
         """Restart a container."""
         url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/restart"
         try:
-            async with self.auth.session.post(url, headers=self.auth.get_headers(), ssl=False) as resp:
+            async with self.auth.session.post(url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
                 success = resp.status == 204
                 if success:
                     _LOGGER.info("✅ Successfully restarted container %s", container_id)
@@ -112,26 +113,25 @@ class PortainerContainerAPI:
                     "container_number": None,
                     "is_stack_container": False
                 }
-            
+
+            # Get labels from container info
             labels = container_info.get("Config", {}).get("Labels", {})
-            stack_name = labels.get("com.docker.compose.project")
-            stack_service = labels.get("com.docker.compose.service")
-            stack_container_number = labels.get("com.docker.compose.container-number")
             
             # Log all labels for debugging
-            compose_labels = {k: v for k, v in labels.items() if k.startswith("com.docker.compose")}
-            if compose_labels:
-                _LOGGER.debug("🔍 Found compose labels: %s", compose_labels)
+            _LOGGER.debug("🔍 Stack detection for container: labels=%s", labels)
             
-            _LOGGER.debug("🔍 Stack detection: stack_name=%s, service=%s, number=%s", 
-                         stack_name, stack_service, stack_container_number)
+            # Check for Docker Compose labels
+            stack_name = labels.get("com.docker.compose.project")
+            service_name = labels.get("com.docker.compose.service")
+            container_number = labels.get("com.docker.compose.container-number")
             
-            if stack_name:
-                _LOGGER.info("✅ Container is part of stack: %s (service: %s)", stack_name, stack_service)
+            if stack_name and service_name:
+                _LOGGER.debug("✅ Container is part of stack: %s (service: %s, container: %s)", 
+                             stack_name, service_name, container_number)
                 return {
                     "stack_name": stack_name,
-                    "service_name": stack_service,
-                    "container_number": stack_container_number,
+                    "service_name": service_name,
+                    "container_number": container_number,
                     "is_stack_container": True
                 }
             else:
@@ -142,8 +142,9 @@ class PortainerContainerAPI:
                     "container_number": None,
                     "is_stack_container": False
                 }
+                
         except Exception as e:
-            _LOGGER.exception("❌ Error extracting stack info from container: %s", e)
+            _LOGGER.exception("❌ Error extracting stack info: %s", e)
             return {
                 "stack_name": None,
                 "service_name": None,

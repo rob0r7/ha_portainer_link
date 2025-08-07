@@ -2,7 +2,7 @@ import logging
 from homeassistant.const import STATE_UNKNOWN
 from homeassistant.components.sensor import SensorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, CONF_ENABLE_RESOURCE_SENSORS, CONF_ENABLE_VERSION_SENSORS, DEFAULT_ENABLE_RESOURCE_SENSORS, DEFAULT_ENABLE_VERSION_SENSORS
 from .entity import BaseContainerEntity
 from .coordinator import PortainerDataUpdateCoordinator
 
@@ -24,6 +24,13 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     entities = []
     
+    # Check if sensors are enabled
+    resource_sensors_enabled = config.get(CONF_ENABLE_RESOURCE_SENSORS, DEFAULT_ENABLE_RESOURCE_SENSORS)
+    version_sensors_enabled = config.get(CONF_ENABLE_VERSION_SENSORS, DEFAULT_ENABLE_VERSION_SENSORS)
+    
+    _LOGGER.info("📊 Sensor configuration: Resource sensors=%s, Version sensors=%s", 
+                 resource_sensors_enabled, version_sensors_enabled)
+    
     # Create sensors for all containers
     for container_id, container_data in coordinator.containers.items():
         container_name = container_data.get("Names", ["unknown"])[0].strip("/")
@@ -38,16 +45,23 @@ async def async_setup_entry(hass, entry, async_add_entities):
         
         _LOGGER.debug("🔍 Processing container: %s (ID: %s, Stack: %s)", container_name, container_id, stack_info.get("stack_name"))
         
-        # Create sensors for this container
+        # Always create status sensor (core functionality)
         entities.append(ContainerStatusSensor(coordinator, entry_id, container_id, container_name, stack_info))
-        entities.append(ContainerCPUSensor(coordinator, entry_id, container_id, container_name, stack_info))
-        entities.append(ContainerMemorySensor(coordinator, entry_id, container_id, container_name, stack_info))
-        entities.append(ContainerUptimeSensor(coordinator, entry_id, container_id, container_name, stack_info))
-        entities.append(ContainerImageSensor(coordinator, entry_id, container_id, container_name, stack_info))
-        entities.append(ContainerCurrentVersionSensor(coordinator, entry_id, container_id, container_name, stack_info))
-        entities.append(ContainerAvailableVersionSensor(coordinator, entry_id, container_id, container_name, stack_info))
+        
+        # Create resource sensors only if enabled
+        if resource_sensors_enabled:
+            entities.append(ContainerCPUSensor(coordinator, entry_id, container_id, container_name, stack_info))
+            entities.append(ContainerMemorySensor(coordinator, entry_id, container_id, container_name, stack_info))
+            entities.append(ContainerUptimeSensor(coordinator, entry_id, container_id, container_name, stack_info))
+        
+        # Create image and version sensors only if enabled
+        if version_sensors_enabled:
+            entities.append(ContainerImageSensor(coordinator, entry_id, container_id, container_name, stack_info))
+            entities.append(ContainerCurrentVersionSensor(coordinator, entry_id, container_id, container_name, stack_info))
+            entities.append(ContainerAvailableVersionSensor(coordinator, entry_id, container_id, container_name, stack_info))
 
-    _LOGGER.info("✅ Created %d sensor entities", len(entities))
+    _LOGGER.info("✅ Created %d sensor entities (Status: always, Resource: %s, Version: %s)", 
+                 len(entities), resource_sensors_enabled, version_sensors_enabled)
     async_add_entities(entities, update_before_add=True)
 
 class ContainerStatusSensor(BaseContainerEntity, SensorEntity):
@@ -101,32 +115,45 @@ class ContainerCPUSensor(BaseContainerEntity, SensorEntity):
 
     @property
     def unit_of_measurement(self):
+        """Return the unit of measurement."""
         return "%"
 
     @property
     def icon(self):
+        """Return the icon of the sensor."""
         return "mdi:cpu-64-bit"
 
     async def async_update(self):
-        """Update the sensor state."""
+        """Update the sensor."""
         try:
-            stats = await self.coordinator.api.get_container_stats(self.coordinator.endpoint_id, self.container_id)
-            if stats:
-                cpu_usage = stats["cpu_stats"]["cpu_usage"]["total_usage"]
-                precpu_usage = stats["precpu_stats"]["cpu_usage"]["total_usage"]
-                system_cpu = stats["cpu_stats"]["system_cpu_usage"]
-                pre_system_cpu = stats["precpu_stats"]["system_cpu_usage"]
+            container_data = self._get_container_data()
+            if not container_data:
+                self._state = STATE_UNKNOWN
+                return
 
-                cpu_delta = cpu_usage - precpu_usage
-                system_delta = system_cpu - pre_system_cpu
-                cpu_count = stats.get("cpu_stats", {}).get("online_cpus", 1)
-
-                usage = (cpu_delta / system_delta) * cpu_count * 100.0 if system_delta > 0 else 0
-                self._state = round(usage, 2)
+            # Get container stats
+            stats = await self.coordinator.api.get_container_stats(
+                self.coordinator.endpoint_id, self.container_id
+            )
+            
+            if stats and "cpu_stats" in stats:
+                cpu_stats = stats["cpu_stats"]
+                precpu_stats = stats.get("precpu_stats", {})
+                
+                # Calculate CPU usage percentage
+                cpu_delta = cpu_stats.get("cpu_usage", {}).get("total", 0) - precpu_stats.get("cpu_usage", {}).get("total", 0)
+                system_delta = cpu_stats.get("system_cpu_usage", 0) - precpu_stats.get("system_cpu_usage", 0)
+                
+                if system_delta > 0:
+                    cpu_percent = (cpu_delta / system_delta) * 100
+                    self._state = round(cpu_percent, 2)
+                else:
+                    self._state = 0.0
             else:
                 self._state = STATE_UNKNOWN
+                
         except Exception as e:
-            _LOGGER.warning("Failed to parse CPU stats for %s: %s", self.name, e)
+            _LOGGER.error("❌ Error updating CPU sensor for container %s: %s", self.container_id, e)
             self._state = STATE_UNKNOWN
 
 class ContainerMemorySensor(BaseContainerEntity, SensorEntity):
@@ -145,27 +172,44 @@ class ContainerMemorySensor(BaseContainerEntity, SensorEntity):
     @property
     def state(self):
         """Return the state of the sensor."""
+        # This will be updated by the coordinator
         return getattr(self, '_state', STATE_UNKNOWN)
 
     @property
     def unit_of_measurement(self):
+        """Return the unit of measurement."""
         return "MB"
 
     @property
     def icon(self):
+        """Return the icon of the sensor."""
         return "mdi:memory"
 
     async def async_update(self):
-        """Update the sensor state."""
+        """Update the sensor."""
         try:
-            stats = await self.coordinator.api.get_container_stats(self.coordinator.endpoint_id, self.container_id)
-            if stats:
-                mem_bytes = stats["memory_stats"]["usage"]
-                self._state = round(mem_bytes / (1024 * 1024), 2)
+            container_data = self._get_container_data()
+            if not container_data:
+                self._state = STATE_UNKNOWN
+                return
+
+            # Get container stats
+            stats = await self.coordinator.api.get_container_stats(
+                self.coordinator.endpoint_id, self.container_id
+            )
+            
+            if stats and "memory_stats" in stats:
+                memory_stats = stats["memory_stats"]
+                usage = memory_stats.get("usage", 0)
+                
+                # Convert bytes to MB
+                memory_mb = usage / (1024 * 1024)
+                self._state = round(memory_mb, 2)
             else:
                 self._state = STATE_UNKNOWN
+                
         except Exception as e:
-            _LOGGER.warning("Failed to parse memory stats for %s: %s", self.name, e)
+            _LOGGER.error("❌ Error updating memory sensor for container %s: %s", self.container_id, e)
             self._state = STATE_UNKNOWN
 
 class ContainerUptimeSensor(BaseContainerEntity, SensorEntity):
@@ -184,51 +228,55 @@ class ContainerUptimeSensor(BaseContainerEntity, SensorEntity):
     @property
     def state(self):
         """Return the state of the sensor."""
+        # This will be updated by the coordinator
         return getattr(self, '_state', STATE_UNKNOWN)
 
     @property
     def icon(self):
+        """Return the icon of the sensor."""
         return "mdi:clock-outline"
 
     async def async_update(self):
-        """Update the sensor state."""
+        """Update the sensor."""
         try:
-            container_info = await self.coordinator.api.get_container_info(self.coordinator.endpoint_id, self.container_id)
-            if container_info:
-                started_at = container_info["State"]["StartedAt"]
-                if started_at and started_at != "0001-01-01T00:00:00Z":
-                    # Convert ISO timestamp to human readable format
-                    from datetime import datetime
-                    try:
-                        dt = datetime.fromisoformat(started_at.replace('Z', '+00:00'))
-                        # Format as relative time (e.g., "2 days ago")
-                        from datetime import timezone
-                        now = datetime.now(timezone.utc)
-                        diff = now - dt.replace(tzinfo=timezone.utc)
-                        
-                        if diff.days > 0:
-                            self._state = f"{diff.days} days ago"
-                        elif diff.seconds > 3600:
-                            hours = diff.seconds // 3600
-                            self._state = f"{hours} hours ago"
-                        elif diff.seconds > 60:
-                            minutes = diff.seconds // 60
-                            self._state = f"{minutes} minutes ago"
-                        else:
-                            self._state = "Just started"
-                    except:
-                        # Fallback to original format if parsing fails
-                        self._state = started_at
+            container_data = self._get_container_data()
+            if not container_data:
+                self._state = STATE_UNKNOWN
+                return
+
+            # Get container stats
+            stats = await self.coordinator.api.get_container_stats(
+                self.coordinator.endpoint_id, self.container_id
+            )
+            
+            if stats and "read" in stats:
+                # Calculate uptime from the read timestamp
+                import time
+                current_time = time.time()
+                start_time = stats["read"]
+                uptime_seconds = current_time - start_time
+                
+                # Convert to human readable format
+                if uptime_seconds < 60:
+                    self._state = f"{int(uptime_seconds)}s"
+                elif uptime_seconds < 3600:
+                    minutes = int(uptime_seconds / 60)
+                    self._state = f"{minutes}m"
+                elif uptime_seconds < 86400:
+                    hours = int(uptime_seconds / 3600)
+                    self._state = f"{hours}h"
                 else:
-                    self._state = "Not started"
+                    days = int(uptime_seconds / 86400)
+                    self._state = f"{days}d"
             else:
                 self._state = STATE_UNKNOWN
+                
         except Exception as e:
-            _LOGGER.warning("Failed to get uptime for %s: %s", self.name, e)
+            _LOGGER.error("❌ Error updating uptime sensor for container %s: %s", self.container_id, e)
             self._state = STATE_UNKNOWN
 
 class ContainerImageSensor(BaseContainerEntity, SensorEntity):
-    """Sensor for container image."""
+    """Sensor for container image information."""
 
     @property
     def entity_type(self) -> str:
@@ -243,22 +291,38 @@ class ContainerImageSensor(BaseContainerEntity, SensorEntity):
     @property
     def state(self):
         """Return the state of the sensor."""
+        # This will be updated by the coordinator
         return getattr(self, '_state', STATE_UNKNOWN)
 
     @property
     def icon(self):
+        """Return the icon of the sensor."""
         return "mdi:docker"
 
     async def async_update(self):
-        """Update the sensor state."""
+        """Update the sensor."""
         try:
-            container_info = await self.coordinator.api.get_container_info(self.coordinator.endpoint_id, self.container_id)
-            if container_info:
-                self._state = container_info.get("Config", {}).get("Image", STATE_UNKNOWN)
+            container_data = self._get_container_data()
+            if not container_data:
+                self._state = STATE_UNKNOWN
+                return
+
+            # Get container inspection data
+            container_info = await self.coordinator.api.inspect_container(
+                self.coordinator.endpoint_id, self.container_id
+            )
+            
+            if container_info and "Config" in container_info:
+                image_name = container_info["Config"].get("Image", "")
+                if image_name:
+                    self._state = image_name
+                else:
+                    self._state = STATE_UNKNOWN
             else:
                 self._state = STATE_UNKNOWN
+                
         except Exception as e:
-            _LOGGER.warning("Failed to get image for %s: %s", self.name, e)
+            _LOGGER.error("❌ Error updating image sensor for container %s: %s", self.container_id, e)
             self._state = STATE_UNKNOWN
 
 class ContainerCurrentVersionSensor(BaseContainerEntity, SensorEntity):
@@ -272,28 +336,41 @@ class ContainerCurrentVersionSensor(BaseContainerEntity, SensorEntity):
     def name(self) -> str:
         """Return the name of the sensor."""
         display_name = self._get_container_name_display()
-        return f"Version {display_name}"
+        return f"Current Version {display_name}"
 
     @property
     def state(self):
         """Return the state of the sensor."""
+        # This will be updated by the coordinator
         return getattr(self, '_state', STATE_UNKNOWN)
 
     @property
     def icon(self):
-        return "mdi:tag-text"
+        """Return the icon of the sensor."""
+        return "mdi:tag"
 
     async def async_update(self):
-        """Update the sensor state."""
+        """Update the sensor."""
         try:
-            container_info = await self.coordinator.api.get_container_info(self.coordinator.endpoint_id, self.container_id)
-            if container_info:
-                image_id = container_info.get("Image")
+            container_data = self._get_container_data()
+            if not container_data:
+                self._state = STATE_UNKNOWN
+                return
+
+            # Get container inspection data
+            container_info = await self.coordinator.api.inspect_container(
+                self.coordinator.endpoint_id, self.container_id
+            )
+            
+            if container_info and "Image" in container_info:
+                image_id = container_info["Image"]
                 if image_id:
-                    # Get image details to extract version info
-                    image_data = await self.coordinator.api.get_image_info(self.coordinator.endpoint_id, image_id)
-                    if image_data:
-                        version = self.coordinator.api.extract_version_from_image(image_data)
+                    # Get image info to extract version
+                    image_info = await self.coordinator.api.get_image_info(
+                        self.coordinator.endpoint_id, image_id
+                    )
+                    if image_info:
+                        version = self.coordinator.api.extract_version_from_image(image_info)
                         self._state = version
                     else:
                         self._state = STATE_UNKNOWN
@@ -301,8 +378,9 @@ class ContainerCurrentVersionSensor(BaseContainerEntity, SensorEntity):
                     self._state = STATE_UNKNOWN
             else:
                 self._state = STATE_UNKNOWN
+                
         except Exception as e:
-            _LOGGER.warning("Failed to get current version for %s: %s", self.name, e)
+            _LOGGER.error("❌ Error updating current version sensor for container %s: %s", self.container_id, e)
             self._state = STATE_UNKNOWN
 
 class ContainerAvailableVersionSensor(BaseContainerEntity, SensorEntity):
@@ -316,31 +394,45 @@ class ContainerAvailableVersionSensor(BaseContainerEntity, SensorEntity):
     def name(self) -> str:
         """Return the name of the sensor."""
         display_name = self._get_container_name_display()
-        return f"Available {display_name}"
+        return f"Available Version {display_name}"
 
     @property
     def state(self):
         """Return the state of the sensor."""
+        # This will be updated by the coordinator
         return getattr(self, '_state', STATE_UNKNOWN)
 
     @property
     def icon(self):
-        return "mdi:tag-plus"
+        """Return the icon of the sensor."""
+        return "mdi:tag-outline"
 
     async def async_update(self):
-        """Update the sensor state."""
+        """Update the sensor."""
         try:
-            container_info = await self.coordinator.api.get_container_info(self.coordinator.endpoint_id, self.container_id)
-            if container_info:
-                image_name = container_info.get("Config", {}).get("Image")
+            container_data = self._get_container_data()
+            if not container_data:
+                self._state = STATE_UNKNOWN
+                return
+
+            # Get container inspection data
+            container_info = await self.coordinator.api.inspect_container(
+                self.coordinator.endpoint_id, self.container_id
+            )
+            
+            if container_info and "Config" in container_info:
+                image_name = container_info["Config"].get("Image", "")
                 if image_name:
                     # Get available version from registry
-                    available_version = await self.coordinator.api.get_available_version(self.coordinator.endpoint_id, image_name)
+                    available_version = await self.coordinator.api.get_available_version(
+                        self.coordinator.endpoint_id, image_name
+                    )
                     self._state = available_version
                 else:
                     self._state = STATE_UNKNOWN
             else:
                 self._state = STATE_UNKNOWN
+                
         except Exception as e:
-            _LOGGER.warning("Failed to get available version for %s: %s", self.name, e)
+            _LOGGER.error("❌ Error updating available version sensor for container %s: %s", self.container_id, e)
             self._state = STATE_UNKNOWN
