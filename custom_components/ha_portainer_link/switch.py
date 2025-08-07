@@ -6,6 +6,45 @@ from .portainer_api import PortainerAPI
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.info("Loaded Portainer switch integration.")
 
+<<<<<<< Updated upstream
+=======
+def _get_host_display_name(base_url):
+    """Extract a clean host name from the base URL for display purposes."""
+    # Remove protocol and common ports
+    host = base_url.replace("https://", "").replace("http://", "")
+    # Remove trailing slash if present
+    host = host.rstrip("/")
+    # Remove common ports
+    for port in [":9000", ":9443", ":80", ":443"]:
+        if host.endswith(port):
+            host = host[:-len(port)]
+    
+    # If the host is an IP address, keep it as is
+    # If it's a domain, try to extract a meaningful name
+    if host.replace('.', '').replace('-', '').replace('_', '').isdigit():
+        # It's an IP address, keep as is
+        return host
+    else:
+        # It's a domain, extract the main part
+        parts = host.split('.')
+        if len(parts) >= 2:
+            # Use the main domain part (e.g., "portainer" from "portainer.example.com")
+            return parts[0]
+        else:
+            return host
+
+def _get_host_hash(base_url):
+    """Generate a short hash of the host URL for unique identification."""
+    return hashlib.md5(base_url.encode()).hexdigest()[:8]
+
+def _get_simple_device_id(entry_id, endpoint_id, host_name, container_or_stack_name):
+    """Generate a simple, predictable device ID."""
+    # Use a simple format: entry_endpoint_host_container
+    sanitized_host = host_name.replace('.', '_').replace(':', '_').replace('-', '_')
+    sanitized_name = container_or_stack_name.replace('-', '_').replace(' ', '_')
+    return f"{entry_id}_{endpoint_id}_{sanitized_host}_{sanitized_name}"
+
+>>>>>>> Stashed changes
 async def async_setup_entry(hass, entry, async_add_entities):
     conf = entry.data
     host = conf["host"]
@@ -54,6 +93,7 @@ class ContainerSwitch(SwitchEntity):
 
     @property
     def device_info(self):
+<<<<<<< Updated upstream
         return {
             "identifiers": {(DOMAIN, self._container_id)},
             "name": self._container_name,
@@ -61,6 +101,35 @@ class ContainerSwitch(SwitchEntity):
             "model": "Docker Container",
             "configuration_url": f"{self._api.base_url}/#!/containers/{self._container_id}/details",
         }
+=======
+        host_name = _get_host_display_name(self._api.base_url)
+        
+        if self._stack_info.get("is_stack_container"):
+            # For stack containers, use the stack as the device
+            stack_name = self._stack_info.get("stack_name", "unknown_stack")
+            device_id = _get_simple_device_id(self._entry_id, self._endpoint_id, host_name, f"stack_{stack_name}")
+            _LOGGER.debug("🏗️ Creating stack device: %s (ID: %s) for host: %s", 
+                        stack_name, device_id, host_name)
+            return {
+                "identifiers": {(DOMAIN, device_id)},
+                "name": f"Stack: {stack_name} ({host_name})",
+                "manufacturer": "Docker via Portainer",
+                "model": "Docker Stack",
+                "configuration_url": f"{self._api.base_url}/#!/stacks/{stack_name}",
+            }
+        else:
+            # For standalone containers, use the container as the device
+            device_id = _get_simple_device_id(self._entry_id, self._endpoint_id, host_name, self._container_name)
+            _LOGGER.debug("🏗️ Creating standalone container device: %s (ID: %s) for host: %s", 
+                        self._container_name, device_id, host_name)
+            return {
+                "identifiers": {(DOMAIN, device_id)},
+                "name": f"{self._container_name} ({host_name})",
+                "manufacturer": "Docker via Portainer",
+                "model": "Docker Container",
+                "configuration_url": f"{self._api.base_url}/#!/containers/{self._container_id}/details",
+            }
+>>>>>>> Stashed changes
 
     async def async_turn_on(self, **kwargs):
         """Start the Docker container."""

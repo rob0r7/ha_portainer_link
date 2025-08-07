@@ -7,6 +7,45 @@ from .portainer_api import PortainerAPI
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.info("Loaded Portainer sensor integration.")
 
+<<<<<<< Updated upstream
+=======
+def _get_host_display_name(base_url):
+    """Extract a clean host name from the base URL for display purposes."""
+    # Remove protocol and common ports
+    host = base_url.replace("https://", "").replace("http://", "")
+    # Remove trailing slash if present
+    host = host.rstrip("/")
+    # Remove common ports
+    for port in [":9000", ":9443", ":80", ":443"]:
+        if host.endswith(port):
+            host = host[:-len(port)]
+    
+    # If the host is an IP address, keep it as is
+    # If it's a domain, try to extract a meaningful name
+    if host.replace('.', '').replace('-', '').replace('_', '').isdigit():
+        # It's an IP address, keep as is
+        return host
+    else:
+        # It's a domain, extract the main part
+        parts = host.split('.')
+        if len(parts) >= 2:
+            # Use the main domain part (e.g., "portainer" from "portainer.example.com")
+            return parts[0]
+        else:
+            return host
+
+def _get_host_hash(base_url):
+    """Generate a short hash of the host URL for unique identification."""
+    return hashlib.md5(base_url.encode()).hexdigest()[:8]
+
+def _get_simple_device_id(entry_id, endpoint_id, host_name, container_or_stack_name):
+    """Generate a simple, predictable device ID."""
+    # Use a simple format: entry_endpoint_host_container
+    sanitized_host = host_name.replace('.', '_').replace(':', '_').replace('-', '_')
+    sanitized_name = container_or_stack_name.replace('-', '_').replace(' ', '_')
+    return f"{entry_id}_{endpoint_id}_{sanitized_host}_{sanitized_name}"
+
+>>>>>>> Stashed changes
 async def async_setup_entry(hass, entry, async_add_entities):
     config = entry.data
     host = config["host"]
@@ -25,6 +64,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         container_id = container["Id"]
         state = container.get("State", STATE_UNKNOWN)
 
+<<<<<<< Updated upstream
         entities.append(ContainerStatusSensor(name, state, api, endpoint_id, container_id))
         entities.append(ContainerCPUSensor(name, api, endpoint_id, container_id))
         entities.append(ContainerMemorySensor(name, api, endpoint_id, container_id))
@@ -32,6 +72,19 @@ async def async_setup_entry(hass, entry, async_add_entities):
         entities.append(ContainerImageSensor(name, container, api, endpoint_id, container_id))
         entities.append(ContainerCurrentVersionSensor(name, api, endpoint_id, container_id))
         entities.append(ContainerAvailableVersionSensor(name, api, endpoint_id, container_id))
+=======
+        # Create sensors for all containers - they will all belong to the same stack device if they're in a stack
+        entities.append(ContainerStatusSensor(name, container_id, api, endpoint_id, stack_info, entry_id))
+        entities.append(ContainerCPUSensor(name, container_id, api, endpoint_id, stack_info, entry_id))
+        entities.append(ContainerMemorySensor(name, container_id, api, endpoint_id, stack_info, entry_id))
+        entities.append(ContainerUptimeSensor(name, container_id, api, endpoint_id, stack_info, entry_id))
+        entities.append(ContainerImageSensor(name, container_id, api, endpoint_id, stack_info, entry_id))
+        entities.append(ContainerCurrentVersionSensor(name, container_id, api, endpoint_id, stack_info, entry_id))
+        entities.append(ContainerAvailableVersionSensor(name, container_id, api, endpoint_id, stack_info, entry_id))
+
+    _LOGGER.info("✅ Created %d entities (%d stack containers, %d standalone containers)", 
+                len(entities), stack_containers_count, standalone_containers_count)
+>>>>>>> Stashed changes
 
     async_add_entities(entities, update_before_add=True)
 
@@ -45,6 +98,7 @@ class BaseContainerSensor(Entity):
 
     @property
     def device_info(self):
+<<<<<<< Updated upstream
         return {
             "identifiers": {(DOMAIN, self._container_id)},
             "name": self._container_name,
@@ -52,16 +106,59 @@ class BaseContainerSensor(Entity):
             "model": "Docker Container",
             "configuration_url": f"{self._api.base_url}/#!/containers/{self._container_id}/details",
         }
+=======
+        host_name = _get_host_display_name(self._api.base_url)
+        
+        if self._stack_info.get("is_stack_container"):
+            # For stack containers, use the stack as the device
+            stack_name = self._stack_info.get("stack_name", "unknown_stack")
+            device_id = _get_simple_device_id(self._entry_id, self._endpoint_id, host_name, f"stack_{stack_name}")
+            _LOGGER.debug("🏗️ Creating stack device: %s (ID: %s) for host: %s", 
+                        stack_name, device_id, host_name)
+            return {
+                "identifiers": {(DOMAIN, device_id)},
+                "name": f"Stack: {stack_name} ({host_name})",
+                "manufacturer": "Docker via Portainer",
+                "model": "Docker Stack",
+                "configuration_url": f"{self._api.base_url}/#!/stacks/{stack_name}",
+            }
+        else:
+            # For standalone containers, use the container as the device
+            device_id = _get_simple_device_id(self._entry_id, self._endpoint_id, host_name, self._container_name)
+            _LOGGER.debug("🏗️ Creating standalone container device: %s (ID: %s) for host: %s", 
+                        self._container_name, device_id, host_name)
+            return {
+                "identifiers": {(DOMAIN, device_id)},
+                "name": f"{self._container_name} ({host_name})",
+                "manufacturer": "Docker via Portainer",
+                "model": "Docker Container",
+                "configuration_url": f"{self._api.base_url}/#!/containers/{self._container_id}/details",
+            }
+>>>>>>> Stashed changes
 
 class ContainerStatusSensor(BaseContainerSensor):
-    """Sensor representing the status of a Docker container."""
+    """Sensor for container status."""
 
+<<<<<<< Updated upstream
     def __init__(self, name, state, api, endpoint_id, container_id):
         super().__init__(name, container_id, api)
         self._attr_name = f"{name} Status"
         self._attr_unique_id = f"{container_id}_status"
         self._endpoint_id = endpoint_id
         self._state = state
+=======
+    def __init__(self, container_name, container_id, api, endpoint_id, stack_info, entry_id):
+        super().__init__(container_name, container_id, api, endpoint_id, stack_info, entry_id)
+        self._attr_unique_id = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_status"
+        self._state = STATE_UNKNOWN
+        # Improve naming for stack containers
+        if stack_info.get("is_stack_container"):
+            stack_name = stack_info.get("stack_name", "unknown")
+            service_name = stack_info.get("service_name", container_name)
+            self._attr_name = f"{service_name} Status ({stack_name})"
+        else:
+            self._attr_name = f"{container_name} Status"
+>>>>>>> Stashed changes
 
     @property
     def state(self):
@@ -88,14 +185,27 @@ class ContainerStatusSensor(BaseContainerSensor):
             self._state = STATE_UNKNOWN
 
 class ContainerCPUSensor(BaseContainerSensor):
-    """Sensor representing CPU usage of a Docker container."""
+    """Sensor for container CPU usage."""
 
+<<<<<<< Updated upstream
     def __init__(self, name, api, endpoint_id, container_id):
         super().__init__(name, container_id, api)
         self._attr_name = f"{name} CPU Usage"
         self._attr_unique_id = f"{container_id}_cpu_usage"
         self._endpoint_id = endpoint_id
         self._state = STATE_UNKNOWN
+=======
+    def __init__(self, container_name, container_id, api, endpoint_id, stack_info, entry_id):
+        super().__init__(container_name, container_id, api, endpoint_id, stack_info, entry_id)
+        self._attr_unique_id = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_cpu_usage"
+        # Improve naming for stack containers
+        if stack_info.get("is_stack_container"):
+            stack_name = stack_info.get("stack_name", "unknown")
+            service_name = stack_info.get("service_name", container_name)
+            self._attr_name = f"{service_name} CPU Usage ({stack_name})"
+        else:
+            self._attr_name = f"{container_name} CPU Usage"
+>>>>>>> Stashed changes
 
     @property
     def state(self):
@@ -128,14 +238,27 @@ class ContainerCPUSensor(BaseContainerSensor):
             self._state = STATE_UNKNOWN
 
 class ContainerMemorySensor(BaseContainerSensor):
-    """Sensor representing memory usage of a Docker container."""
+    """Sensor for container memory usage."""
 
+<<<<<<< Updated upstream
     def __init__(self, name, api, endpoint_id, container_id):
         super().__init__(name, container_id, api)
         self._attr_name = f"{name} Memory Usage"
         self._attr_unique_id = f"{container_id}_memory_usage"
         self._endpoint_id = endpoint_id
         self._state = STATE_UNKNOWN
+=======
+    def __init__(self, container_name, container_id, api, endpoint_id, stack_info, entry_id):
+        super().__init__(container_name, container_id, api, endpoint_id, stack_info, entry_id)
+        self._attr_unique_id = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_memory_usage"
+        # Improve naming for stack containers
+        if stack_info.get("is_stack_container"):
+            stack_name = stack_info.get("stack_name", "unknown")
+            service_name = stack_info.get("service_name", container_name)
+            self._attr_name = f"{service_name} Memory Usage ({stack_name})"
+        else:
+            self._attr_name = f"{container_name} Memory Usage"
+>>>>>>> Stashed changes
 
     @property
     def state(self):
@@ -159,14 +282,27 @@ class ContainerMemorySensor(BaseContainerSensor):
             self._state = STATE_UNKNOWN
 
 class ContainerUptimeSensor(BaseContainerSensor):
-    """Sensor representing uptime of a Docker container."""
+    """Sensor for container uptime."""
 
+<<<<<<< Updated upstream
     def __init__(self, name, api, endpoint_id, container_id):
         super().__init__(name, container_id, api)
         self._attr_name = f"{name} Uptime"
         self._attr_unique_id = f"{container_id}_uptime"
         self._endpoint_id = endpoint_id
         self._state = STATE_UNKNOWN
+=======
+    def __init__(self, container_name, container_id, api, endpoint_id, stack_info, entry_id):
+        super().__init__(container_name, container_id, api, endpoint_id, stack_info, entry_id)
+        self._attr_unique_id = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_uptime"
+        # Improve naming for stack containers
+        if stack_info.get("is_stack_container"):
+            stack_name = stack_info.get("stack_name", "unknown")
+            service_name = stack_info.get("service_name", container_name)
+            self._attr_name = f"{service_name} Uptime ({stack_name})"
+        else:
+            self._attr_name = f"{container_name} Uptime"
+>>>>>>> Stashed changes
 
     @property
     def state(self):
@@ -210,14 +346,27 @@ class ContainerUptimeSensor(BaseContainerSensor):
             self._state = STATE_UNKNOWN
 
 class ContainerImageSensor(BaseContainerSensor):
-    """Sensor representing Docker image of a container."""
+    """Sensor for container image."""
 
+<<<<<<< Updated upstream
     def __init__(self, name, container_data, api, endpoint_id, container_id):
         super().__init__(name, container_id, api)
         self._attr_name = f"{name} Image"
         self._attr_unique_id = f"{container_id}_image"
         self._endpoint_id = endpoint_id
         self._state = container_data.get("Image", STATE_UNKNOWN)
+=======
+    def __init__(self, container_name, container_id, api, endpoint_id, stack_info, entry_id):
+        super().__init__(container_name, container_id, api, endpoint_id, stack_info, entry_id)
+        self._attr_unique_id = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_image"
+        # Improve naming for stack containers
+        if stack_info.get("is_stack_container"):
+            stack_name = stack_info.get("stack_name", "unknown")
+            service_name = stack_info.get("service_name", container_name)
+            self._attr_name = f"{service_name} Image ({stack_name})"
+        else:
+            self._attr_name = f"{container_name} Image"
+>>>>>>> Stashed changes
 
     @property
     def state(self):
@@ -241,14 +390,27 @@ class ContainerImageSensor(BaseContainerSensor):
 
 
 class ContainerCurrentVersionSensor(BaseContainerSensor):
-    """Sensor representing the current version of a Docker container."""
+    """Sensor for container current version."""
 
+<<<<<<< Updated upstream
     def __init__(self, name, api, endpoint_id, container_id):
         super().__init__(name, container_id, api)
         self._attr_name = f"{name} Current Version"
         self._attr_unique_id = f"{container_id}_current_version"
         self._endpoint_id = endpoint_id
         self._state = STATE_UNKNOWN
+=======
+    def __init__(self, container_name, container_id, api, endpoint_id, stack_info, entry_id):
+        super().__init__(container_name, container_id, api, endpoint_id, stack_info, entry_id)
+        self._attr_unique_id = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_current_version"
+        # Improve naming for stack containers
+        if stack_info.get("is_stack_container"):
+            stack_name = stack_info.get("stack_name", "unknown")
+            service_name = stack_info.get("service_name", container_name)
+            self._attr_name = f"{service_name} Current Version ({stack_name})"
+        else:
+            self._attr_name = f"{container_name} Current Version"
+>>>>>>> Stashed changes
 
     @property
     def state(self):
@@ -281,14 +443,27 @@ class ContainerCurrentVersionSensor(BaseContainerSensor):
 
 
 class ContainerAvailableVersionSensor(BaseContainerSensor):
-    """Sensor representing the available version of a Docker container."""
+    """Sensor for container available version."""
 
+<<<<<<< Updated upstream
     def __init__(self, name, api, endpoint_id, container_id):
         super().__init__(name, container_id, api)
         self._attr_name = f"{name} Available Version"
         self._attr_unique_id = f"{container_id}_available_version"
         self._endpoint_id = endpoint_id
         self._state = STATE_UNKNOWN
+=======
+    def __init__(self, container_name, container_id, api, endpoint_id, stack_info, entry_id):
+        super().__init__(container_name, container_id, api, endpoint_id, stack_info, entry_id)
+        self._attr_unique_id = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_available_version"
+        # Improve naming for stack containers
+        if stack_info.get("is_stack_container"):
+            stack_name = stack_info.get("stack_name", "unknown")
+            service_name = stack_info.get("service_name", container_name)
+            self._attr_name = f"{service_name} Available Version ({stack_name})"
+        else:
+            self._attr_name = f"{container_name} Available Version"
+>>>>>>> Stashed changes
 
     @property
     def state(self):

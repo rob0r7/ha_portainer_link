@@ -1,7 +1,11 @@
 {
   "domain": "ha_portainer_link",
   "name": "HA Portainer Link",
+<<<<<<< Updated upstream
   "version": "0.4.7",
+=======
+  "version": "0.2.5",
+>>>>>>> Stashed changes
   "documentation": "https://github.com/rob0r7/ha_portainer_link",
   "dependencies": [],
   "codeowners": ["@rob0r7"],
