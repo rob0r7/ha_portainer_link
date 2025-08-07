@@ -38,7 +38,7 @@ class PortainerImageAPI:
             
             # Get current image details
             current_image_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/{current_image_id}/json"
-            async with self.auth.session.get(current_image_url, headers=self.auth.get_headers(), ssl=False) as resp:
+            async with self.auth.session.get(current_image_url, headers=self.auth.get_headers()) as resp:
                 if resp.status != 200:
                     _LOGGER.debug("Could not get current image info: %s", resp.status)
                     return False
@@ -84,13 +84,13 @@ class PortainerImageAPI:
             params = {"fromImage": image_name}
             
             _LOGGER.debug("📥 Pulling latest image from registry: %s (check #%d)", image_name, self._update_check_count)
-            async with self.auth.session.post(pull_url, headers=self.auth.get_headers(), params=params, ssl=False) as resp:
+            async with self.auth.session.post(pull_url, headers=self.auth.get_headers(), params=params) as resp:
                 if resp.status == 200:
                     _LOGGER.debug("✅ Successfully pulled image from registry")
                     
                     # Get the newly pulled image digest
                     images_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/json"
-                    async with self.auth.session.get(images_url, headers=self.auth.get_headers(), ssl=False) as resp2:
+                    async with self.auth.session.get(images_url, headers=self.auth.get_headers()) as resp2:
                         if resp2.status == 200:
                             images_data = await resp2.json()
                             # Find the image with the same name but potentially different digest
@@ -169,7 +169,7 @@ class PortainerImageAPI:
             url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/create"
             params = {"fromImage": image_name}
             
-            async with self.auth.session.post(url, headers=self.auth.get_headers(), params=params, ssl=False) as resp:
+            async with self.auth.session.post(url, headers=self.auth.get_headers(), params=params) as resp:
                 if resp.status == 200:
                     _LOGGER.info("✅ Successfully pulled image update for container %s (%s)", container_id, image_name)
                     return True
@@ -184,7 +184,7 @@ class PortainerImageAPI:
         """Get detailed information about a Docker image."""
         try:
             url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/{image_id}/json"
-            async with self.auth.session.get(url, headers=self.auth.get_headers(), ssl=False) as resp:
+            async with self.auth.session.get(url, headers=self.auth.get_headers()) as resp:
                 if resp.status == 200:
                     return await resp.json()
                 else:
@@ -270,7 +270,7 @@ class PortainerImageAPI:
             
             # First, try to get the current image info without pulling
             images_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/json"
-            async with self.auth.session.get(images_url, headers=self.auth.get_headers(), ssl=False) as resp:
+            async with self.auth.session.get(images_url, headers=self.auth.get_headers()) as resp:
                 if resp.status == 200:
                     images_data = await resp.json()
                     # Find the image with the same name
@@ -292,12 +292,12 @@ class PortainerImageAPI:
             pull_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/create"
             params = {"fromImage": image_name}
             
-            async with self.auth.session.post(pull_url, headers=self.auth.get_headers(), params=params, ssl=False) as resp:
+            async with self.auth.session.post(pull_url, headers=self.auth.get_headers(), params=params) as resp:
                 if resp.status == 200:
                     _LOGGER.debug("✅ Successfully pulled image %s from registry", image_name)
                     
                     # Get the newly pulled image info
-                    async with self.auth.session.get(images_url, headers=self.auth.get_headers(), ssl=False) as resp2:
+                    async with self.auth.session.get(images_url, headers=self.auth.get_headers()) as resp2:
                         if resp2.status == 200:
                             images_data = await resp2.json()
                             # Find the image with the same name
@@ -350,7 +350,7 @@ class PortainerImageAPI:
         """Get detailed container information including image details."""
         url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/json"
         try:
-            async with self.auth.session.get(url, headers=self.auth.get_headers(), ssl=False) as resp:
+            async with self.auth.session.get(url, headers=self.auth.get_headers()) as resp:
                 if resp.status == 200:
                     return await resp.json()
                 else:

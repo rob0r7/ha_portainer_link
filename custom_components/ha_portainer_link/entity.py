@@ -3,6 +3,8 @@ import hashlib
 from typing import Optional, Dict, Any
 from homeassistant.helpers.entity import Entity
 from homeassistant.core import HomeAssistant
+from urllib.parse import urlparse
+import ipaddress
 
 from .const import DOMAIN
 from .coordinator import PortainerDataUpdateCoordinator
@@ -11,28 +13,33 @@ _LOGGER = logging.getLogger(__name__)
 
 def _get_host_display_name(base_url: str) -> str:
     """Extract a clean host name from the base URL for display purposes."""
-    # Remove protocol and common ports
-    host = base_url.replace("https://", "").replace("http://", "")
-    # Remove trailing slash if present
-    host = host.rstrip("/")
-    # Remove common ports
-    for port in [":9000", ":9443", ":80", ":443"]:
-        if host.endswith(port):
-            host = host[:-len(port)]
-    
-    # If the host is an IP address, keep it as is
-    # If it's a domain, try to extract a meaningful name
-    if host.replace('.', '').replace('-', '').replace('_', '').isdigit():
-        # It's an IP address, keep as is
-        return host
+    # Parse the URL to safely extract the hostname
+    parsed = urlparse(base_url)
+    netloc = parsed.netloc or base_url
+
+    # Handle IPv6 in brackets and strip port if present
+    host_only = netloc
+    if host_only.startswith("["):
+        # [IPv6]:port or [IPv6]
+        end_idx = host_only.find("]")
+        host_only = host_only[1:end_idx] if end_idx != -1 else host_only.strip("[]")
     else:
-        # It's a domain, extract the main part
-        parts = host.split('.')
-        if len(parts) >= 2:
-            # Use the main domain part (e.g., "portainer" from "portainer.example.com")
-            return parts[0]
-        else:
-            return host
+        # hostname:port
+        if ":" in host_only:
+            host_only = host_only.split(":", 1)[0]
+
+    # If the host is an IP address, keep it as is
+    try:
+        ipaddress.ip_address(host_only)
+        return host_only
+    except ValueError:
+        pass
+
+    # It's a domain, extract the left-most label as a friendly name
+    parts = host_only.strip(".").split('.')
+    if len(parts) >= 2:
+        return parts[0]
+    return host_only
 
 def _get_simple_device_id(entry_id: str, endpoint_id: int, host_name: str, container_or_stack_name: str) -> str:
     """Generate a simple, predictable device ID."""

@@ -45,7 +45,7 @@ class PortainerAuth:
         payload = {"Username": self.username, "Password": self.password}
         
         try:
-            async with self.session.post(url, json=payload, ssl=False) as resp:
+            async with self.session.post(url, json=payload) as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     self.token = data.get("jwt")

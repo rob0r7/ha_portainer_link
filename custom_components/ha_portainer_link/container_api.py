@@ -16,7 +16,7 @@ class PortainerContainerAPI:
         """Get all containers for an endpoint."""
         url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/json?all=1"
         try:
-            async with self.auth.session.get(url, headers=self.auth.get_headers(), ssl=False) as resp:
+            async with self.auth.session.get(url, headers=self.auth.get_headers()) as resp:
                 if resp.status == 200:
                     return await resp.json()
                 else:
@@ -30,7 +30,7 @@ class PortainerContainerAPI:
         """Inspect a specific container."""
         url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/json"
         try:
-            async with self.auth.session.get(url, headers=self.auth.get_headers(), ssl=False) as resp:
+            async with self.auth.session.get(url, headers=self.auth.get_headers()) as resp:
                 if resp.status == 200:
                     container_data = await resp.json()
                     _LOGGER.debug("✅ Successfully inspected container %s", container_id)
@@ -46,7 +46,7 @@ class PortainerContainerAPI:
         """Get container statistics."""
         url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/stats?stream=false"
         try:
-            async with self.auth.session.get(url, headers=self.auth.get_headers(), ssl=False) as resp:
+            async with self.auth.session.get(url, headers=self.auth.get_headers()) as resp:
                 if resp.status == 200:
                     return await resp.json()
                 else:
@@ -60,7 +60,7 @@ class PortainerContainerAPI:
         """Start a container."""
         url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/start"
         try:
-            async with self.auth.session.post(url, headers=self.auth.get_headers(), ssl=False) as resp:
+            async with self.auth.session.post(url, headers=self.auth.get_headers()) as resp:
                 success = resp.status == 204
                 if success:
                     _LOGGER.info("✅ Successfully started container %s", container_id)
@@ -75,7 +75,7 @@ class PortainerContainerAPI:
         """Stop a container."""
         url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/stop"
         try:
-            async with self.auth.session.post(url, headers=self.auth.get_headers(), ssl=False) as resp:
+            async with self.auth.session.post(url, headers=self.auth.get_headers()) as resp:
                 success = resp.status == 204
                 if success:
                     _LOGGER.info("✅ Successfully stopped container %s", container_id)
@@ -90,7 +90,7 @@ class PortainerContainerAPI:
         """Restart a container."""
         url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/restart"
         try:
-            async with self.auth.session.post(url, headers=self.auth.get_headers(), ssl=False) as resp:
+            async with self.auth.session.post(url, headers=self.auth.get_headers()) as resp:
                 success = resp.status == 204
                 if success:
                     _LOGGER.info("✅ Successfully restarted container %s", container_id)

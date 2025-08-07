@@ -16,7 +16,7 @@ class PortainerStackAPI:
         """Get all stacks from Portainer for a specific endpoint."""
         try:
             stacks_url = f"{self.base_url}/api/stacks"
-            async with self.auth.session.get(stacks_url, headers=self.auth.get_headers(), ssl=False) as resp:
+            async with self.auth.session.get(stacks_url, headers=self.auth.get_headers()) as resp:
                 if resp.status == 200:
                     stacks_data = await resp.json()
                     # Filter stacks for the specific endpoint
@@ -37,7 +37,7 @@ class PortainerStackAPI:
             
             # Get all containers in the stack
             containers_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/json?all=1"
-            async with self.auth.session.get(containers_url, headers=self.auth.get_headers(), ssl=False) as resp:
+            async with self.auth.session.get(containers_url, headers=self.auth.get_headers()) as resp:
                 if resp.status != 200:
                     _LOGGER.error("❌ Could not get containers list: HTTP %s", resp.status)
                     return False
@@ -62,7 +62,7 @@ class PortainerStackAPI:
                 for container_id in stack_containers:
                     try:
                         stop_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/stop"
-                        async with self.auth.session.post(stop_url, headers=self.auth.get_headers(), ssl=False) as stop_resp:
+                        async with self.auth.session.post(stop_url, headers=self.auth.get_headers()) as stop_resp:
                             if stop_resp.status == 204:
                                 success_count += 1
                                 _LOGGER.debug("✅ Stopped container %s", container_id)
@@ -86,7 +86,7 @@ class PortainerStackAPI:
             
             # Get all containers in the stack
             containers_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/json?all=1"
-            async with self.auth.session.get(containers_url, headers=self.auth.get_headers(), ssl=False) as resp:
+            async with self.auth.session.get(containers_url, headers=self.auth.get_headers()) as resp:
                 if resp.status != 200:
                     _LOGGER.error("❌ Could not get containers list: HTTP %s", resp.status)
                     return False
@@ -111,7 +111,7 @@ class PortainerStackAPI:
                 for container_id in stack_containers:
                     try:
                         start_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/start"
-                        async with self.auth.session.post(start_url, headers=self.auth.get_headers(), ssl=False) as start_resp:
+                        async with self.auth.session.post(start_url, headers=self.auth.get_headers()) as start_resp:
                             if start_resp.status == 204:
                                 success_count += 1
                                 _LOGGER.debug("✅ Started container %s", container_id)
@@ -173,7 +173,7 @@ class PortainerStackAPI:
             stack_file_url = f"{self.base_url}/api/stacks/{stack_id}/file"
             _LOGGER.info("📄 Retrieving stack file from: %s", stack_file_url)
             
-            async with self.auth.session.get(stack_file_url, headers=self.auth.get_headers(), ssl=False) as resp:
+            async with self.auth.session.get(stack_file_url, headers=self.auth.get_headers()) as resp:
                 _LOGGER.info("📄 Stack file response status: %s", resp.status)
                 if resp.status != 200:
                     response_text = await resp.text()
@@ -203,7 +203,7 @@ class PortainerStackAPI:
             
             env_variables = []
             try:
-                async with self.auth.session.get(stack_details_url, headers=self.auth.get_headers(), ssl=False) as details_resp:
+                async with self.auth.session.get(stack_details_url, headers=self.auth.get_headers()) as details_resp:
                     if details_resp.status == 200:
                         stack_details = await details_resp.json()
                         if "Env" in stack_details:
@@ -242,7 +242,7 @@ class PortainerStackAPI:
             _LOGGER.info("🔄 Environment variables count: %d", len(update_payload.get("Env", [])))
             _LOGGER.debug("🔄 Full update payload: %s", update_payload)
             
-            async with self.auth.session.put(update_url, headers=self.auth.get_headers(), json=update_payload, ssl=False) as resp:
+            async with self.auth.session.put(update_url, headers=self.auth.get_headers(), json=update_payload) as resp:
                 _LOGGER.info("🔄 Update response status: %s", resp.status)
                 
                 if resp.status == 200:

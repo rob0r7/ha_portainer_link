@@ -46,32 +46,43 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
             stack_containers_count = 0
             standalone_containers_count = 0
             
+            # Save containers and prepare inspection tasks
+            inspection_tasks: List[asyncio.Task] = []
+            container_ids: List[str] = []
             for container in containers:
                 container_id = container["Id"]
                 container_name = container.get("Names", ["unknown"])[0].strip("/")
                 self.containers[container_id] = container
-                
-                # Get stack information for each container
-                container_info = await self.api.inspect_container(self.endpoint_id, container_id)
-                if container_info:
-                    stack_info = self.api.get_container_stack_info(container_info)
-                    self.container_stack_info[container_id] = stack_info
-                    
-                    if stack_info.get("is_stack_container"):
-                        stack_name = stack_info.get("stack_name")
-                        service_name = stack_info.get("service_name")
-                        if stack_name:
-                            self.container_stack_map[container_id] = stack_name
-                            stack_containers_count += 1
-                            _LOGGER.debug("✅ Container %s is part of stack %s (service: %s)", 
-                                         container_name, stack_name, service_name)
-                        else:
-                            _LOGGER.warning("⚠️ Container %s has stack labels but no stack name", container_name)
+                container_ids.append(container_id)
+                inspection_tasks.append(asyncio.create_task(self.api.inspect_container(self.endpoint_id, container_id)))
+            
+            # Run inspections concurrently
+            inspection_results = await asyncio.gather(*inspection_tasks, return_exceptions=True)
+            for container_id, result in zip(container_ids, inspection_results):
+                container_name = self.containers.get(container_id, {}).get("Names", ["unknown"])[0].strip("/")
+                if isinstance(result, Exception) or result is None:
+                    if isinstance(result, Exception):
+                        _LOGGER.warning("⚠️ Exception inspecting container %s: %s", container_name, result)
                     else:
-                        standalone_containers_count += 1
-                        _LOGGER.debug("ℹ️ Container %s is standalone", container_name)
+                        _LOGGER.warning("⚠️ Could not inspect container %s", container_name)
+                    continue
+                
+                stack_info = self.api.get_container_stack_info(result)
+                self.container_stack_info[container_id] = stack_info
+                
+                if stack_info.get("is_stack_container"):
+                    stack_name = stack_info.get("stack_name")
+                    service_name = stack_info.get("service_name")
+                    if stack_name:
+                        self.container_stack_map[container_id] = stack_name
+                        stack_containers_count += 1
+                        _LOGGER.debug("✅ Container %s is part of stack %s (service: %s)", 
+                                     container_name, stack_name, service_name)
+                    else:
+                        _LOGGER.warning("⚠️ Container %s has stack labels but no stack name", container_name)
                 else:
-                    _LOGGER.warning("⚠️ Could not inspect container %s", container_name)
+                    standalone_containers_count += 1
+                    _LOGGER.debug("ℹ️ Container %s is standalone", container_name)
             
             # Process stacks
             self.stacks = {stack["Name"]: stack for stack in stacks}

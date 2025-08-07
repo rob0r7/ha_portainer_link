@@ -188,7 +188,7 @@ class PortainerAPI:
                 "pullImage": True  # Pull latest images
             }
             
-            async with self.session.put(update_url, headers=self.auth.get_headers(), json=update_payload, ssl=False) as resp:
+            async with self.session.put(update_url, headers=self.auth.get_headers(), json=update_payload) as resp:
                 if resp.status == 200:
                     _LOGGER.info("✅ Successfully updated stack %s", stack_name)
                     return True
@@ -224,7 +224,7 @@ class PortainerAPI:
             # Stop the current container
             _LOGGER.info("⏹️ Stopping container %s", container_name)
             stop_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/stop"
-            async with self.session.post(stop_url, headers=self.auth.get_headers(), ssl=False) as resp:
+            async with self.session.post(stop_url, headers=self.auth.get_headers()) as resp:
                 if resp.status not in [204, 304]:  # 304 means already stopped
                     _LOGGER.warning("Could not stop container %s: %s", container_name, resp.status)
             
@@ -235,7 +235,7 @@ class PortainerAPI:
             # Remove the old container
             _LOGGER.info("🗑️ Removing old container %s", container_name)
             remove_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}?force=1"
-            async with self.session.delete(remove_url, headers=self.auth.get_headers(), ssl=False) as resp:
+            async with self.session.delete(remove_url, headers=self.auth.get_headers()) as resp:
                 if resp.status not in [204, 404]:  # 404 means already removed
                     _LOGGER.warning("Could not remove container %s: %s", container_name, resp.status)
             
@@ -332,7 +332,7 @@ class PortainerAPI:
                 }
             }
             
-            async with self.session.post(create_url, headers=self.auth.get_headers(), json=create_payload, ssl=False) as resp:
+            async with self.session.post(create_url, headers=self.auth.get_headers(), json=create_payload) as resp:
                 if resp.status == 201:
                     new_container_data = await resp.json()
                     new_container_id = new_container_data.get("Id")
@@ -341,7 +341,7 @@ class PortainerAPI:
                     # Start the new container
                     _LOGGER.info("▶️ Starting new container %s", container_name)
                     start_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{new_container_id}/start"
-                    async with self.session.post(start_url, headers=self.auth.get_headers(), ssl=False) as resp:
+                    async with self.session.post(start_url, headers=self.auth.get_headers()) as resp:
                         if resp.status == 204:
                             _LOGGER.info("✅ Successfully started new container %s", container_name)
                             return True
