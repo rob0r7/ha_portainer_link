@@ -114,13 +114,8 @@ Invalid config for 'logger': 'custom_components.ha_portainer_link' is an invalid
 service: ha_portainer_link.refresh
 ```
 
-#### Stack Update Not Pulling New Images
-**Solution**: The stack update function now performs a complete force update:
-1. Pulls latest images for all containers
-2. Stops all containers in the stack
-3. Removes old containers
-4. Redeploys with new images
-5. This process may take several minutes for large stacks
+#### Stack Update Buttons Disabled
+**Note**: Stack update buttons are temporarily disabled due to reliability issues. Use individual container pull update buttons instead.
 
 ### Debugging
 Enable debug logging in your `configuration.yaml`:
@@ -165,7 +160,7 @@ Force refresh container data for all integrations.
 ### Stack Controls
 - **Stack Start**: Start entire stack
 - **Stack Stop**: Stop entire stack
-- **Stack Update**: Force update stack with image pull and container recreation
+- **Stack Update**: Temporarily disabled due to reliability issues
 
 ### Bulk Operations (Full View only)
 - **Start All**: Start all stopped containers
@@ -173,11 +168,13 @@ Force refresh container data for all integrations.
 
 ## 🔄 Recent Updates
 
-### v0.3.4 (Current)
-- 🔧 Fixed migration handler for config entries from older versions
-- 🔧 Added missing services.yaml file for proper service registration
-- 🔧 Cleaned up unused imports to reduce log noise
-- 🔧 Enhanced migration to handle all version upgrades properly
+### v0.3.8 (Current)
+- 🔧 Disabled stack update buttons due to reliability issues
+- 🔧 Fixed entity category errors for version sensors
+- 🔧 Removed device registry warnings by eliminating via_device references
+- 🔧 Improved integration stability and error handling
+- 🔧 Enhanced lightweight and full view mode implementation
+- 🔧 Streamlined configuration flow and migration handling
 
 ### v0.3.7
 - 🔧 Fixed indentation error in stack update fallback logic

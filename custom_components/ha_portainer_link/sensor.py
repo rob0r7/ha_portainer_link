@@ -382,7 +382,7 @@ class ContainerImageSensor(BaseContainerEntity, SensorEntity):
 
     @property
     def entity_category(self) -> EntityCategory | None:
-        return EntityCategory.CONFIG
+        return EntityCategory.DIAGNOSTIC
 
 class ContainerCurrentVersionSensor(BaseContainerEntity, SensorEntity):
     """Sensor for container current version."""
@@ -444,7 +444,7 @@ class ContainerCurrentVersionSensor(BaseContainerEntity, SensorEntity):
 
     @property
     def entity_category(self) -> EntityCategory | None:
-        return EntityCategory.CONFIG
+        return EntityCategory.DIAGNOSTIC
 
 class ContainerAvailableVersionSensor(BaseContainerEntity, SensorEntity):
     """Sensor for container available version."""
@@ -457,7 +457,10 @@ class ContainerAvailableVersionSensor(BaseContainerEntity, SensorEntity):
     def name(self) -> str:
         """Return the name of the sensor."""
         display_name = self._get_container_name_display()
-        return f"Available Version {display_name}"
+        if self.stack_info.get("is_stack_container"):
+            return f"Container Available Version {display_name}"
+        else:
+            return f"Available Version {display_name}"
 
     @property
     def state(self):
@@ -478,21 +481,18 @@ class ContainerAvailableVersionSensor(BaseContainerEntity, SensorEntity):
                 self._state = STATE_UNKNOWN
                 return
 
-            # Get container inspection data
-            container_info = await self.coordinator.api.inspect_container(
+            # Check if update sensors are enabled
+            if not self.coordinator.update_sensors_enabled():
+                self._state = STATE_UNKNOWN
+                return
+
+            # Get available version from image API
+            available_version = await self.coordinator.api.check_image_updates(
                 self.coordinator.endpoint_id, self.container_id
             )
             
-            if container_info and "Config" in container_info:
-                image_name = container_info["Config"].get("Image", "")
-                if image_name:
-                    # Get available version from registry
-                    available_version = await self.coordinator.api.get_available_version(
-                        self.coordinator.endpoint_id, image_name
-                    )
-                    self._state = available_version
-                else:
-                    self._state = STATE_UNKNOWN
+            if available_version:
+                self._state = available_version
             else:
                 self._state = STATE_UNKNOWN
                 
@@ -502,7 +502,7 @@ class ContainerAvailableVersionSensor(BaseContainerEntity, SensorEntity):
 
     @property
     def entity_category(self) -> EntityCategory | None:
-        return EntityCategory.CONFIG
+        return EntityCategory.DIAGNOSTIC
 
 
 class StackStatusSensor(BaseStackEntity, SensorEntity):

@@ -37,7 +37,6 @@ def create_stack_device_info(entry_id: str, stack_id: str, stack_name: str) -> D
         name=f"Stack: {stack_name}",
         manufacturer="Docker",
         model="Docker Stack",
-        via_device=(DOMAIN, entry_id),
     )
 
 def create_container_device_info(entry_id: str, container_id: str, container_name: str, stack_info: dict = None) -> DeviceInfo:
@@ -47,11 +46,9 @@ def create_container_device_info(entry_id: str, container_id: str, container_nam
         # Container belongs to a stack
         stack_id = stack_info.get("stack_id")
         stack_name = stack_info.get("stack_name", "unknown")
-        via_device = (DOMAIN, entry_id, "stack", stack_id)
         name = f"Container: {container_name}"
     else:
         # Standalone container
-        via_device = (DOMAIN, entry_id)
         name = f"Container: {container_name}"
     
     return DeviceInfo(
@@ -60,7 +57,6 @@ def create_container_device_info(entry_id: str, container_id: str, container_nam
         name=name,
         manufacturer="Docker",
         model="Docker Container",
-        via_device=via_device,
     )
 
 async def async_setup(hass: HomeAssistant, config: dict):

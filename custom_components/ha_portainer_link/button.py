@@ -62,7 +62,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
             # Create stack buttons
             entities.append(StackStopButton(coordinator, entry_id, stack_name))
             entities.append(StackStartButton(coordinator, entry_id, stack_name))
-            entities.append(StackUpdateButton(coordinator, entry_id, stack_name))
+            # Temporarily disabled stack update buttons as they don't work properly
+            # entities.append(StackUpdateButton(coordinator, entry_id, stack_name))
 
     _LOGGER.info("✅ Created %d button entities (Container: %s, Stack: %s)", 
                  len(entities), container_buttons_enabled, stack_buttons_enabled)
