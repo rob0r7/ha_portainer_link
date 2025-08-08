@@ -9,12 +9,13 @@ _LOGGER = logging.getLogger(__name__)
 class PortainerImageAPI:
     """Handle Portainer image operations."""
 
-    def __init__(self, base_url: str, auth, config: Optional[Dict[str, Any]] = None, ssl_verify: bool = True):
+    def __init__(self, base_url: str, auth, config: Optional[Dict[str, Any]] = None, ssl_verify: bool = True, session=None):
         """Initialize image API."""
         self.base_url = base_url
         self.auth = auth
         self.config = config or {}
         self.ssl_verify = ssl_verify
+        self.session = session  # Use shared session from main API
         
         # Initialize rate limiting with fixed values (simplified)
         self._cache_duration = 6 * 3600  # 6 hours in seconds
@@ -54,7 +55,8 @@ class PortainerImageAPI:
             
             # Get current image details
             current_image_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/{current_image_id}/json"
-            async with self.auth.session.get(current_image_url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
+            session = self.session or self.auth.session
+            async with session.get(current_image_url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
                 if resp.status != 200:
                     _LOGGER.debug("Could not get current image info: %s", resp.status)
                     return False
@@ -96,7 +98,8 @@ class PortainerImageAPI:
             params = {"fromImage": image_name}
             
             try:
-                async with self.auth.session.post(pull_url, params=params, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
+                session = self.session or self.auth.session
+                async with session.post(pull_url, params=params, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
                     if resp.status == 200:
                         # Successfully pulled new image
                         _LOGGER.debug("✅ New image available for %s", image_name)
@@ -143,7 +146,8 @@ class PortainerImageAPI:
             pull_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/create"
             params = {"fromImage": image_name}
             
-            async with self.auth.session.post(pull_url, params=params, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
+            session = self.session or self.auth.session
+            async with session.post(pull_url, params=params, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
                 if resp.status == 200:
                     _LOGGER.info("✅ Successfully pulled latest image for %s", image_name)
                     return True
@@ -162,7 +166,8 @@ class PortainerImageAPI:
             
             # Try with current SSL setting first
             try:
-                async with self.auth.session.get(image_url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
+                session = self.session or self.auth.session
+                async with session.get(image_url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
                     if resp.status == 200:
                         return await resp.json()
                     else:
@@ -172,7 +177,7 @@ class PortainerImageAPI:
                 _LOGGER.info("🔧 SSL certificate error, retrying with SSL disabled: %s", e)
                 # Retry with SSL disabled
                 try:
-                    async with self.auth.session.get(image_url, headers=self.auth.get_headers(), ssl=False) as resp:
+                    async with session.get(image_url, headers=self.auth.get_headers(), ssl=False) as resp:
                         if resp.status == 200:
                             _LOGGER.info("✅ Successfully connected with SSL disabled")
                             # Update SSL setting for future calls
@@ -280,7 +285,8 @@ class PortainerImageAPI:
             params = {"fromImage": image_name}
             
             try:
-                async with self.auth.session.post(pull_url, params=params, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
+                session = self.session or self.auth.session
+                async with session.post(pull_url, params=params, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
                     if resp.status == 200:
                         # Successfully pulled new image, get its info
                         image_id = resp.headers.get("X-Docker-Content-Digest", "")
@@ -341,7 +347,8 @@ class PortainerImageAPI:
             
             # Try with current SSL setting first
             try:
-                async with self.auth.session.get(container_url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
+                session = self.session or self.auth.session
+                async with session.get(container_url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
                     if resp.status == 200:
                         return await resp.json()
                     else:
@@ -351,7 +358,7 @@ class PortainerImageAPI:
                 _LOGGER.info("🔧 SSL certificate error, retrying with SSL disabled: %s", e)
                 # Retry with SSL disabled
                 try:
-                    async with self.auth.session.get(container_url, headers=self.auth.get_headers(), ssl=False) as resp:
+                    async with session.get(container_url, headers=self.auth.get_headers(), ssl=False) as resp:
                         if resp.status == 200:
                             _LOGGER.info("✅ Successfully connected with SSL disabled")
                             # Update SSL setting for future calls

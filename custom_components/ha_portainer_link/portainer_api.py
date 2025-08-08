@@ -27,15 +27,18 @@ class PortainerAPI:
         self.ssl_verify = True  # Will be determined automatically
         self.config = config or {}
         
-        _LOGGER.debug("🔧 Initializing Portainer API with base URL: %s", self.base_url)
+        # Get configured endpoint ID, default to 1 if not specified
+        self.endpoint_id = self.config.get('endpoint_id', 1)
+        
+        _LOGGER.debug("🔧 Initializing Portainer API with base URL: %s and endpoint ID: %s", self.base_url, self.endpoint_id)
         
         # Initialize authentication
         self.auth = PortainerAuth(self.base_url, username, password, api_key, self.ssl_verify)
         
         # Initialize API modules with the base URL
-        self.containers = PortainerContainerAPI(self.base_url, self.auth, self.ssl_verify)
-        self.stacks = PortainerStackAPI(self.base_url, self.auth, self.ssl_verify)
-        self.images = PortainerImageAPI(self.base_url, self.auth, self.config, self.ssl_verify)
+        self.containers = PortainerContainerAPI(self.base_url, self.auth, self.ssl_verify, None)  # Session will be set later
+        self.stacks = PortainerStackAPI(self.base_url, self.auth, self.ssl_verify, None)  # Session will be set later
+        self.images = PortainerImageAPI(self.base_url, self.auth, self.config, self.ssl_verify, None)  # Session will be set later
 
     async def initialize(self) -> bool:
         """Initialize the API connection."""
@@ -62,19 +65,27 @@ class PortainerAPI:
                     # Update SSL verification setting for all components
                     self.ssl_verify = ssl_verify
                     self.containers.ssl_verify = ssl_verify
+                    self.containers.session = self.session  # Set shared session
                     self.stacks.ssl_verify = ssl_verify
+                    self.stacks.session = self.session  # Set shared session
                     self.images.ssl_verify = ssl_verify
+                    self.images.session = self.session  # Set shared session
                     self.auth.ssl_verify = ssl_verify
                     
                     # Initialize authentication
                     if await self.auth.initialize(self.session):
-                        # Test the connection by trying to get containers
-                        test_containers = await self.containers.get_containers(1)
-                        if test_containers is not None:
-                            _LOGGER.info("✅ Connection successful with %s", description)
-                            return True
+                        # Test the connection by checking if endpoint exists first
+                        if await self.containers.check_endpoint_exists(self.endpoint_id):
+                            # Test the connection by trying to get containers
+                            test_containers = await self.containers.get_containers(self.endpoint_id)
+                            if test_containers is not None:
+                                _LOGGER.info("✅ Connection successful with %s", description)
+                                return True
+                            else:
+                                _LOGGER.warning("⚠️ Connection test failed with %s", description)
+                                await self.session.close()
                         else:
-                            _LOGGER.warning("⚠️ Connection test failed with %s", description)
+                            _LOGGER.warning("⚠️ Endpoint %s does not exist with %s", self.endpoint_id, description)
                             await self.session.close()
                     else:
                         _LOGGER.warning("⚠️ Authentication failed with %s", description)
@@ -203,7 +214,7 @@ class PortainerAPI:
             # Remove the container
             remove_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}?force=1"
             try:
-                async with self.auth.session.delete(remove_url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
+                async with self.session.delete(remove_url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
                     if resp.status != 204:
                         _LOGGER.error("❌ Failed to remove container %s: HTTP %s", container_id, resp.status)
                         return False
@@ -214,64 +225,68 @@ class PortainerAPI:
             # Create new container with same configuration but updated image
             create_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/create"
             
-            # Prepare container configuration
+            # Use defensive programming to avoid KeyError
+            config = container_info.get("Config", {})
+            host_config = container_info.get("HostConfig", {})
+            
+            # Prepare container configuration with safe defaults
             container_config = {
-                "Image": container_info["Config"]["Image"],
-                "Cmd": container_info["Config"]["Cmd"],
-                "Env": container_info["Config"]["Env"],
-                "ExposedPorts": container_info["Config"]["ExposedPorts"],
-                "Volumes": container_info["Config"]["Volumes"],
-                "WorkingDir": container_info["Config"]["WorkingDir"],
-                "Entrypoint": container_info["Config"]["Entrypoint"],
-                "Labels": container_info["Config"]["Labels"],
+                "Image": config.get("Image"),
+                "Cmd": config.get("Cmd"),
+                "Env": config.get("Env", []),
+                "ExposedPorts": config.get("ExposedPorts", {}),
+                "Volumes": config.get("Volumes", {}),
+                "WorkingDir": config.get("WorkingDir"),
+                "Entrypoint": config.get("Entrypoint"),
+                "Labels": config.get("Labels", {}),
                 "HostConfig": {
-                    "Binds": container_info["HostConfig"]["Binds"],
-                    "PortBindings": container_info["HostConfig"]["PortBindings"],
-                    "RestartPolicy": container_info["HostConfig"]["RestartPolicy"],
-                    "NetworkMode": container_info["HostConfig"]["NetworkMode"],
-                    "CapAdd": container_info["HostConfig"]["CapAdd"],
-                    "CapDrop": container_info["HostConfig"]["CapDrop"],
-                    "SecurityOpt": container_info["HostConfig"]["SecurityOpt"],
-                    "Devices": container_info["HostConfig"]["Devices"],
-                    "ExtraHosts": container_info["HostConfig"]["ExtraHosts"],
-                    "VolumesFrom": container_info["HostConfig"]["VolumesFrom"],
-                    "CpuShares": container_info["HostConfig"]["CpuShares"],
-                    "Memory": container_info["HostConfig"]["Memory"],
-                    "CgroupParent": container_info["HostConfig"]["CgroupParent"],
-                    "BlkioWeight": container_info["HostConfig"]["BlkioWeight"],
-                    "BlkioWeightDevice": container_info["HostConfig"]["BlkioWeightDevice"],
-                    "BlkioDeviceReadBps": container_info["HostConfig"]["BlkioDeviceReadBps"],
-                    "BlkioDeviceWriteBps": container_info["HostConfig"]["BlkioDeviceWriteBps"],
-                    "BlkioDeviceReadIOps": container_info["HostConfig"]["BlkioDeviceReadIOps"],
-                    "BlkioDeviceWriteIOps": container_info["HostConfig"]["BlkioDeviceWriteIOps"],
-                    "CpuPeriod": container_info["HostConfig"]["CpuPeriod"],
-                    "CpuQuota": container_info["HostConfig"]["CpuQuota"],
-                    "CpuRealtimePeriod": container_info["HostConfig"]["CpuRealtimePeriod"],
-                    "CpuRealtimeRuntime": container_info["HostConfig"]["CpuRealtimeRuntime"],
-                    "CpusetCpus": container_info["HostConfig"]["CpusetCpus"],
-                    "CpusetMems": container_info["HostConfig"]["CpusetMems"],
-                    "Devices": container_info["HostConfig"]["Devices"],
-                    "DeviceCgroupRules": container_info["HostConfig"]["DeviceCgroupRules"],
-                    "DeviceRequests": container_info["HostConfig"]["DeviceRequests"],
-                    "KernelMemory": container_info["HostConfig"]["KernelMemory"],
-                    "KernelMemoryTCP": container_info["HostConfig"]["KernelMemoryTCP"],
-                    "MemoryReservation": container_info["HostConfig"]["MemoryReservation"],
-                    "MemorySwap": container_info["HostConfig"]["MemorySwap"],
-                    "MemorySwappiness": container_info["HostConfig"]["MemorySwappiness"],
-                    "NanoCpus": container_info["HostConfig"]["NanoCpus"],
-                    "OomKillDisable": container_info["HostConfig"]["OomKillDisable"],
-                    "PidsLimit": container_info["HostConfig"]["PidsLimit"],
-                    "Ulimits": container_info["HostConfig"]["Ulimits"],
-                    "CpuCount": container_info["HostConfig"]["CpuCount"],
-                    "CpuPercent": container_info["HostConfig"]["CpuPercent"],
-                    "IOMaximumIOps": container_info["HostConfig"]["IOMaximumIOps"],
-                    "IOMaximumBandwidth": container_info["HostConfig"]["IOMaximumBandwidth"],
+                    "Binds": host_config.get("Binds", []),
+                    "PortBindings": host_config.get("PortBindings", {}),
+                    "RestartPolicy": host_config.get("RestartPolicy", {}),
+                    "NetworkMode": host_config.get("NetworkMode", "default"),
+                    "CapAdd": host_config.get("CapAdd", []),
+                    "CapDrop": host_config.get("CapDrop", []),
+                    "SecurityOpt": host_config.get("SecurityOpt", []),
+                    "Devices": host_config.get("Devices", []),
+                    "ExtraHosts": host_config.get("ExtraHosts", []),
+                    "VolumesFrom": host_config.get("VolumesFrom", []),
+                    "CpuShares": host_config.get("CpuShares"),
+                    "Memory": host_config.get("Memory"),
+                    "CgroupParent": host_config.get("CgroupParent"),
+                    "BlkioWeight": host_config.get("BlkioWeight"),
+                    "BlkioWeightDevice": host_config.get("BlkioWeightDevice", []),
+                    "BlkioDeviceReadBps": host_config.get("BlkioDeviceReadBps", []),
+                    "BlkioDeviceWriteBps": host_config.get("BlkioDeviceWriteBps", []),
+                    "BlkioDeviceReadIOps": host_config.get("BlkioDeviceReadIOps", []),
+                    "BlkioDeviceWriteIOps": host_config.get("BlkioDeviceWriteIOps", []),
+                    "CpuPeriod": host_config.get("CpuPeriod"),
+                    "CpuQuota": host_config.get("CpuQuota"),
+                    "CpuRealtimePeriod": host_config.get("CpuRealtimePeriod"),
+                    "CpuRealtimeRuntime": host_config.get("CpuRealtimeRuntime"),
+                    "CpusetCpus": host_config.get("CpusetCpus"),
+                    "CpusetMems": host_config.get("CpusetMems"),
+                    "DeviceCgroupRules": host_config.get("DeviceCgroupRules", []),
+                    "DeviceRequests": host_config.get("DeviceRequests", []),
+                    "KernelMemory": host_config.get("KernelMemory"),
+                    "KernelMemoryTCP": host_config.get("KernelMemoryTCP"),
+                    "MemoryReservation": host_config.get("MemoryReservation"),
+                    "MemorySwap": host_config.get("MemorySwap"),
+                    "MemorySwappiness": host_config.get("MemorySwappiness"),
+                    "NanoCpus": host_config.get("NanoCpus"),
+                    "OomKillDisable": host_config.get("OomKillDisable"),
+                    "PidsLimit": host_config.get("PidsLimit"),
+                    "Ulimits": host_config.get("Ulimits", []),
+                    "CpuCount": host_config.get("CpuCount"),
+                    "CpuPercent": host_config.get("CpuPercent"),
+                    "IOMaximumIOps": host_config.get("IOMaximumIOps"),
+                    "IOMaximumBandwidth": host_config.get("IOMaximumBandwidth"),
                 }
             }
 
             # Create new container
             try:
-                async with self.auth.session.post(create_url, json=container_config, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
+                session = self.session or self.auth.session
+                async with session.post(create_url, json=container_config, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
                     if resp.status == 201:
                         create_response = await resp.json()
                         new_container_id = create_response["Id"]
@@ -311,7 +326,8 @@ class PortainerAPI:
             # Get current service configuration
             service_url = f"{self.base_url}/api/stacks/{stack_name}/services/{service_name}"
             try:
-                async with self.auth.session.get(service_url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
+                session = self.session or self.auth.session
+                async with session.get(service_url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
                     if resp.status == 200:
                         service_config = await resp.json()
                         
@@ -328,7 +344,7 @@ class PortainerAPI:
                             }
                         }
                         
-                        async with self.auth.session.post(update_url, json=update_data, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
+                        async with session.post(update_url, json=update_data, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
                             if resp.status == 200:
                                 _LOGGER.info("✅ Successfully updated stack service %s", service_name)
                                 return True
@@ -357,7 +373,8 @@ class PortainerAPI:
             # Remove the container
             remove_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}?force=1"
             try:
-                async with self.auth.session.delete(remove_url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
+                session = self.session or self.auth.session
+                async with session.delete(remove_url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
                     if resp.status != 204:
                         _LOGGER.error("❌ Failed to remove container %s: HTTP %s", container_id, resp.status)
                         return False
@@ -388,7 +405,8 @@ class PortainerAPI:
 
             # Create new container
             try:
-                async with self.auth.session.post(create_url, json=container_config, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
+                session = self.session or self.auth.session
+                async with session.post(create_url, json=container_config, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
                     if resp.status == 201:
                         create_response = await resp.json()
                         new_container_id = create_response["Id"]

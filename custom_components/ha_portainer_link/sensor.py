@@ -20,17 +20,23 @@ async def async_setup_entry(hass, entry, async_add_entities):
     # Get coordinator
     coordinator = hass.data[DOMAIN][f"{entry_id}_coordinator"]
     
-    # Wait for initial data
-    await coordinator.async_config_entry_first_refresh()
-
-    entities = []
-    
     # Check if sensors are enabled using coordinator
     resource_sensors_enabled = coordinator.is_resource_sensors_enabled()
     version_sensors_enabled = coordinator.is_version_sensors_enabled()
     
     _LOGGER.info("📊 Sensor configuration: Resource sensors=%s, Version sensors=%s", 
                  resource_sensors_enabled, version_sensors_enabled)
+    
+    # Always create status sensors (core functionality), but check if any other sensors are enabled
+    any_sensors_enabled = resource_sensors_enabled or version_sensors_enabled or coordinator.is_stack_view_enabled()
+    
+    # If no sensors are enabled, don't create any entities
+    if not any_sensors_enabled:
+        _LOGGER.info("✅ No sensors to create (all sensor types disabled)")
+        return
+    
+    # Coordinator data is already loaded in main setup
+    entities = []
     
     # Create sensors for all containers
     for container_id, container_data in coordinator.containers.items():
@@ -61,9 +67,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
             entities.append(ContainerCurrentVersionSensor(coordinator, entry_id, container_id, container_name, stack_info))
             entities.append(ContainerAvailableVersionSensor(coordinator, entry_id, container_id, container_name, stack_info))
 
-    _LOGGER.info("✅ Created %d sensor entities (Status: always, Resource: %s, Version: %s)", 
-                 len(entities), resource_sensors_enabled, version_sensors_enabled)
-    
     # Create stack-level sensors if stack view is enabled
     if coordinator.is_stack_view_enabled():
         for stack_name, stack_data in coordinator.stacks.items():
@@ -75,6 +78,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
             # Create stack container count sensor
             entities.append(StackContainerCountSensor(coordinator, entry_id, stack_name))
     
+    _LOGGER.info("✅ Created %d sensor entities", len(entities))
     async_add_entities(entities, update_before_add=True)
 
 class ContainerStatusSensor(BaseContainerEntity, SensorEntity):
@@ -482,7 +486,7 @@ class ContainerAvailableVersionSensor(BaseContainerEntity, SensorEntity):
                 return
 
             # Check if update sensors are enabled
-            if not self.coordinator.update_sensors_enabled():
+            if not self.coordinator.is_update_sensors_enabled():
                 self._state = STATE_UNKNOWN
                 return
 

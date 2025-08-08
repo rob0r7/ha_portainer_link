@@ -30,6 +30,7 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
         self.stacks: Dict[str, Dict[str, Any]] = {}
         self.container_stack_map: Dict[str, str] = {}  # container_id -> stack_name
         self.container_stack_info: Dict[str, Dict[str, Any]] = {}  # container_id -> detailed stack info
+        self.update_availability: Dict[str, bool] = {}  # container_id -> has_updates
 
     async def _async_update_data(self) -> Dict[str, Any]:
         """Update container and stack data."""
@@ -73,7 +74,14 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
                 container_id = container["Id"]
                 container_name = container.get("Names", ["unknown"])[0].strip("/")
                 container_state = container.get("State", {})
-                is_running = container_state.get("Running", False) if isinstance(container_state, dict) else False
+                
+                # Handle both string and dictionary state formats
+                if isinstance(container_state, dict):
+                    is_running = container_state.get("Running", False)
+                elif isinstance(container_state, str):
+                    is_running = container_state.lower() == "running"
+                else:
+                    is_running = False
                 
                 _LOGGER.debug("🔍 Processing container: %s (ID: %s, Running: %s, State: %s)", 
                              container_name, container_id, is_running, container_state)
@@ -82,21 +90,35 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
                 
                 # Only get stack information if stack view is enabled
                 if self.is_stack_view_enabled():
-                    # Get stack information for each container
-                    container_info = await self.api.inspect_container(self.endpoint_id, container_id)
-                    if container_info:
-                        stack_info = self.api.get_container_stack_info(container_info)
+                    # Extract stack information from container labels (much faster than individual inspection)
+                    labels = container.get("Labels", {}) or {}
+                    stack_name = labels.get("com.docker.compose.project")
+                    service_name = labels.get("com.docker.compose.service")
+                    container_number = labels.get("com.docker.compose.container-number")
+                    
+                    if stack_name:
+                        # This is a stack container
+                        stack_info = {
+                            "stack_name": stack_name,
+                            "service_name": service_name,
+                            "container_number": container_number,
+                            "is_stack_container": True
+                        }
                         self.container_stack_info[container_id] = stack_info
-                        
-                        if stack_info.get("is_stack_container"):
-                            stack_name = stack_info.get("stack_name")
-                            if stack_name:
-                                self.container_stack_map[container_id] = stack_name
-                                stack_containers_count += 1
-                                _LOGGER.debug("📦 Container %s belongs to stack %s", container_name, stack_name)
-                        else:
-                            standalone_containers_count += 1
-                            _LOGGER.debug("🏠 Container %s is standalone", container_name)
+                        self.container_stack_map[container_id] = stack_name
+                        stack_containers_count += 1
+                        _LOGGER.debug("📦 Container %s belongs to stack %s", container_name, stack_name)
+                    else:
+                        # This is a standalone container
+                        stack_info = {
+                            "stack_name": None,
+                            "service_name": None,
+                            "container_number": None,
+                            "is_stack_container": False
+                        }
+                        self.container_stack_info[container_id] = stack_info
+                        standalone_containers_count += 1
+                        _LOGGER.debug("🏠 Container %s is standalone", container_name)
                 else:
                     # In lightweight mode, all containers are standalone
                     standalone_containers_count += 1
@@ -107,6 +129,32 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
                 stack_name = stack.get("Name")
                 if stack_name:
                     self.stacks[stack_name] = stack
+            
+            # Check for updates if update sensors are enabled (but don't block initial load)
+            if self.is_update_sensors_enabled():
+                # Only check updates every 5 minutes to avoid performance issues
+                import time
+                current_time = time.time()
+                last_update_check = getattr(self, '_last_update_check', 0)
+                
+                if current_time - last_update_check > 300:  # 5 minutes
+                    _LOGGER.debug("🔍 Checking for container updates...")
+                    self.update_availability = {}
+                    # Check updates for each container (this could be optimized further)
+                    for container_id in self.containers:
+                        try:
+                            has_updates = await self.api.images.check_image_updates(self.endpoint_id, container_id)
+                            self.update_availability[container_id] = has_updates
+                        except Exception as e:
+                            _LOGGER.debug("⚠️ Could not check updates for container %s: %s", container_id, e)
+                            self.update_availability[container_id] = False
+                    self._last_update_check = current_time
+                else:
+                    # Keep existing update availability data
+                    if not hasattr(self, 'update_availability'):
+                        self.update_availability = {}
+            else:
+                self.update_availability = {}
             
             _LOGGER.info("✅ Updated Portainer data: %d containers (%d stack, %d standalone), %d stacks", 
                         len(self.containers), stack_containers_count, standalone_containers_count, len(self.stacks))
@@ -136,6 +184,10 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
     def get_container_stack_info(self, container_id: str) -> Optional[Dict[str, Any]]:
         """Get detailed stack information for a container."""
         return self.container_stack_info.get(container_id)
+
+    def get_update_availability(self, container_id: str) -> bool:
+        """Get update availability for a container."""
+        return self.update_availability.get(container_id, False)
 
     def get_stack_containers(self, stack_name: str) -> List[Dict[str, Any]]:
         """Get all containers belonging to a stack."""

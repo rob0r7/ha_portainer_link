@@ -18,15 +18,18 @@ async def async_setup_entry(hass, entry, async_add_entities):
     # Get coordinator
     coordinator = hass.data[DOMAIN][f"{entry_id}_coordinator"]
     
-    # Wait for initial data
-    await coordinator.async_config_entry_first_refresh()
-
-    entities = []
-    
     # Check if update sensors are enabled using coordinator
     update_sensors_enabled = coordinator.is_update_sensors_enabled()
     
     _LOGGER.info("📊 Binary sensor configuration: Update sensors=%s", update_sensors_enabled)
+    
+    # If update sensors are disabled, don't create any entities
+    if not update_sensors_enabled:
+        _LOGGER.info("✅ No binary sensors to create (update sensors disabled)")
+        return
+    
+    # Coordinator data is already loaded in main setup
+    entities = []
     
     # Create binary sensors for all containers
     for container_id, container_data in coordinator.containers.items():
@@ -42,12 +45,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
         
         _LOGGER.debug("🔍 Processing container: %s (ID: %s, Stack: %s)", container_name, container_id, stack_info.get("stack_name"))
         
-        # Create update sensors only if enabled
-        if update_sensors_enabled:
-            entities.append(ContainerUpdateAvailableSensor(coordinator, entry_id, container_id, container_name, stack_info))
+        entities.append(ContainerUpdateAvailableSensor(coordinator, entry_id, container_id, container_name, stack_info))
 
-    _LOGGER.info("✅ Created %d binary sensor entities (Update sensors: %s)", 
-                 len(entities), update_sensors_enabled)
+    _LOGGER.info("✅ Created %d binary sensor entities", len(entities))
     async_add_entities(entities, update_before_add=True)
 
 class ContainerUpdateAvailableSensor(BaseContainerEntity, BinarySensorEntity):
@@ -86,11 +86,8 @@ class ContainerUpdateAvailableSensor(BaseContainerEntity, BinarySensorEntity):
                 self._state = False
                 return
 
-            # Check if updates are available for this container
-            has_updates = await self.coordinator.api.check_image_updates(
-                self.coordinator.endpoint_id, self.container_id
-            )
-            self._state = has_updates
+            # Use coordinator's cached update availability
+            self._state = self.coordinator.get_update_availability(self.container_id)
             
         except Exception as e:
             _LOGGER.error("❌ Error updating update sensor for container %s: %s", self.container_id, e)

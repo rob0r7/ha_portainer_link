@@ -114,8 +114,15 @@ Invalid config for 'logger': 'custom_components.ha_portainer_link' is an invalid
 service: ha_portainer_link.refresh
 ```
 
-#### Stack Update Buttons Disabled
-**Note**: Stack update buttons are temporarily disabled due to reliability issues. Use individual container pull update buttons instead.
+#### Stack Update Process
+**Note**: Stack updates now perform a comprehensive process:
+1. Retrieves stack file content (docker-compose.yml) and environment variables
+2. Stops all containers in the stack
+3. Deletes existing containers to force recreation
+4. Redeploys the stack with fresh images and current compose settings
+5. Waits for containers to be running with configurable timeout
+6. Includes robust error handling and fallback mechanisms
+7. Provides detailed progress reporting and debugging information
 
 ### Debugging
 Enable debug logging in your `configuration.yaml`:
@@ -160,7 +167,7 @@ Force refresh container data for all integrations.
 ### Stack Controls
 - **Stack Start**: Start entire stack
 - **Stack Stop**: Stop entire stack
-- **Stack Update**: Temporarily disabled due to reliability issues
+- **Stack Update**: Comprehensive update with image pulling, container recreation, and robust error handling
 
 ### Bulk Operations (Full View only)
 - **Start All**: Start all stopped containers
@@ -168,13 +175,23 @@ Force refresh container data for all integrations.
 
 ## 🔄 Recent Updates
 
-### v0.3.8 (Current)
-- 🔧 Disabled stack update buttons due to reliability issues
+### v0.4.0 (Current)
+- 🚀 Completely reworked stack update functionality with improved architecture
+- 🔧 Enhanced stack update with centralized request handling and SSL auto-fallback
+- 🔧 Added comprehensive error handling with detailed result reporting
+- 🔧 Improved user feedback with button state management and configurable timeouts
+- 🔧 Enhanced logging and progress tracking with detailed step-by-step reporting
+- 🔧 Fixed button success logic to properly handle fallback paths
+- 🔧 Fixed connection validation to properly detect endpoint existence
+- 🔧 Fixed critical session management issue that caused "Session is closed" errors
+- 🔧 Fixed endpoint ID configuration to use configured endpoint instead of hardcoded endpoint 1
+- 🔧 Added comprehensive session sharing across all API modules (containers, stacks, images)
+- 🔧 Fixed constructor parameter mismatches that caused initialization errors
+- 🔧 Fixed sensor method name error that caused update sensor failures
+- 🔧 Added defensive programming to prevent KeyError in container recreation
+- 🔧 Improved stack stop logic for fresh stacks
 - 🔧 Fixed entity category errors for version sensors
 - 🔧 Removed device registry warnings by eliminating via_device references
-- 🔧 Improved integration stability and error handling
-- 🔧 Enhanced lightweight and full view mode implementation
-- 🔧 Streamlined configuration flow and migration handling
 
 ### v0.3.7
 - 🔧 Fixed indentation error in stack update fallback logic

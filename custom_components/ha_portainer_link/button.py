@@ -23,17 +23,20 @@ async def async_setup_entry(hass, entry, async_add_entities):
     # Get coordinator
     coordinator = hass.data[DOMAIN][f"{entry_id}_coordinator"]
     
-    # Wait for initial data
-    await coordinator.async_config_entry_first_refresh()
-
-    entities = []
-    
     # Check if buttons are enabled using coordinator
     container_buttons_enabled = coordinator.is_container_buttons_enabled()
     stack_buttons_enabled = coordinator.is_stack_buttons_enabled()
     
     _LOGGER.info("📊 Button configuration: Container buttons=%s, Stack buttons=%s", 
                  container_buttons_enabled, stack_buttons_enabled)
+    
+    # If no buttons are enabled, don't create any entities
+    if not container_buttons_enabled and not stack_buttons_enabled:
+        _LOGGER.info("✅ No buttons to create (all button types disabled)")
+        return
+    
+    # Coordinator data is already loaded in main setup
+    entities = []
     
     # Create container buttons
     if container_buttons_enabled:
@@ -62,11 +65,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
             # Create stack buttons
             entities.append(StackStopButton(coordinator, entry_id, stack_name))
             entities.append(StackStartButton(coordinator, entry_id, stack_name))
-            # Temporarily disabled stack update buttons as they don't work properly
-            # entities.append(StackUpdateButton(coordinator, entry_id, stack_name))
+            entities.append(StackUpdateButton(coordinator, entry_id, stack_name))
 
-    _LOGGER.info("✅ Created %d button entities (Container: %s, Stack: %s)", 
-                 len(entities), container_buttons_enabled, stack_buttons_enabled)
+    _LOGGER.info("✅ Created %d button entities", len(entities))
     async_add_entities(entities, update_before_add=True)
 
 class RestartContainerButton(BaseContainerEntity, ButtonEntity):
@@ -182,7 +183,7 @@ class StackStopButton(BaseStackEntity, ButtonEntity):
         """Handle the button press."""
         try:
             _LOGGER.info("🔄 Stopping stack %s", self.stack_name)
-            await self.coordinator.api.stop_stack(self.coordinator.endpoint_id, self.stack_name)
+            await self.coordinator.api.stacks.stop_stack(self.coordinator.endpoint_id, self.stack_name)
             
             # Trigger a refresh to update the state
             await self.coordinator.async_request_refresh()
@@ -222,7 +223,7 @@ class StackStartButton(BaseStackEntity, ButtonEntity):
         """Handle the button press."""
         try:
             _LOGGER.info("🔄 Starting stack %s", self.stack_name)
-            await self.coordinator.api.start_stack(self.coordinator.endpoint_id, self.stack_name)
+            await self.coordinator.api.stacks.start_stack(self.coordinator.endpoint_id, self.stack_name)
             
             # Trigger a refresh to update the state
             await self.coordinator.async_request_refresh()
@@ -238,7 +239,7 @@ class StackStartButton(BaseStackEntity, ButtonEntity):
             raise
 
 class StackUpdateButton(BaseStackEntity, ButtonEntity):
-    """Button for updating a stack."""
+    """Button to trigger force update of a Portainer stack (pull + redeploy)."""
 
     @property
     def entity_type(self) -> str:
@@ -258,11 +259,27 @@ class StackUpdateButton(BaseStackEntity, ButtonEntity):
     def entity_category(self) -> EntityCategory | None:
         return EntityCategory.CONFIG
 
-    async def async_press(self):
+    async def async_press(self) -> None:
         """Handle the button press."""
         try:
-            _LOGGER.info("🔄 Updating stack %s", self.stack_name)
-            await self.coordinator.api.update_stack(self.coordinator.endpoint_id, self.stack_name)
+            _LOGGER.info("🔄 Force updating stack %s", self.stack_name)
+            result = await self.coordinator.api.stacks.update_stack(self.coordinator.endpoint_id, self.stack_name)
+            
+            # Accept either successful PUT or fallback start, and require readiness wait to pass
+            success = (
+                result.get("wait_ready", False)
+                and (
+                    result.get("update_put", {}).get("ok", False)
+                    or result.get("started", False)
+                )
+            )
+            
+            if success:
+                _LOGGER.info("✅ Stack %s updated successfully: %s", self.stack_name, result)
+            else:
+                _LOGGER.error("❌ Stack %s update failed: %s", self.stack_name, result)
+                # Don't throw exception, just log the error and provide user feedback
+                _LOGGER.warning("⚠️ Stack update failed but continuing - check logs for details")
             
             # Trigger a refresh to update the state
             await self.coordinator.async_request_refresh()
@@ -271,11 +288,10 @@ class StackUpdateButton(BaseStackEntity, ButtonEntity):
             import asyncio
             await asyncio.sleep(2)
             
-            _LOGGER.debug("✅ Stack %s updated successfully", self.stack_name)
-            
         except Exception as e:
             _LOGGER.error("❌ Error updating stack %s: %s", self.stack_name, e)
-            raise
+            # Don't re-raise the exception, just log it
+            _LOGGER.warning("⚠️ Stack update encountered an error but continuing - check logs for details")
 
 class BulkStartAllButton(BaseContainerEntity, ButtonEntity):
     """Button for starting all containers."""

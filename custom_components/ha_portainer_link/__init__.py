@@ -103,47 +103,54 @@ async def async_setup(hass: HomeAssistant, config: dict):
     
     return True
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up HA Portainer Link from a config entry."""
-    # Clear any existing data for this entry to ensure clean reload
-    entry_id = entry.entry_id
-    if DOMAIN in hass.data:
-        for key in list(hass.data[DOMAIN].keys()):
-            if key.startswith(entry_id):
-                _LOGGER.debug("🧹 Cleaning up existing data for entry %s: %s", entry_id, key)
-                hass.data[DOMAIN].pop(key, None)
-    
-    hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = entry.data
-
-    # Create API instance
-    config = entry.data
-    host = config["host"]
-    username = config.get("username")
-    password = config.get("password")
-    api_key = config.get("api_key")
+    config = dict(entry.data)  # Create mutable copy
     endpoint_id = config["endpoint_id"]
+    entry_id = entry.entry_id
+
+    _LOGGER.info("🚀 Setting up HA Portainer Link for entry %s (endpoint %s)", entry_id, endpoint_id)
     
-    _LOGGER.info("🔧 Setting up Portainer API with host: %s", host)
+    # Apply integration mode presets
+    integration_mode = config.get("integration_mode", "lightweight")
+    if integration_mode in INTEGRATION_MODE_PRESETS:
+        preset_features = INTEGRATION_MODE_PRESETS[integration_mode]
+        config.update(preset_features)
+        _LOGGER.info("📊 Applied %s mode features: %s", integration_mode, list(preset_features.keys()))
     
-    api = PortainerAPI(host, username, password, api_key, config=config)
+    # Create API instance
+    api = PortainerAPI(
+        host=config["host"],
+        username=config["username"],
+        password=config["password"],
+        endpoint_id=endpoint_id,
+        ssl_verify=config.get("ssl_verify", True)
+    )
     
     # Initialize API
     if not await api.initialize():
-        _LOGGER.error("❌ Failed to initialize Portainer API for entry %s", entry.entry_id)
+        _LOGGER.error("❌ Failed to initialize Portainer API")
         return False
     
-    # Create coordinator with config
+    # Create coordinator
     coordinator = PortainerDataUpdateCoordinator(hass, api, endpoint_id, config)
     
-    # Store coordinator for use by platforms
-    hass.data[DOMAIN][f"{entry.entry_id}_coordinator"] = coordinator
-    hass.data[DOMAIN][f"{entry.entry_id}_api"] = api
-    hass.data[DOMAIN][f"{entry.entry_id}_endpoint_id"] = endpoint_id
-
-    # Set up platforms
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
+    # Store coordinator in hass data
+    hass.data[DOMAIN][f"{entry_id}_coordinator"] = coordinator
+    
+    # Initialize coordinator data (only once)
+    try:
+        await coordinator.async_config_entry_first_refresh()
+        _LOGGER.info("✅ Coordinator initialized successfully")
+    except Exception as e:
+        _LOGGER.error("❌ Failed to initialize coordinator: %s", e)
+        return False
+    
+    # Forward the setup to the platforms
+    hass.async_create_task(
+        hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    )
+    
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):

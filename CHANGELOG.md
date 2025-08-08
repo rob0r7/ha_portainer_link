@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2025-08-08
+
+### Added
+- Comprehensive stack update functionality with multi-step process
+- Image pulling for all containers in a stack before update
+- Container recreation with proper cleanup and redeployment
+- Robust error handling and fallback mechanisms
+- Button state management during stack updates
+- Enhanced logging and progress tracking for stack operations
+
+### Changed
+- Completely reworked stack update process for better reliability
+- Enhanced user feedback during stack update operations
+- Improved error recovery with automatic fallback mechanisms
+- Updated documentation to reflect new stack update capabilities
+
+### Fixed
+- Entity category configuration for version sensors
+- Device registry warnings in Home Assistant logs
+- Integration mode handling and feature toggling
+- Configuration flow and migration handling
+
 ## [0.3.8] - 2025-08-08
 
 ### Changed

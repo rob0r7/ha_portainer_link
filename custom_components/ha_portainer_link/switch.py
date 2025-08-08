@@ -27,13 +27,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
     _LOGGER.info("  - Stack view enabled: %s", coordinator.is_stack_view_enabled())
     _LOGGER.info("  - Update interval: %s minutes", config.get("update_interval", "not set"))
     
-    # Wait for initial data
-    await coordinator.async_config_entry_first_refresh()
-
-    entities = []
-    
     # Container switches are always available as core functionality
     _LOGGER.info("📊 Switch configuration: Container switches are always enabled (core functionality)")
+    
+    # Coordinator data is already loaded in main setup
+    entities = []
     
     # Debug: Check if we have containers
     container_count = len(coordinator.containers)
@@ -47,6 +45,10 @@ async def async_setup_entry(hass, entry, async_add_entities):
         container_state = container_data.get("State", {})
         if isinstance(container_state, dict):
             is_running = container_state.get("Running", False)
+        elif isinstance(container_state, str):
+            # Handle string state format (e.g., "running", "stopped")
+            is_running = container_state.lower() == "running"
+            _LOGGER.debug("🔍 Container %s has string state: %s (running: %s)", container_name, container_state, is_running)
         else:
             _LOGGER.warning("⚠️ Container state is not a dictionary for %s: %s", container_name, type(container_state))
             is_running = False
@@ -68,7 +70,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         
         _LOGGER.debug("✅ Created switch for container: %s (ID: %s)", container_name, container_id)
 
-    _LOGGER.info("✅ Created %d switch entities (Container switches: always enabled)", len(entities))
+    _LOGGER.info("✅ Created %d switch entities", len(entities))
     
     # Debug: Log all created entities
     for entity in entities:
