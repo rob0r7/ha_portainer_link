@@ -3,7 +3,7 @@ from homeassistant.const import STATE_UNKNOWN
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.entity import EntityCategory
 
-from .const import DOMAIN, CONF_ENABLE_RESOURCE_SENSORS, CONF_ENABLE_VERSION_SENSORS, DEFAULT_ENABLE_RESOURCE_SENSORS, DEFAULT_ENABLE_VERSION_SENSORS
+from .const import DOMAIN
 from .entity import BaseContainerEntity, BaseStackEntity
 from .coordinator import PortainerDataUpdateCoordinator
 
@@ -11,7 +11,7 @@ _LOGGER = logging.getLogger(__name__)
 _LOGGER.info("Loaded Portainer sensor integration.")
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    config = entry.data
+    config = dict(entry.data)  # Create mutable copy
     endpoint_id = config["endpoint_id"]
     entry_id = entry.entry_id
 
@@ -25,9 +25,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     entities = []
     
-    # Check if sensors are enabled
-    resource_sensors_enabled = config.get(CONF_ENABLE_RESOURCE_SENSORS, DEFAULT_ENABLE_RESOURCE_SENSORS)
-    version_sensors_enabled = config.get(CONF_ENABLE_VERSION_SENSORS, DEFAULT_ENABLE_VERSION_SENSORS)
+    # Check if sensors are enabled using coordinator
+    resource_sensors_enabled = coordinator.is_resource_sensors_enabled()
+    version_sensors_enabled = coordinator.is_version_sensors_enabled()
     
     _LOGGER.info("📊 Sensor configuration: Resource sensors=%s, Version sensors=%s", 
                  resource_sensors_enabled, version_sensors_enabled)

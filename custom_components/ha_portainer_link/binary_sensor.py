@@ -2,15 +2,14 @@ import logging
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.helpers.entity import EntityCategory
 
-from .const import DOMAIN, CONF_ENABLE_UPDATE_SENSORS, DEFAULT_ENABLE_UPDATE_SENSORS
+from .const import DOMAIN
 from .entity import BaseContainerEntity
 from .coordinator import PortainerDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
-_LOGGER.info("Loaded Portainer binary sensor integration.")
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    config = entry.data
+    config = dict(entry.data)  # Create mutable copy
     endpoint_id = config["endpoint_id"]
     entry_id = entry.entry_id
 
@@ -24,8 +23,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     entities = []
     
-    # Check if update sensors are enabled
-    update_sensors_enabled = config.get(CONF_ENABLE_UPDATE_SENSORS, DEFAULT_ENABLE_UPDATE_SENSORS)
+    # Check if update sensors are enabled using coordinator
+    update_sensors_enabled = coordinator.is_update_sensors_enabled()
     
     _LOGGER.info("📊 Binary sensor configuration: Update sensors=%s", update_sensors_enabled)
     
@@ -77,7 +76,7 @@ class ContainerUpdateAvailableSensor(BaseContainerEntity, BinarySensorEntity):
 
     @property
     def entity_category(self) -> EntityCategory | None:
-        return EntityCategory.CONFIG
+        return EntityCategory.DIAGNOSTIC
 
     async def async_update(self):
         """Update the sensor."""

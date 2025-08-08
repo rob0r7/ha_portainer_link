@@ -9,7 +9,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.entity_registry import RegistryEntry
 
-from .const import DOMAIN, CONF_SSL_VERIFY, DEFAULT_SSL_VERIFY
+from .const import DOMAIN
 from .portainer_api import PortainerAPI
 from .coordinator import PortainerDataUpdateCoordinator
 

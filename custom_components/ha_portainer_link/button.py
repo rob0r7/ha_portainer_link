@@ -6,11 +6,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.entity import EntityCategory
 
-from .const import (
-    DOMAIN, CONF_ENABLE_CONTAINER_BUTTONS, CONF_ENABLE_STACK_BUTTONS, 
-    CONF_ENABLE_BULK_OPERATIONS, DEFAULT_ENABLE_CONTAINER_BUTTONS, 
-    DEFAULT_ENABLE_STACK_BUTTONS, DEFAULT_ENABLE_BULK_OPERATIONS
-)
+from .const import DOMAIN
 from .entity import BaseContainerEntity, BaseStackEntity
 from .coordinator import PortainerDataUpdateCoordinator
 
@@ -18,7 +14,7 @@ _LOGGER = logging.getLogger(__name__)
 _LOGGER.info("Loaded Portainer button integration.")
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    config = entry.data
+    config = dict(entry.data)  # Create mutable copy
     endpoint_id = config["endpoint_id"]
     entry_id = entry.entry_id
 
@@ -32,13 +28,12 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     entities = []
     
-    # Check if buttons are enabled
-    container_buttons_enabled = config.get(CONF_ENABLE_CONTAINER_BUTTONS, DEFAULT_ENABLE_CONTAINER_BUTTONS)
-    stack_buttons_enabled = config.get(CONF_ENABLE_STACK_BUTTONS, DEFAULT_ENABLE_STACK_BUTTONS)
-    bulk_operations_enabled = config.get(CONF_ENABLE_BULK_OPERATIONS, DEFAULT_ENABLE_BULK_OPERATIONS)
+    # Check if buttons are enabled using coordinator
+    container_buttons_enabled = coordinator.is_container_buttons_enabled()
+    stack_buttons_enabled = coordinator.is_stack_buttons_enabled()
     
-    _LOGGER.info("📊 Button configuration: Container buttons=%s, Stack buttons=%s, Bulk operations=%s", 
-                 container_buttons_enabled, stack_buttons_enabled, bulk_operations_enabled)
+    _LOGGER.info("📊 Button configuration: Container buttons=%s, Stack buttons=%s", 
+                 container_buttons_enabled, stack_buttons_enabled)
     
     # Create container buttons
     if container_buttons_enabled:
@@ -69,13 +64,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
             entities.append(StackStartButton(coordinator, entry_id, stack_name))
             entities.append(StackUpdateButton(coordinator, entry_id, stack_name))
 
-    # Create bulk operation buttons
-    if bulk_operations_enabled:
-        entities.append(BulkStartAllButton(coordinator, entry_id))
-        entities.append(BulkStopAllButton(coordinator, entry_id))
-
-    _LOGGER.info("✅ Created %d button entities (Container: %s, Stack: %s, Bulk: %s)", 
-                 len(entities), container_buttons_enabled, stack_buttons_enabled, bulk_operations_enabled)
+    _LOGGER.info("✅ Created %d button entities (Container: %s, Stack: %s)", 
+                 len(entities), container_buttons_enabled, stack_buttons_enabled)
     async_add_entities(entities, update_before_add=True)
 
 class RestartContainerButton(BaseContainerEntity, ButtonEntity):

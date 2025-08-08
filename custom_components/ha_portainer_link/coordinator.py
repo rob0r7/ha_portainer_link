@@ -6,16 +6,6 @@ from homeassistant.core import HomeAssistant
 import asyncio
 
 from .portainer_api import PortainerAPI
-from .const import (
-    CONF_UPDATE_INTERVAL, CONF_ENABLE_UPDATE_CHECKS, CONF_ENABLE_HEALTH_MONITORING,
-    CONF_ENABLE_RESOURCE_MONITORING, CONF_ENABLE_STACK_VIEW, CONF_ENABLE_CONTAINER_LOGS,
-    CONF_ENABLE_RESOURCE_SENSORS, CONF_ENABLE_VERSION_SENSORS, CONF_ENABLE_UPDATE_SENSORS,
-    CONF_ENABLE_STACK_BUTTONS, CONF_ENABLE_CONTAINER_BUTTONS, CONF_ENABLE_BULK_OPERATIONS,
-    DEFAULT_UPDATE_INTERVAL, DEFAULT_ENABLE_UPDATE_CHECKS, DEFAULT_ENABLE_HEALTH_MONITORING,
-    DEFAULT_ENABLE_RESOURCE_MONITORING, DEFAULT_ENABLE_STACK_VIEW, DEFAULT_ENABLE_CONTAINER_LOGS,
-    DEFAULT_ENABLE_RESOURCE_SENSORS, DEFAULT_ENABLE_VERSION_SENSORS, DEFAULT_ENABLE_UPDATE_SENSORS,
-    DEFAULT_ENABLE_STACK_BUTTONS, DEFAULT_ENABLE_CONTAINER_BUTTONS, DEFAULT_ENABLE_BULK_OPERATIONS
-)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,8 +14,8 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
 
     def __init__(self, hass: HomeAssistant, api: PortainerAPI, endpoint_id: int, config: Dict[str, Any]):
         """Initialize the coordinator."""
-        # Get configurable update interval
-        update_interval = config.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
+        # Get update interval from config
+        update_interval = config.get("update_interval", 5)
         
         super().__init__(
             hass,
@@ -63,7 +53,7 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
             
             # Get containers and stacks in parallel
             containers_task = self.api.get_containers(self.endpoint_id)
-            stacks_task = self.api.get_stacks(self.endpoint_id) if self.is_stack_view_enabled() else asyncio.sleep(0)
+            stacks_task = self.api.get_stacks(self.endpoint_id) if self.is_stack_view_enabled() else asyncio.sleep(0, result=[])
             
             if self.is_stack_view_enabled():
                 containers, stacks = await asyncio.gather(containers_task, stacks_task)
@@ -100,45 +90,35 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
                         
                         if stack_info.get("is_stack_container"):
                             stack_name = stack_info.get("stack_name")
-                            service_name = stack_info.get("service_name")
                             if stack_name:
                                 self.container_stack_map[container_id] = stack_name
                                 stack_containers_count += 1
-                                _LOGGER.debug("✅ Container %s is part of stack %s (service: %s)", 
-                                             container_name, stack_name, service_name)
-                            else:
-                                _LOGGER.warning("⚠️ Container %s has stack labels but no stack name", container_name)
+                                _LOGGER.debug("📦 Container %s belongs to stack %s", container_name, stack_name)
                         else:
                             standalone_containers_count += 1
-                            _LOGGER.debug("ℹ️ Container %s is standalone", container_name)
-                    else:
-                        _LOGGER.warning("⚠️ Could not inspect container %s", container_name)
+                            _LOGGER.debug("🏠 Container %s is standalone", container_name)
                 else:
                     # In lightweight mode, all containers are standalone
                     standalone_containers_count += 1
             
-            # Process stacks only if stack view is enabled
-            if self.is_stack_view_enabled():
-                self.stacks = {stack["Name"]: stack for stack in stacks}
-                _LOGGER.info("✅ Updated data: %d containers (%d stack containers, %d standalone), %d stacks", 
-                             len(self.containers), stack_containers_count, standalone_containers_count, len(self.stacks))
-            else:
-                self.stacks = {}
-                _LOGGER.info("✅ Updated data: %d containers (all standalone, stack view disabled)", 
-                             len(self.containers))
+            # Process stacks
+            self.stacks = {}
+            for stack in stacks:
+                stack_name = stack.get("Name")
+                if stack_name:
+                    self.stacks[stack_name] = stack
             
-            # Log stack mapping for debugging (only if stack view enabled)
-            if self.is_stack_view_enabled() and self.container_stack_map:
-                _LOGGER.info("📋 Stack mapping: %s", self.container_stack_map)
+            _LOGGER.info("✅ Updated Portainer data: %d containers (%d stack, %d standalone), %d stacks", 
+                        len(self.containers), stack_containers_count, standalone_containers_count, len(self.stacks))
             
             return {
-                "containers": containers,
-                "stacks": stacks,
+                "containers": self.containers,
+                "stacks": self.stacks,
                 "container_stack_map": self.container_stack_map
             }
             
         except Exception as e:
-            _LOGGER.error("❌ Failed to update Portainer data: %s", e)
+            _LOGGER.exception("❌ Error updating Portainer data: %s", e)
             raise UpdateFailed(f"Failed to update Portainer data: {e}")
 
     def get_container(self, container_id: str) -> Optional[Dict[str, Any]]:
@@ -158,84 +138,47 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
         return self.container_stack_info.get(container_id)
 
     def get_stack_containers(self, stack_name: str) -> List[Dict[str, Any]]:
-        """Get all containers that belong to a specific stack."""
+        """Get all containers belonging to a stack."""
         stack_containers = []
-        for container_id, container_stack in self.container_stack_map.items():
-            if container_stack == stack_name:
-                container_data = self.containers.get(container_id)
-                if container_data:
-                    stack_containers.append(container_data)
+        for container_id, container_data in self.containers.items():
+            if self.container_stack_map.get(container_id) == stack_name:
+                stack_containers.append(container_data)
         return stack_containers
 
     def get_standalone_containers(self) -> List[Dict[str, Any]]:
-        """Get all containers that are not part of any stack."""
+        """Get all standalone containers (not part of any stack)."""
         standalone_containers = []
         for container_id, container_data in self.containers.items():
             if container_id not in self.container_stack_map:
                 standalone_containers.append(container_data)
         return standalone_containers
 
-    # Feature toggle methods
-    def is_update_checks_enabled(self) -> bool:
-        """Check if update checks are enabled."""
-        return self.config.get(CONF_ENABLE_UPDATE_CHECKS, DEFAULT_ENABLE_UPDATE_CHECKS)
-
-    def is_health_monitoring_enabled(self) -> bool:
-        """Check if health monitoring is enabled."""
-        return self.config.get(CONF_ENABLE_HEALTH_MONITORING, DEFAULT_ENABLE_HEALTH_MONITORING)
-
-    def is_resource_monitoring_enabled(self) -> bool:
-        """Check if resource monitoring is enabled."""
-        return self.config.get(CONF_ENABLE_RESOURCE_MONITORING, DEFAULT_ENABLE_RESOURCE_MONITORING)
-
+    # Feature toggle methods based on integration mode
     def is_stack_view_enabled(self) -> bool:
         """Check if stack view is enabled."""
-        return self.config.get(CONF_ENABLE_STACK_VIEW, DEFAULT_ENABLE_STACK_VIEW)
-
-    def is_container_logs_enabled(self) -> bool:
-        """Check if container logs are enabled."""
-        return self.config.get(CONF_ENABLE_CONTAINER_LOGS, DEFAULT_ENABLE_CONTAINER_LOGS)
+        return self.config.get("enable_stack_view", False)
 
     def is_resource_sensors_enabled(self) -> bool:
         """Check if resource sensors are enabled."""
-        return self.config.get(CONF_ENABLE_RESOURCE_SENSORS, DEFAULT_ENABLE_RESOURCE_SENSORS)
+        return self.config.get("enable_resource_sensors", False)
 
     def is_version_sensors_enabled(self) -> bool:
         """Check if version sensors are enabled."""
-        return self.config.get(CONF_ENABLE_VERSION_SENSORS, DEFAULT_ENABLE_VERSION_SENSORS)
+        return self.config.get("enable_version_sensors", False)
 
     def is_update_sensors_enabled(self) -> bool:
         """Check if update sensors are enabled."""
-        return self.config.get(CONF_ENABLE_UPDATE_SENSORS, DEFAULT_ENABLE_UPDATE_SENSORS)
+        return self.config.get("enable_update_sensors", False)
 
     def is_stack_buttons_enabled(self) -> bool:
         """Check if stack buttons are enabled."""
-        return self.config.get(CONF_ENABLE_STACK_BUTTONS, DEFAULT_ENABLE_STACK_BUTTONS)
+        return self.config.get("enable_stack_buttons", False)
 
     def is_container_buttons_enabled(self) -> bool:
         """Check if container buttons are enabled."""
-        return self.config.get(CONF_ENABLE_CONTAINER_BUTTONS, DEFAULT_ENABLE_CONTAINER_BUTTONS)
-
-    def is_bulk_operations_enabled(self) -> bool:
-        """Check if bulk operations are enabled."""
-        return self.config.get(CONF_ENABLE_BULK_OPERATIONS, DEFAULT_ENABLE_BULK_OPERATIONS)
+        return self.config.get("enable_container_buttons", True)  # Always enabled by default
 
     async def async_shutdown(self):
-        """Shutdown the coordinator and clean up resources."""
-        _LOGGER.debug("🛑 Shutting down Portainer coordinator for endpoint %s", self.endpoint_id)
-        
-        # Cancel any pending updates
-        if hasattr(self, '_update_task') and self._update_task:
-            self._update_task.cancel()
-            try:
-                await self._update_task
-            except asyncio.CancelledError:
-                pass
-        
-        # Clear data
-        self.containers.clear()
-        self.stacks.clear()
-        self.container_stack_map.clear()
-        self.container_stack_info.clear()
-        
-        _LOGGER.debug("✅ Coordinator shutdown complete for endpoint %s", self.endpoint_id)
+        """Shutdown the coordinator."""
+        if hasattr(self.api, 'close'):
+            await self.api.close()

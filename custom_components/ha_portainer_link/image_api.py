@@ -4,11 +4,6 @@ from typing import Optional, Dict, Any
 import time
 from aiohttp.client_exceptions import ClientConnectorCertificateError
 
-from .const import (
-    CONF_CACHE_DURATION, CONF_RATE_LIMIT_CHECKS, CONF_RATE_LIMIT_PERIOD,
-    DEFAULT_CACHE_DURATION, DEFAULT_RATE_LIMIT_CHECKS, DEFAULT_RATE_LIMIT_PERIOD
-)
-
 _LOGGER = logging.getLogger(__name__)
 
 class PortainerImageAPI:
@@ -21,10 +16,10 @@ class PortainerImageAPI:
         self.config = config or {}
         self.ssl_verify = ssl_verify
         
-        # Initialize rate limiting with configurable values
-        self._cache_duration = self.config.get(CONF_CACHE_DURATION, DEFAULT_CACHE_DURATION) * 3600  # Convert to seconds
-        self._rate_limit_checks = self.config.get(CONF_RATE_LIMIT_CHECKS, DEFAULT_RATE_LIMIT_CHECKS)
-        self._rate_limit_period = self.config.get(CONF_RATE_LIMIT_PERIOD, DEFAULT_RATE_LIMIT_PERIOD) * 3600  # Convert to seconds
+        # Initialize rate limiting with fixed values (simplified)
+        self._cache_duration = 6 * 3600  # 6 hours in seconds
+        self._rate_limit_checks = 50
+        self._rate_limit_period = 6 * 3600  # 6 hours in seconds
         
         # Initialize caches and counters
         self._update_cache: Dict[str, tuple] = {}
