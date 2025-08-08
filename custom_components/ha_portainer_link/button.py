@@ -4,6 +4,7 @@ from datetime import timedelta
 from homeassistant.components.button import ButtonEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.entity import EntityCategory
 
 from .const import (
     DOMAIN, CONF_ENABLE_CONTAINER_BUTTONS, CONF_ENABLE_STACK_BUTTONS, 
@@ -88,12 +89,19 @@ class RestartContainerButton(BaseContainerEntity, ButtonEntity):
     def name(self) -> str:
         """Return the name of the button."""
         display_name = self._get_container_name_display()
-        return f"Restart {display_name}"
+        if self.stack_info.get("is_stack_container"):
+            return f"Container Restart {display_name}"
+        else:
+            return f"Restart {display_name}"
 
     @property
     def icon(self):
         """Return the icon of the button."""
         return "mdi:restart"
+
+    @property
+    def entity_category(self) -> EntityCategory | None:
+        return EntityCategory.CONFIG
 
     async def async_press(self):
         """Handle the button press."""
@@ -125,12 +133,19 @@ class PullUpdateButton(BaseContainerEntity, ButtonEntity):
     def name(self) -> str:
         """Return the name of the button."""
         display_name = self._get_container_name_display()
-        return f"Pull Update {display_name}"
+        if self.stack_info.get("is_stack_container"):
+            return f"Container Pull Update {display_name}"
+        else:
+            return f"Pull Update {display_name}"
 
     @property
     def icon(self):
         """Return the icon of the button."""
         return "mdi:download"
+
+    @property
+    def entity_category(self) -> EntityCategory | None:
+        return EntityCategory.CONFIG
 
     async def async_press(self):
         """Handle the button press."""
@@ -161,12 +176,16 @@ class StackStopButton(BaseStackEntity, ButtonEntity):
     @property
     def name(self) -> str:
         """Return the name of the button."""
-        return f"Stop Stack {self.stack_name}"
+        return f"Stack Stop {self.stack_name}"
 
     @property
     def icon(self):
         """Return the icon of the button."""
         return "mdi:stop-circle"
+
+    @property
+    def entity_category(self) -> EntityCategory | None:
+        return EntityCategory.CONFIG
 
     async def async_press(self):
         """Handle the button press."""
@@ -197,12 +216,16 @@ class StackStartButton(BaseStackEntity, ButtonEntity):
     @property
     def name(self) -> str:
         """Return the name of the button."""
-        return f"Start Stack {self.stack_name}"
+        return f"Stack Start {self.stack_name}"
 
     @property
     def icon(self):
         """Return the icon of the button."""
         return "mdi:play-circle"
+
+    @property
+    def entity_category(self) -> EntityCategory | None:
+        return EntityCategory.CONFIG
 
     async def async_press(self):
         """Handle the button press."""
@@ -233,12 +256,16 @@ class StackUpdateButton(BaseStackEntity, ButtonEntity):
     @property
     def name(self) -> str:
         """Return the name of the button."""
-        return f"Update Stack {self.stack_name}"
+        return f"Stack Update {self.stack_name}"
 
     @property
     def icon(self):
         """Return the icon of the button."""
         return "mdi:update"
+
+    @property
+    def entity_category(self) -> EntityCategory | None:
+        return EntityCategory.CONFIG
 
     async def async_press(self):
         """Handle the button press."""
@@ -279,6 +306,10 @@ class BulkStartAllButton(BaseContainerEntity, ButtonEntity):
     def icon(self):
         """Return the icon of the button."""
         return "mdi:play-circle-multiple"
+
+    @property
+    def entity_category(self) -> EntityCategory | None:
+        return EntityCategory.CONFIG
 
     async def async_press(self):
         """Handle the button press."""
@@ -325,6 +356,10 @@ class BulkStopAllButton(BaseContainerEntity, ButtonEntity):
     def icon(self):
         """Return the icon of the button."""
         return "mdi:stop-circle-multiple"
+
+    @property
+    def entity_category(self) -> EntityCategory | None:
+        return EntityCategory.CONFIG
 
     async def async_press(self):
         """Handle the button press."""

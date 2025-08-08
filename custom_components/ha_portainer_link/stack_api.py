@@ -1,6 +1,7 @@
 import logging
 import aiohttp
 from typing import List, Dict, Any, Optional
+from aiohttp.client_exceptions import ClientConnectorCertificateError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -15,8 +16,11 @@ class PortainerStackAPI:
 
     async def get_stacks(self, endpoint_id: int) -> List[Dict[str, Any]]:
         """Get all stacks from Portainer for a specific endpoint."""
+        stacks_url = f"{self.base_url}/api/stacks"
+        
+        # Try with current SSL setting first
         try:
-            stacks_url = f"{self.base_url}/api/stacks"
+            _LOGGER.debug("🔧 Stack API get_stacks with ssl_verify: %s", self.ssl_verify)
             async with self.auth.session.get(stacks_url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
                 if resp.status == 200:
                     stacks_data = await resp.json()
@@ -27,6 +31,26 @@ class PortainerStackAPI:
                 else:
                     _LOGGER.error("❌ Could not get stacks list: HTTP %s", resp.status)
                     return []
+        except ClientConnectorCertificateError as e:
+            _LOGGER.info("🔧 SSL certificate error, retrying with SSL disabled: %s", e)
+            # Retry with SSL disabled
+            try:
+                async with self.auth.session.get(stacks_url, headers=self.auth.get_headers(), ssl=False) as resp:
+                    if resp.status == 200:
+                        _LOGGER.info("✅ Successfully connected with SSL disabled")
+                        # Update SSL setting for future calls
+                        self.ssl_verify = False
+                        stacks_data = await resp.json()
+                        # Filter stacks for the specific endpoint
+                        endpoint_stacks = [stack for stack in stacks_data if stack.get("EndpointId") == endpoint_id]
+                        _LOGGER.debug("Found %d stacks for endpoint %s", len(endpoint_stacks), endpoint_id)
+                        return endpoint_stacks
+                    else:
+                        _LOGGER.error("❌ Could not get stacks list: HTTP %s", resp.status)
+                        return []
+            except Exception as retry_e:
+                _LOGGER.exception("❌ Error getting stacks with SSL disabled: %s", retry_e)
+                return []
         except Exception as e:
             _LOGGER.exception("❌ Error getting stacks: %s", e)
             return []

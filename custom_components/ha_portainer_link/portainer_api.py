@@ -6,6 +6,7 @@ from .auth import PortainerAuth
 from .container_api import PortainerContainerAPI
 from .stack_api import PortainerStackAPI
 from .image_api import PortainerImageAPI
+from aiohttp import ClientConnectorCertificateError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -14,7 +15,7 @@ class PortainerAPI:
 
     def __init__(self, host: str, username: Optional[str] = None, 
                  password: Optional[str] = None, api_key: Optional[str] = None,
-                 ssl_verify: bool = True, config: Optional[Dict[str, Any]] = None):
+                 config: Optional[Dict[str, Any]] = None):
         """Initialize the Portainer API."""
         # Ensure host has proper scheme and format
         if not host.startswith(("http://", "https://")):
@@ -23,13 +24,13 @@ class PortainerAPI:
         
         self.base_url = host.rstrip("/")
         self.session: Optional[aiohttp.ClientSession] = None
-        self.ssl_verify = ssl_verify
+        self.ssl_verify = True  # Will be determined automatically
         self.config = config or {}
         
         _LOGGER.debug("🔧 Initializing Portainer API with base URL: %s", self.base_url)
         
         # Initialize authentication
-        self.auth = PortainerAuth(self.base_url, username, password, api_key, ssl_verify)
+        self.auth = PortainerAuth(self.base_url, username, password, api_key, self.ssl_verify)
         
         # Initialize API modules with the base URL
         self.containers = PortainerContainerAPI(self.base_url, self.auth, self.ssl_verify)
@@ -39,17 +40,59 @@ class PortainerAPI:
     async def initialize(self) -> bool:
         """Initialize the API connection."""
         try:
-            # Create session with SSL verification setting
-            connector = aiohttp.TCPConnector(ssl=self.ssl_verify)
-            self.session = aiohttp.ClientSession(connector=connector)
+            # Try different SSL verification approaches automatically
+            ssl_options = [
+                (True, "SSL verification enabled"),
+                (False, "SSL verification disabled"),
+                (None, "SSL verification default")
+            ]
             
-            # Initialize authentication
-            if not await self.auth.initialize(self.session):
-                _LOGGER.error("❌ Failed to initialize authentication")
-                return False
+            for ssl_verify, description in ssl_options:
+                try:
+                    _LOGGER.info("🔧 Trying connection with %s", description)
+                    
+                    # Close any existing session
+                    if self.session:
+                        await self.session.close()
+                    
+                    # Create new session with current SSL setting
+                    connector = aiohttp.TCPConnector(ssl=ssl_verify)
+                    self.session = aiohttp.ClientSession(connector=connector)
+                    
+                    # Update SSL verification setting for all components
+                    self.ssl_verify = ssl_verify
+                    self.containers.ssl_verify = ssl_verify
+                    self.stacks.ssl_verify = ssl_verify
+                    self.images.ssl_verify = ssl_verify
+                    self.auth.ssl_verify = ssl_verify
+                    
+                    # Initialize authentication
+                    if await self.auth.initialize(self.session):
+                        # Test the connection by trying to get containers
+                        test_containers = await self.containers.get_containers(1)
+                        if test_containers is not None:
+                            _LOGGER.info("✅ Connection successful with %s", description)
+                            return True
+                        else:
+                            _LOGGER.warning("⚠️ Connection test failed with %s", description)
+                            await self.session.close()
+                    else:
+                        _LOGGER.warning("⚠️ Authentication failed with %s", description)
+                        await self.session.close()
+                        
+                except ClientConnectorCertificateError as e:
+                    _LOGGER.info("🔧 SSL certificate error with %s, trying next option: %s", description, e)
+                    if self.session:
+                        await self.session.close()
+                    continue
+                except Exception as e:
+                    _LOGGER.debug("❌ Connection failed with %s: %s", description, e)
+                    if self.session:
+                        await self.session.close()
+                    continue
             
-            _LOGGER.info("✅ Portainer API initialized successfully")
-            return True
+            _LOGGER.error("❌ All SSL verification approaches failed")
+            return False
             
         except Exception as e:
             _LOGGER.exception("❌ Failed to initialize Portainer API: %s", e)
@@ -64,6 +107,7 @@ class PortainerAPI:
     # Container operations - delegate to container API
     async def get_containers(self, endpoint_id: int):
         """Get all containers for an endpoint."""
+        _LOGGER.debug("🔧 get_containers called with ssl_verify: %s", self.ssl_verify)
         return await self.containers.get_containers(endpoint_id)
 
     async def inspect_container(self, endpoint_id: int, container_id: str):
@@ -93,6 +137,7 @@ class PortainerAPI:
     # Stack operations - delegate to stack API
     async def get_stacks(self, endpoint_id: int):
         """Get all stacks from Portainer for a specific endpoint."""
+        _LOGGER.debug("🔧 get_stacks called with ssl_verify: %s", self.ssl_verify)
         return await self.stacks.get_stacks(endpoint_id)
 
     async def stop_stack(self, endpoint_id: int, stack_name: str):

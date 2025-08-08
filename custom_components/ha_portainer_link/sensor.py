@@ -1,9 +1,10 @@
 import logging
 from homeassistant.const import STATE_UNKNOWN
 from homeassistant.components.sensor import SensorEntity
+from homeassistant.helpers.entity import EntityCategory
 
 from .const import DOMAIN, CONF_ENABLE_RESOURCE_SENSORS, CONF_ENABLE_VERSION_SENSORS, DEFAULT_ENABLE_RESOURCE_SENSORS, DEFAULT_ENABLE_VERSION_SENSORS
-from .entity import BaseContainerEntity
+from .entity import BaseContainerEntity, BaseStackEntity
 from .coordinator import PortainerDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -62,6 +63,18 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     _LOGGER.info("✅ Created %d sensor entities (Status: always, Resource: %s, Version: %s)", 
                  len(entities), resource_sensors_enabled, version_sensors_enabled)
+    
+    # Create stack-level sensors if stack view is enabled
+    if coordinator.is_stack_view_enabled():
+        for stack_name, stack_data in coordinator.stacks.items():
+            _LOGGER.debug("🔍 Creating stack sensors for: %s", stack_name)
+            
+            # Create stack status sensor
+            entities.append(StackStatusSensor(coordinator, entry_id, stack_name))
+            
+            # Create stack container count sensor
+            entities.append(StackContainerCountSensor(coordinator, entry_id, stack_name))
+    
     async_add_entities(entities, update_before_add=True)
 
 class ContainerStatusSensor(BaseContainerEntity, SensorEntity):
@@ -75,7 +88,10 @@ class ContainerStatusSensor(BaseContainerEntity, SensorEntity):
     def name(self) -> str:
         """Return the name of the sensor."""
         display_name = self._get_container_name_display()
-        return f"Status {display_name}"
+        if self.stack_info.get("is_stack_container"):
+            return f"Container Status {display_name}"
+        else:
+            return f"Status {display_name}"
 
     @property
     def state(self):
@@ -94,6 +110,10 @@ class ContainerStatusSensor(BaseContainerEntity, SensorEntity):
             "paused": "mdi:pause-circle",
         }.get(self.state, "mdi:help-circle")
 
+    @property
+    def entity_category(self) -> EntityCategory | None:
+        return EntityCategory.DIAGNOSTIC
+
 class ContainerCPUSensor(BaseContainerEntity, SensorEntity):
     """Sensor for container CPU usage."""
 
@@ -105,7 +125,10 @@ class ContainerCPUSensor(BaseContainerEntity, SensorEntity):
     def name(self) -> str:
         """Return the name of the sensor."""
         display_name = self._get_container_name_display()
-        return f"CPU {display_name}"
+        if self.stack_info.get("is_stack_container"):
+            return f"Container CPU {display_name}"
+        else:
+            return f"CPU {display_name}"
 
     @property
     def state(self):
@@ -156,6 +179,10 @@ class ContainerCPUSensor(BaseContainerEntity, SensorEntity):
             _LOGGER.error("❌ Error updating CPU sensor for container %s: %s", self.container_id, e)
             self._state = STATE_UNKNOWN
 
+    @property
+    def entity_category(self) -> EntityCategory | None:
+        return EntityCategory.DIAGNOSTIC
+
 class ContainerMemorySensor(BaseContainerEntity, SensorEntity):
     """Sensor for container memory usage."""
 
@@ -167,7 +194,10 @@ class ContainerMemorySensor(BaseContainerEntity, SensorEntity):
     def name(self) -> str:
         """Return the name of the sensor."""
         display_name = self._get_container_name_display()
-        return f"Memory {display_name}"
+        if self.stack_info.get("is_stack_container"):
+            return f"Container Memory {display_name}"
+        else:
+            return f"Memory {display_name}"
 
     @property
     def state(self):
@@ -212,6 +242,10 @@ class ContainerMemorySensor(BaseContainerEntity, SensorEntity):
             _LOGGER.error("❌ Error updating memory sensor for container %s: %s", self.container_id, e)
             self._state = STATE_UNKNOWN
 
+    @property
+    def entity_category(self) -> EntityCategory | None:
+        return EntityCategory.DIAGNOSTIC
+
 class ContainerUptimeSensor(BaseContainerEntity, SensorEntity):
     """Sensor for container uptime."""
 
@@ -223,7 +257,10 @@ class ContainerUptimeSensor(BaseContainerEntity, SensorEntity):
     def name(self) -> str:
         """Return the name of the sensor."""
         display_name = self._get_container_name_display()
-        return f"Uptime {display_name}"
+        if self.stack_info.get("is_stack_container"):
+            return f"Container Uptime {display_name}"
+        else:
+            return f"Uptime {display_name}"
 
     @property
     def state(self):
@@ -244,36 +281,54 @@ class ContainerUptimeSensor(BaseContainerEntity, SensorEntity):
                 self._state = STATE_UNKNOWN
                 return
 
-            # Get container stats
-            stats = await self.coordinator.api.get_container_stats(
+            # Get container inspection data to get the actual start time
+            container_info = await self.coordinator.api.inspect_container(
                 self.coordinator.endpoint_id, self.container_id
             )
             
-            if stats and "read" in stats:
-                # Calculate uptime from the read timestamp
-                import time
-                current_time = time.time()
-                start_time = stats["read"]
-                uptime_seconds = current_time - start_time
-                
-                # Convert to human readable format
-                if uptime_seconds < 60:
-                    self._state = f"{int(uptime_seconds)}s"
-                elif uptime_seconds < 3600:
-                    minutes = int(uptime_seconds / 60)
-                    self._state = f"{minutes}m"
-                elif uptime_seconds < 86400:
-                    hours = int(uptime_seconds / 3600)
-                    self._state = f"{hours}h"
+            if container_info and "State" in container_info:
+                # Get the container start time
+                started_at = container_info["State"].get("StartedAt")
+                if started_at:
+                    # Parse the Docker timestamp format
+                    import datetime
+                    try:
+                        # Docker timestamps are in ISO format with 'Z' suffix
+                        start_time = datetime.datetime.fromisoformat(started_at.replace('Z', '+00:00'))
+                        current_time = datetime.datetime.now(datetime.timezone.utc)
+                        
+                        # Calculate uptime
+                        uptime_delta = current_time - start_time
+                        uptime_seconds = uptime_delta.total_seconds()
+                        
+                        # Convert to human readable format
+                        if uptime_seconds < 60:
+                            self._state = f"{int(uptime_seconds)}s"
+                        elif uptime_seconds < 3600:
+                            minutes = int(uptime_seconds / 60)
+                            self._state = f"{minutes}m"
+                        elif uptime_seconds < 86400:
+                            hours = int(uptime_seconds / 3600)
+                            self._state = f"{hours}h"
+                        else:
+                            days = int(uptime_seconds / 86400)
+                            self._state = f"{days}d"
+                    except Exception as e:
+                        _LOGGER.error("❌ Error parsing container start time for %s: %s", self.container_id, e)
+                        self._state = STATE_UNKNOWN
                 else:
-                    days = int(uptime_seconds / 86400)
-                    self._state = f"{days}d"
+                    # Container not started or no start time available
+                    self._state = "0s"
             else:
                 self._state = STATE_UNKNOWN
                 
         except Exception as e:
             _LOGGER.error("❌ Error updating uptime sensor for container %s: %s", self.container_id, e)
             self._state = STATE_UNKNOWN
+
+    @property
+    def entity_category(self) -> EntityCategory | None:
+        return EntityCategory.DIAGNOSTIC
 
 class ContainerImageSensor(BaseContainerEntity, SensorEntity):
     """Sensor for container image information."""
@@ -324,6 +379,10 @@ class ContainerImageSensor(BaseContainerEntity, SensorEntity):
         except Exception as e:
             _LOGGER.error("❌ Error updating image sensor for container %s: %s", self.container_id, e)
             self._state = STATE_UNKNOWN
+
+    @property
+    def entity_category(self) -> EntityCategory | None:
+        return EntityCategory.CONFIG
 
 class ContainerCurrentVersionSensor(BaseContainerEntity, SensorEntity):
     """Sensor for container current version."""
@@ -383,6 +442,10 @@ class ContainerCurrentVersionSensor(BaseContainerEntity, SensorEntity):
             _LOGGER.error("❌ Error updating current version sensor for container %s: %s", self.container_id, e)
             self._state = STATE_UNKNOWN
 
+    @property
+    def entity_category(self) -> EntityCategory | None:
+        return EntityCategory.CONFIG
+
 class ContainerAvailableVersionSensor(BaseContainerEntity, SensorEntity):
     """Sensor for container available version."""
 
@@ -436,3 +499,69 @@ class ContainerAvailableVersionSensor(BaseContainerEntity, SensorEntity):
         except Exception as e:
             _LOGGER.error("❌ Error updating available version sensor for container %s: %s", self.container_id, e)
             self._state = STATE_UNKNOWN
+
+    @property
+    def entity_category(self) -> EntityCategory | None:
+        return EntityCategory.CONFIG
+
+
+class StackStatusSensor(BaseStackEntity, SensorEntity):
+    """Sensor for stack status."""
+
+    @property
+    def entity_type(self) -> str:
+        return "stack_status"
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        return f"Stack Status {self.stack_name}"
+
+    @property
+    def state(self):
+        """Return the state of the sensor."""
+        stack_data = self._get_stack_data()
+        if stack_data:
+            return stack_data.get("Status", STATE_UNKNOWN)
+        return STATE_UNKNOWN
+
+    @property
+    def icon(self):
+        """Return the icon of the sensor."""
+        return {
+            "active": "mdi:check-circle",
+            "inactive": "mdi:close-circle",
+            "pending": "mdi:clock",
+        }.get(self.state, "mdi:help-circle")
+
+    @property
+    def entity_category(self) -> EntityCategory | None:
+        return EntityCategory.DIAGNOSTIC
+
+
+class StackContainerCountSensor(BaseStackEntity, SensorEntity):
+    """Sensor for stack container count."""
+
+    @property
+    def entity_type(self) -> str:
+        return "stack_container_count"
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        return f"Stack Container Count {self.stack_name}"
+
+    @property
+    def state(self):
+        """Return the state of the sensor."""
+        containers = self._get_stack_containers()
+        return len(containers) if containers else 0
+
+    @property
+    def icon(self):
+        """Return the icon of the sensor."""
+        return "mdi:docker"
+
+    @property
+    def entity_category(self) -> EntityCategory | None:
+        return EntityCategory.DIAGNOSTIC

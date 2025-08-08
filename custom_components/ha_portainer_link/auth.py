@@ -1,6 +1,7 @@
 import logging
 import aiohttp
 from typing import Optional, Dict, Any
+from aiohttp import ClientConnectorCertificateError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -47,7 +48,9 @@ class PortainerAuth:
         payload = {"Username": self.username, "Password": self.password}
         
         try:
-            async with self.session.post(url, json=payload, ssl=self.ssl_verify) as resp:
+            # Use the current SSL verification setting
+            ssl_setting = self.ssl_verify if hasattr(self, 'ssl_verify') else True
+            async with self.session.post(url, json=payload, ssl=ssl_setting) as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     self.token = data.get("jwt")
@@ -60,6 +63,9 @@ class PortainerAuth:
                 else:
                     _LOGGER.error("❌ Authentication failed: HTTP %s", resp.status)
                     return False
+        except ClientConnectorCertificateError as e:
+            _LOGGER.info("🔧 SSL certificate error during authentication: %s", e)
+            return False
         except Exception as e:
             _LOGGER.exception("❌ Authentication error: %s", e)
             return False

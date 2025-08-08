@@ -1,5 +1,6 @@
 import logging
 from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.helpers.entity import EntityCategory
 
 from .const import DOMAIN, CONF_ENABLE_UPDATE_SENSORS, DEFAULT_ENABLE_UPDATE_SENSORS
 from .entity import BaseContainerEntity
@@ -73,6 +74,10 @@ class ContainerUpdateAvailableSensor(BaseContainerEntity, BinarySensorEntity):
     def icon(self):
         """Return the icon of the sensor."""
         return "mdi:update" if self.is_on else "mdi:update-disabled"
+
+    @property
+    def entity_category(self) -> EntityCategory | None:
+        return EntityCategory.CONFIG
 
     async def async_update(self):
         """Update the sensor."""

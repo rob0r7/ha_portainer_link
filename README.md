@@ -25,25 +25,27 @@ A Home Assistant integration for managing Docker containers and stacks through P
 1. **Portainer URL**: Enter the full Portainer URL (e.g., `https://192.168.0.6:9443` or `http://192.168.0.6:9000`)
 2. **Authentication**: Use either username/password or API key
 3. **Endpoint ID**: Docker endpoint ID (usually 1)
-4. **SSL Verification**: Enable/disable SSL certificate verification
+4. **SSL Verification**: Automatically determined based on connection success
 
 ### Integration Modes
 
 #### **Lightweight Mode**
 - Minimal functionality for performance-sensitive environments
-- Container status sensors and basic start/stop switches only
+- Container status sensors and start/stop switches (always available)
 - 10-minute update intervals
 - No resource monitoring or stack view
 
 #### **Standard Mode**
 - Balanced functionality for most common use cases
 - Stack view, resource sensors, version tracking, update checks
+- Container start/stop switches (always available)
 - 5-minute update intervals
 - Moderate resource usage
 
 #### **Full Mode**
 - Complete functionality with all features enabled
 - Everything including container logs and bulk operations
+- Container start/stop switches (always available)
 - 3-minute update intervals
 - Comprehensive monitoring
 
@@ -56,7 +58,7 @@ A Home Assistant integration for managing Docker containers and stacks through P
 
 **Core Features** (Always Available):
 - Container status sensors
-- Basic container control switches
+- Container start/stop switches
 
 **Optional Features**:
 - **Stack View**: Stack clustering and management
@@ -84,7 +86,7 @@ A Home Assistant integration for managing Docker containers and stacks through P
 
 ### Connection Issues
 - **Invalid URL**: Ensure the URL includes the full scheme and port (e.g., `https://192.168.0.6:9443`)
-- **SSL Errors**: Try disabling SSL verification for self-signed certificates
+- **SSL Errors**: SSL verification is automatically determined - the integration will try different approaches
 - **Authentication**: Verify username/password or API key
 
 ### Performance Issues
@@ -103,6 +105,9 @@ A Home Assistant integration for managing Docker containers and stacks through P
 - **Simplified Configuration**: Changed to accept full Portainer URL directly (e.g., `https://192.168.0.6:9443`)
 - **Eliminated URL Construction**: Removed complex host/port parsing logic to prevent connection issues
 - **Better User Experience**: Clearer input field description and validation
+- **Fixed Uptime Sensor**: Corrected uptime calculation to use actual container start time instead of stats timestamp
+- **Container Switches Always Available**: Made container start/stop switches core functionality available in all integration modes
+- **Automatic SSL Verification**: SSL verification is now automatically determined based on connection success
 
 ### Version 0.3.2
 - **Bug Fixes**: Fixed URL construction issues causing connection errors

@@ -2,6 +2,7 @@ import logging
 import aiohttp
 from typing import Optional, Dict, Any
 import time
+from aiohttp.client_exceptions import ClientConnectorCertificateError
 
 from .const import (
     CONF_CACHE_DURATION, CONF_RATE_LIMIT_CHECKS, CONF_RATE_LIMIT_PERIOD,
@@ -163,12 +164,32 @@ class PortainerImageAPI:
         """Get detailed information about a Docker image."""
         try:
             image_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/{image_id}/json"
-            async with self.auth.session.get(image_url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
-                if resp.status == 200:
-                    return await resp.json()
-                else:
-                    _LOGGER.error("❌ Failed to get image info: HTTP %s", resp.status)
+            
+            # Try with current SSL setting first
+            try:
+                async with self.auth.session.get(image_url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
+                    if resp.status == 200:
+                        return await resp.json()
+                    else:
+                        _LOGGER.error("❌ Failed to get image info: HTTP %s", resp.status)
+                        return None
+            except ClientConnectorCertificateError as e:
+                _LOGGER.info("🔧 SSL certificate error, retrying with SSL disabled: %s", e)
+                # Retry with SSL disabled
+                try:
+                    async with self.auth.session.get(image_url, headers=self.auth.get_headers(), ssl=False) as resp:
+                        if resp.status == 200:
+                            _LOGGER.info("✅ Successfully connected with SSL disabled")
+                            # Update SSL setting for future calls
+                            self.ssl_verify = False
+                            return await resp.json()
+                        else:
+                            _LOGGER.error("❌ Failed to get image info: HTTP %s", resp.status)
+                            return None
+                except Exception as retry_e:
+                    _LOGGER.exception("❌ Error getting image info with SSL disabled: %s", retry_e)
                     return None
+                    
         except Exception as e:
             _LOGGER.exception("❌ Error getting image info: %s", e)
             return None
@@ -322,12 +343,32 @@ class PortainerImageAPI:
         """Get container inspection data."""
         try:
             container_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/json"
-            async with self.auth.session.get(container_url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
-                if resp.status == 200:
-                    return await resp.json()
-                else:
-                    _LOGGER.error("❌ Failed to get container info: HTTP %s", resp.status)
+            
+            # Try with current SSL setting first
+            try:
+                async with self.auth.session.get(container_url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
+                    if resp.status == 200:
+                        return await resp.json()
+                    else:
+                        _LOGGER.error("❌ Failed to get container info: HTTP %s", resp.status)
+                        return None
+            except ClientConnectorCertificateError as e:
+                _LOGGER.info("🔧 SSL certificate error, retrying with SSL disabled: %s", e)
+                # Retry with SSL disabled
+                try:
+                    async with self.auth.session.get(container_url, headers=self.auth.get_headers(), ssl=False) as resp:
+                        if resp.status == 200:
+                            _LOGGER.info("✅ Successfully connected with SSL disabled")
+                            # Update SSL setting for future calls
+                            self.ssl_verify = False
+                            return await resp.json()
+                        else:
+                            _LOGGER.error("❌ Failed to get container info: HTTP %s", resp.status)
+                            return None
+                except Exception as retry_e:
+                    _LOGGER.exception("❌ Error getting container info with SSL disabled: %s", retry_e)
                     return None
+                    
         except Exception as e:
             _LOGGER.exception("❌ Error getting container info: %s", e)
             return None

@@ -73,19 +73,32 @@ class PortainerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "unknown"
 
         data_schema = vol.Schema({
-            vol.Required(CONF_HOST, description="Portainer URL (e.g., https://192.168.0.6:9443 or http://192.168.0.6:9000)"): str,
-            vol.Optional(CONF_SSL_VERIFY, default=DEFAULT_SSL_VERIFY, description="Verify SSL certificates"): bool,
-            vol.Optional(CONF_USERNAME, description="Username"): str,
-            vol.Optional(CONF_PASSWORD, description="Password"): str,
-            vol.Optional(CONF_API_KEY, description="API Key (alternative to username/password)"): str,
-            vol.Required(CONF_ENDPOINT_ID, default=1, description="Docker endpoint ID (usually 1)"): int,
-            vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT, description="Request timeout in seconds"): int,
+            vol.Required(CONF_HOST, description="Full Portainer URL including protocol and port"): str,
+            vol.Optional(CONF_USERNAME, description="Portainer username (leave empty if using API key)"): str,
+            vol.Optional(CONF_PASSWORD, description="Portainer password (leave empty if using API key)"): str,
+            vol.Optional(CONF_API_KEY, description="Portainer API key (alternative to username/password)"): str,
+            vol.Required(CONF_ENDPOINT_ID, default=1, description="Docker endpoint ID (usually 1 for single Docker host)"): int,
+            vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT, description="Request timeout in seconds (default: 30)"): int,
         })
 
         return self.async_show_form(
             step_id="user", 
             data_schema=data_schema, 
-            errors=errors
+            errors=errors,
+            description_placeholders={
+                "examples": """
+**Examples:**
+- **HTTPS with custom port:** `https://192.168.1.100:9443`
+- **HTTP with default port:** `http://192.168.1.100:9000`
+- **Local network:** `https://portainer.local:9443`
+- **With domain:** `https://portainer.mydomain.com`
+
+**Authentication Options:**
+- **Username/Password:** Enter your Portainer login credentials
+- **API Key:** Generate in Portainer → Settings → API Keys
+- **Endpoint ID:** Usually 1 for single Docker host, check Portainer → Endpoints
+                """
+            }
         )
 
     async def async_step_integration_mode(self, user_input=None) -> FlowResult:
@@ -115,7 +128,7 @@ class PortainerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         }
 
         data_schema = vol.Schema({
-            vol.Required(CONF_INTEGRATION_MODE, default=DEFAULT_INTEGRATION_MODE): vol.In(mode_options)
+            vol.Required(CONF_INTEGRATION_MODE, default=DEFAULT_INTEGRATION_MODE, description="Choose how much functionality you want"): vol.In(mode_options)
         })
 
         return self.async_show_form(
@@ -124,7 +137,35 @@ class PortainerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={
                 "lightweight_desc": INTEGRATION_MODE_PRESETS[INTEGRATION_MODE_LIGHTWEIGHT]["description"],
                 "standard_desc": INTEGRATION_MODE_PRESETS[INTEGRATION_MODE_STANDARD]["description"],
-                "full_desc": INTEGRATION_MODE_PRESETS[INTEGRATION_MODE_FULL]["description"]
+                "full_desc": INTEGRATION_MODE_PRESETS[INTEGRATION_MODE_FULL]["description"],
+                "mode_help": """
+**Integration Modes:**
+
+**Lightweight** - Minimal resource usage
+- Container status sensors
+- Start/stop switches
+- 10-minute updates
+- Perfect for performance-sensitive environments
+
+**Standard** - Balanced functionality  
+- Stack view and management
+- Resource monitoring (CPU, memory, uptime)
+- Version tracking and update checks
+- 5-minute updates
+- Recommended for most users
+
+**Full** - Complete functionality
+- Everything including container logs
+- Bulk operations
+- Advanced monitoring
+- 3-minute updates
+- For power users who want everything
+
+**Custom** - Choose your own features
+- Granular control over every feature
+- Configurable update intervals
+- Perfect for advanced users
+                """
             }
         )
 
@@ -136,20 +177,42 @@ class PortainerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         # Show custom feature options
         data_schema = vol.Schema({
-            vol.Optional(CONF_ENABLE_STACK_VIEW, default=DEFAULT_ENABLE_STACK_VIEW, description="Enable stack view and management"): bool,
-            vol.Optional(CONF_ENABLE_CONTAINER_LOGS, default=DEFAULT_ENABLE_CONTAINER_LOGS, description="Enable container log viewing"): bool,
-            vol.Optional(CONF_ENABLE_RESOURCE_SENSORS, default=DEFAULT_ENABLE_RESOURCE_SENSORS, description="Enable CPU/memory/uptime sensors"): bool,
-            vol.Optional(CONF_ENABLE_VERSION_SENSORS, default=DEFAULT_ENABLE_VERSION_SENSORS, description="Enable version tracking sensors"): bool,
-            vol.Optional(CONF_ENABLE_UPDATE_SENSORS, default=DEFAULT_ENABLE_UPDATE_SENSORS, description="Enable update availability sensors"): bool,
-            vol.Optional(CONF_ENABLE_STACK_BUTTONS, default=DEFAULT_ENABLE_STACK_BUTTONS, description="Enable stack control buttons"): bool,
-            vol.Optional(CONF_ENABLE_CONTAINER_BUTTONS, default=DEFAULT_ENABLE_CONTAINER_BUTTONS, description="Enable container control buttons"): bool,
-            vol.Optional(CONF_ENABLE_BULK_OPERATIONS, default=DEFAULT_ENABLE_BULK_OPERATIONS, description="Enable bulk start/stop operations"): bool,
+            vol.Optional(CONF_ENABLE_STACK_VIEW, default=DEFAULT_ENABLE_STACK_VIEW, description="Enable stack clustering and management features"): bool,
+            vol.Optional(CONF_ENABLE_CONTAINER_LOGS, default=DEFAULT_ENABLE_CONTAINER_LOGS, description="Enable container log viewing (requires Full mode)"): bool,
+            vol.Optional(CONF_ENABLE_RESOURCE_SENSORS, default=DEFAULT_ENABLE_RESOURCE_SENSORS, description="Enable CPU, memory, and uptime monitoring sensors"): bool,
+            vol.Optional(CONF_ENABLE_VERSION_SENSORS, default=DEFAULT_ENABLE_VERSION_SENSORS, description="Enable current and available version tracking"): bool,
+            vol.Optional(CONF_ENABLE_UPDATE_SENSORS, default=DEFAULT_ENABLE_UPDATE_SENSORS, description="Enable update availability detection (rate-limited)"): bool,
+            vol.Optional(CONF_ENABLE_STACK_BUTTONS, default=DEFAULT_ENABLE_STACK_BUTTONS, description="Enable stack start/stop/update buttons"): bool,
+            vol.Optional(CONF_ENABLE_CONTAINER_BUTTONS, default=DEFAULT_ENABLE_CONTAINER_BUTTONS, description="Enable container restart and pull update buttons"): bool,
+            vol.Optional(CONF_ENABLE_BULK_OPERATIONS, default=DEFAULT_ENABLE_BULK_OPERATIONS, description="Enable bulk start/stop all containers buttons"): bool,
             vol.Optional(CONF_UPDATE_INTERVAL, default=DEFAULT_UPDATE_INTERVAL, description=f"Update interval in minutes ({MIN_UPDATE_INTERVAL}-{MAX_UPDATE_INTERVAL})"): vol.All(vol.Coerce(int), vol.Range(min=MIN_UPDATE_INTERVAL, max=MAX_UPDATE_INTERVAL)),
         })
 
         return self.async_show_form(
             step_id="custom_features",
-            data_schema=data_schema
+            data_schema=data_schema,
+            description_placeholders={
+                "feature_help": """
+**Custom Feature Configuration:**
+
+**Core Features (Always Available):**
+- Container status sensors
+- Container start/stop switches
+
+**Optional Features:**
+- **Stack View:** Group containers by Docker Compose stacks
+- **Resource Sensors:** Monitor CPU, memory, and uptime
+- **Version Sensors:** Track current and available versions
+- **Update Sensors:** Check for available updates (rate-limited)
+- **Stack Buttons:** Control entire stacks at once
+- **Container Buttons:** Restart containers and pull updates
+- **Bulk Operations:** Start/stop all containers with one button
+
+**Update Interval:** How often to refresh data (1-60 minutes)
+- Lower values = more responsive but higher resource usage
+- Higher values = less responsive but lower resource usage
+                """
+            }
         )
 
     async def _create_entry(self) -> FlowResult:
@@ -174,7 +237,6 @@ class PortainerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         
         # Process host URL - user should provide full URL
         host = config[CONF_HOST].strip()
-        ssl_verify = config.get(CONF_SSL_VERIFY, DEFAULT_SSL_VERIFY)
         
         # Validate and normalize the URL
         if not host.startswith(("http://", "https://")):
@@ -185,8 +247,7 @@ class PortainerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Ensure the URL is properly formatted
         config[CONF_HOST] = host.rstrip("/")
         
-        _LOGGER.debug("🔧 Processed host URL: %s (ssl_verify: %s)", 
-                     config[CONF_HOST], ssl_verify)
+        _LOGGER.debug("🔧 Processed host URL: %s", config[CONF_HOST])
         
         return config
 
@@ -224,7 +285,7 @@ class PortainerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         # Test connection
         try:
-            api = PortainerAPI(host, username, password, api_key, config.get(CONF_SSL_VERIFY, DEFAULT_SSL_VERIFY))
+            api = PortainerAPI(host, username, password, api_key, config=config)
             if not await api.initialize():
                 raise CannotConnect("Failed to initialize connection to Portainer")
             

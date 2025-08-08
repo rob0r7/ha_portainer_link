@@ -46,6 +46,21 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
         try:
             _LOGGER.debug("🔄 Updating Portainer data for endpoint %s", self.endpoint_id)
             
+            # First, check if the endpoint exists
+            endpoint_exists = await self.api.containers.check_endpoint_exists(self.endpoint_id)
+            if not endpoint_exists:
+                _LOGGER.error("❌ Endpoint %s does not exist. Getting available endpoints...", self.endpoint_id)
+                available_endpoints = await self.api.containers.get_available_endpoints()
+                if available_endpoints:
+                    _LOGGER.error("❌ Available endpoints are: %s", [ep.get("Id") for ep in available_endpoints])
+                else:
+                    _LOGGER.error("❌ No endpoints found. Check your Portainer configuration.")
+                return {
+                    "containers": [],
+                    "stacks": [],
+                    "container_stack_map": {}
+                }
+            
             # Get containers and stacks in parallel
             containers_task = self.api.get_containers(self.endpoint_id)
             stacks_task = self.api.get_stacks(self.endpoint_id) if self.is_stack_view_enabled() else asyncio.sleep(0)
@@ -67,6 +82,12 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
             for container in containers:
                 container_id = container["Id"]
                 container_name = container.get("Names", ["unknown"])[0].strip("/")
+                container_state = container.get("State", {})
+                is_running = container_state.get("Running", False) if isinstance(container_state, dict) else False
+                
+                _LOGGER.debug("🔍 Processing container: %s (ID: %s, Running: %s, State: %s)", 
+                             container_name, container_id, is_running, container_state)
+                
                 self.containers[container_id] = container
                 
                 # Only get stack information if stack view is enabled
@@ -198,3 +219,23 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
     def is_bulk_operations_enabled(self) -> bool:
         """Check if bulk operations are enabled."""
         return self.config.get(CONF_ENABLE_BULK_OPERATIONS, DEFAULT_ENABLE_BULK_OPERATIONS)
+
+    async def async_shutdown(self):
+        """Shutdown the coordinator and clean up resources."""
+        _LOGGER.debug("🛑 Shutting down Portainer coordinator for endpoint %s", self.endpoint_id)
+        
+        # Cancel any pending updates
+        if hasattr(self, '_update_task') and self._update_task:
+            self._update_task.cancel()
+            try:
+                await self._update_task
+            except asyncio.CancelledError:
+                pass
+        
+        # Clear data
+        self.containers.clear()
+        self.stacks.clear()
+        self.container_stack_map.clear()
+        self.container_stack_info.clear()
+        
+        _LOGGER.debug("✅ Coordinator shutdown complete for endpoint %s", self.endpoint_id)

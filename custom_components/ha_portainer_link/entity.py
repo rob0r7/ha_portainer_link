@@ -6,6 +6,7 @@ from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
 from .coordinator import PortainerDataUpdateCoordinator
+from . import create_portainer_device_info, create_stack_device_info, create_container_device_info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -120,26 +121,13 @@ class BaseContainerEntity(BasePortainerEntity):
         host_name = _get_host_display_name(self.coordinator.api.base_url)
         
         if self.stack_info.get("is_stack_container"):
-            # For stack containers, use the stack as the device
+            # For stack containers, use the stack as the parent device
             stack_name = self.stack_info.get("stack_name", "unknown_stack")
-            device_id = _get_simple_device_id(self.entry_id, self.coordinator.endpoint_id, host_name, f"stack_{stack_name}")
-            return {
-                "identifiers": {(DOMAIN, device_id)},
-                "name": f"Stack: {stack_name} ({host_name})",
-                "manufacturer": "Docker via Portainer",
-                "model": "Docker Stack",
-                "configuration_url": f"{self.coordinator.api.base_url}/#!/stacks/{stack_name}",
-            }
+            stack_id = self.stack_info.get("stack_id", stack_name)
+            return create_stack_device_info(self.entry_id, stack_id, stack_name)
         else:
             # For standalone containers, use the container as the device
-            device_id = _get_simple_device_id(self.entry_id, self.coordinator.endpoint_id, host_name, self.container_name)
-            return {
-                "identifiers": {(DOMAIN, device_id)},
-                "name": f"{self.container_name} ({host_name})",
-                "manufacturer": "Docker via Portainer",
-                "model": "Docker Container",
-                "configuration_url": f"{self.coordinator.api.base_url}/#!/containers/{self.container_id}/details",
-            }
+            return create_container_device_info(self.entry_id, self.container_id, self.container_name, self.stack_info)
 
     def _get_container_data(self) -> Optional[Dict[str, Any]]:
         """Get current container data from coordinator."""
@@ -148,9 +136,8 @@ class BaseContainerEntity(BasePortainerEntity):
     def _get_container_name_display(self) -> str:
         """Get display name for the container."""
         if self.stack_info.get("is_stack_container"):
-            stack_name = self.stack_info.get("stack_name", "unknown")
             service_name = self.stack_info.get("service_name", self.container_name)
-            return f"{service_name} ({stack_name})"
+            return f"{service_name}"
         else:
             return self.container_name
 
@@ -176,15 +163,7 @@ class BaseStackEntity(BasePortainerEntity):
     @property
     def device_info(self) -> Dict[str, Any]:
         """Return device info."""
-        host_name = _get_host_display_name(self.coordinator.api.base_url)
-        device_id = _get_simple_device_id(self.entry_id, self.coordinator.endpoint_id, host_name, f"stack_{self.stack_name}")
-        return {
-            "identifiers": {(DOMAIN, device_id)},
-            "name": f"Stack: {self.stack_name} ({host_name})",
-            "manufacturer": "Docker via Portainer",
-            "model": "Docker Stack",
-            "configuration_url": f"{self.coordinator.api.base_url}/#!/stacks/{self.stack_name}",
-        }
+        return create_stack_device_info(self.entry_id, self.stack_name, self.stack_name)
 
     def _get_stack_data(self) -> Optional[Dict[str, Any]]:
         """Get current stack data from coordinator."""
