@@ -58,9 +58,10 @@ class PortainerAPI:
                     if self.session:
                         await self.session.close()
                     
-                    # Create new session with current SSL setting
+                    # Create new session with current SSL setting and reasonable timeouts
+                    timeout = aiohttp.ClientTimeout(total=30, connect=10, sock_connect=10, sock_read=20)
                     connector = aiohttp.TCPConnector(ssl=ssl_verify)
-                    self.session = aiohttp.ClientSession(connector=connector)
+                    self.session = aiohttp.ClientSession(connector=connector, timeout=timeout)
                     
                     # Update SSL verification setting for all components
                     self.ssl_verify = ssl_verify

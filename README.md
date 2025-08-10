@@ -108,7 +108,12 @@ ssl.SSLCertVerificationError: certificate verify failed
 ```
 Invalid config for 'logger': 'custom_components.ha_portainer_link' is an invalid option
 ```
-**Solution**: Use `ha_portainer_link: info` in your `configuration.yaml`, not `custom_components.ha_portainer_link`.
+**Solution**: Use the proper logs mapping in your `configuration.yaml`:
+```yaml
+logger:
+  logs:
+    custom_components.ha_portainer_link: info
+```
 
 #### Container State Not Updating
 **Solution**: The integration automatically refreshes data. If issues persist, use the refresh service:

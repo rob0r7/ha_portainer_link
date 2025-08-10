@@ -29,6 +29,7 @@ class PortainerAuth:
             self.headers = {
                 "X-API-Key": self.api_key,
                 "Content-Type": "application/json",
+                "Accept": "application/json, text/plain, */*",
             }
             _LOGGER.info("✅ Using API key authentication")
             return True

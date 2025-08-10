@@ -178,8 +178,14 @@ class ContainerCPUSensor(BaseContainerEntity, SensorEntity):
                 precpu_stats = stats.get("precpu_stats", {})
                 
                 # Calculate CPU usage percentage
-                cpu_delta = cpu_stats.get("cpu_usage", {}).get("total", 0) - precpu_stats.get("cpu_usage", {}).get("total", 0)
-                system_delta = cpu_stats.get("system_cpu_usage", 0) - precpu_stats.get("system_cpu_usage", 0)
+                # Docker stats schemas vary; try multiple keys safely
+                current_total = cpu_stats.get("cpu_usage", {}).get("total") or cpu_stats.get("cpu_usage", {}).get("total_usage", 0)
+                previous_total = precpu_stats.get("cpu_usage", {}).get("total") or precpu_stats.get("cpu_usage", {}).get("total_usage", 0)
+                cpu_delta = max(0, current_total - previous_total)
+
+                current_system = cpu_stats.get("system_cpu_usage") or cpu_stats.get("system_usage", 0)
+                previous_system = precpu_stats.get("system_cpu_usage") or precpu_stats.get("system_usage", 0)
+                system_delta = max(0, current_system - previous_system)
                 
                 if system_delta > 0:
                     cpu_percent = (cpu_delta / system_delta) * 100
@@ -243,11 +249,15 @@ class ContainerMemorySensor(BaseContainerEntity, SensorEntity):
             )
             
             if stats and "memory_stats" in stats:
-                memory_stats = stats["memory_stats"]
+                memory_stats = stats.get("memory_stats", {})
+                # Prefer usage minus cache when available
                 usage = memory_stats.get("usage", 0)
+                stats_detail = memory_stats.get("stats", {})
+                cache = stats_detail.get("cache", 0) or stats_detail.get("inactive_file", 0)
+                effective = max(0, usage - cache) if cache and usage else usage
                 
                 # Convert bytes to MB
-                memory_mb = usage / (1024 * 1024)
+                memory_mb = effective / (1024 * 1024)
                 self._state = round(memory_mb, 2)
             else:
                 self._state = STATE_UNKNOWN
@@ -307,25 +317,26 @@ class ContainerUptimeSensor(BaseContainerEntity, SensorEntity):
                     # Parse the Docker timestamp format
                     import datetime
                     try:
-                        # Docker timestamps are in ISO format with 'Z' suffix
-                        start_time = datetime.datetime.fromisoformat(started_at.replace('Z', '+00:00'))
+                        # Normalize various timestamp formats
+                        normalized = started_at.replace('Z', '+00:00').split('.')[0] + '+00:00' if 'Z' in started_at and '.' in started_at else started_at.replace('Z', '+00:00')
+                        start_time = datetime.datetime.fromisoformat(normalized)
                         current_time = datetime.datetime.now(datetime.timezone.utc)
                         
                         # Calculate uptime
                         uptime_delta = current_time - start_time
-                        uptime_seconds = uptime_delta.total_seconds()
+                        uptime_seconds = max(0, int(uptime_delta.total_seconds()))
                         
                         # Convert to human readable format
                         if uptime_seconds < 60:
-                            self._state = f"{int(uptime_seconds)}s"
+                            self._state = f"{uptime_seconds}s"
                         elif uptime_seconds < 3600:
-                            minutes = int(uptime_seconds / 60)
+                            minutes = uptime_seconds // 60
                             self._state = f"{minutes}m"
                         elif uptime_seconds < 86400:
-                            hours = int(uptime_seconds / 3600)
+                            hours = uptime_seconds // 3600
                             self._state = f"{hours}h"
                         else:
-                            days = int(uptime_seconds / 86400)
+                            days = uptime_seconds // 86400
                             self._state = f"{days}d"
                     except Exception as e:
                         _LOGGER.error("❌ Error parsing container start time for %s: %s", self.container_id, e)
