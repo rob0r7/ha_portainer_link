@@ -265,7 +265,41 @@ class StackUpdateButton(BaseStackEntity, ButtonEntity):
             _LOGGER.info("🔄 Force updating stack %s", self.stack_name)
             result = await self.coordinator.api.stacks.update_stack(self.coordinator.endpoint_id, self.stack_name)
             
-            # Accept either successful PUT or fallback start, and require readiness wait to pass
+            # Log the full result for debugging
+            _LOGGER.info("📊 Stack update result for %s: %s", self.stack_name, result)
+            
+            # Check if compose content was retrieved
+            if not result.get("compose_retrieved", False):
+                _LOGGER.error("❌ Could not retrieve compose content for stack %s", self.stack_name)
+                _LOGGER.warning("⚠️ Stack update may have failed due to missing compose content")
+            
+            # Check if containers were deleted
+            deleted_count = len(result.get("deleted", []))
+            if deleted_count == 0:
+                _LOGGER.warning("⚠️ No containers were deleted for stack %s (may be normal for fresh stacks)", self.stack_name)
+            else:
+                _LOGGER.info("✅ Deleted %d containers for stack %s", deleted_count, self.stack_name)
+            
+            # Check if PUT update was successful
+            update_put = result.get("update_put", {})
+            if update_put.get("ok", False):
+                _LOGGER.info("✅ Stack update PUT successful for %s", self.stack_name)
+            else:
+                _LOGGER.warning("⚠️ Stack update PUT failed for %s: HTTP %s", self.stack_name, update_put.get("status", "unknown"))
+                if update_put.get("body"):
+                    _LOGGER.debug("📄 PUT error body: %s", update_put.get("body"))
+            
+            # Check if fallback start was used
+            if result.get("started", False):
+                _LOGGER.info("✅ Stack %s started via fallback method", self.stack_name)
+            
+            # Check if containers are running
+            if result.get("wait_ready", False):
+                _LOGGER.info("✅ Stack %s containers are running", self.stack_name)
+            else:
+                _LOGGER.warning("⚠️ Stack %s containers may not be fully ready", self.stack_name)
+            
+            # Determine overall success
             success = (
                 result.get("wait_ready", False)
                 and (
@@ -275,9 +309,10 @@ class StackUpdateButton(BaseStackEntity, ButtonEntity):
             )
             
             if success:
-                _LOGGER.info("✅ Stack %s updated successfully: %s", self.stack_name, result)
+                _LOGGER.info("✅ Stack %s updated successfully", self.stack_name)
             else:
-                _LOGGER.error("❌ Stack %s update failed: %s", self.stack_name, result)
+                _LOGGER.error("❌ Stack %s update failed", self.stack_name)
+                _LOGGER.error("❌ Update details: %s", result)
                 # Don't throw exception, just log the error and provide user feedback
                 _LOGGER.warning("⚠️ Stack update failed but continuing - check logs for details")
             

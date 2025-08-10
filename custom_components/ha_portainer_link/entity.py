@@ -58,6 +58,15 @@ def _get_stable_entity_id(entry_id: str, endpoint_id: int, container_name: str, 
     sanitized_id = stable_id.replace('-', '_').replace(' ', '_').replace('/', '_')
     return f"entry_{entry_id}_endpoint_{endpoint_id}_{sanitized_id}_{entity_type}"
 
+def _get_container_stable_id(container_name: str, stack_info: Dict[str, Any]) -> str:
+    """Generate a stable container identifier that doesn't change when container is recreated."""
+    if stack_info.get("is_stack_container"):
+        stack_name = stack_info.get("stack_name", "unknown")
+        service_name = stack_info.get("service_name", container_name)
+        return f"{stack_name}_{service_name}"
+    else:
+        return container_name
+
 class BasePortainerEntity(Entity):
     """Base class for all Portainer entities."""
 
@@ -95,6 +104,7 @@ class BaseContainerEntity(BasePortainerEntity):
         self.container_id = container_id
         self.container_name = container_name
         self.stack_info = stack_info
+        self.stable_container_id = _get_container_stable_id(container_name, stack_info)
         self._attr_unique_id = _get_stable_entity_id(
             entry_id, 
             coordinator.endpoint_id, 
@@ -115,6 +125,43 @@ class BaseContainerEntity(BasePortainerEntity):
                         self.container_name, self.container_id[:12], new_container_id[:12])
             self.container_id = new_container_id
 
+    def _find_current_container_id(self) -> Optional[str]:
+        """Find the current container ID for this entity based on stable ID."""
+        # Use coordinator's stable container map if available
+        if hasattr(self.coordinator, 'get_container_by_stable_id'):
+            current_container_id = self.coordinator.get_container_by_stable_id(self.stable_container_id)
+            if current_container_id:
+                return current_container_id
+        
+        # Fallback: search through all containers
+        for container_id, container_data in self.coordinator.containers.items():
+            container_name = container_data.get("Names", ["unknown"])[0].strip("/")
+            stack_info = self.coordinator.get_container_stack_info(container_id) or {
+                "stack_name": None,
+                "service_name": None,
+                "container_number": None,
+                "is_stack_container": False
+            }
+            stable_id = _get_container_stable_id(container_name, stack_info)
+            if stable_id == self.stable_container_id:
+                return container_id
+        return None
+
+    def _get_container_data(self) -> Optional[Dict[str, Any]]:
+        """Get current container data from coordinator."""
+        # First try the stored container ID
+        container_data = self.coordinator.get_container(self.container_id)
+        if container_data:
+            return container_data
+        
+        # If not found, try to find the current container ID
+        current_container_id = self._find_current_container_id()
+        if current_container_id:
+            self.update_container_id(current_container_id)
+            return self.coordinator.get_container(current_container_id)
+        
+        return None
+
     @property
     def device_info(self) -> Dict[str, Any]:
         """Return device info."""
@@ -128,10 +175,6 @@ class BaseContainerEntity(BasePortainerEntity):
         else:
             # For standalone containers, use the container as the device
             return create_container_device_info(self.entry_id, self.container_id, self.container_name, self.stack_info)
-
-    def _get_container_data(self) -> Optional[Dict[str, Any]]:
-        """Get current container data from coordinator."""
-        return self.coordinator.get_container(self.container_id)
 
     def _get_container_name_display(self) -> str:
         """Get display name for the container."""

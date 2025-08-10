@@ -66,6 +66,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
             entities.append(ContainerImageSensor(coordinator, entry_id, container_id, container_name, stack_info))
             entities.append(ContainerCurrentVersionSensor(coordinator, entry_id, container_id, container_name, stack_info))
             entities.append(ContainerAvailableVersionSensor(coordinator, entry_id, container_id, container_name, stack_info))
+            entities.append(ContainerCurrentDigestSensor(coordinator, entry_id, container_id, container_name, stack_info))
+            entities.append(ContainerAvailableDigestSensor(coordinator, entry_id, container_id, container_name, stack_info))
 
     # Create stack-level sensors if stack view is enabled
     if coordinator.is_stack_view_enabled():
@@ -502,6 +504,124 @@ class ContainerAvailableVersionSensor(BaseContainerEntity, SensorEntity):
                 
         except Exception as e:
             _LOGGER.error("❌ Error updating available version sensor for container %s: %s", self.container_id, e)
+            self._state = STATE_UNKNOWN
+
+    @property
+    def entity_category(self) -> EntityCategory | None:
+        return EntityCategory.DIAGNOSTIC
+
+
+class ContainerCurrentDigestSensor(BaseContainerEntity, SensorEntity):
+    """Sensor for container current image digest."""
+
+    @property
+    def entity_type(self) -> str:
+        return "current_digest"
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        display_name = self._get_container_name_display()
+        if self.stack_info.get("is_stack_container"):
+            return f"Container Current Digest {display_name}"
+        else:
+            return f"Current Digest {display_name}"
+
+    @property
+    def state(self):
+        """Return the state of the sensor."""
+        # This will be updated by the coordinator
+        return getattr(self, '_state', STATE_UNKNOWN)
+
+    @property
+    def icon(self):
+        """Return the icon of the sensor."""
+        return "mdi:fingerprint"
+
+    async def async_update(self):
+        """Update the sensor."""
+        try:
+            container_data = self._get_container_data()
+            if not container_data:
+                self._state = STATE_UNKNOWN
+                return
+
+            # Check if version sensors are enabled
+            if not self.coordinator.is_version_sensors_enabled():
+                self._state = STATE_UNKNOWN
+                return
+
+            # Get current digest from image API
+            current_digest = await self.coordinator.api.get_current_digest(
+                self.coordinator.endpoint_id, self.container_id
+            )
+            
+            if current_digest and current_digest != "unknown":
+                self._state = current_digest
+            else:
+                self._state = STATE_UNKNOWN
+                
+        except Exception as e:
+            _LOGGER.error("❌ Error updating current digest sensor for container %s: %s", self.container_id, e)
+            self._state = STATE_UNKNOWN
+
+    @property
+    def entity_category(self) -> EntityCategory | None:
+        return EntityCategory.DIAGNOSTIC
+
+
+class ContainerAvailableDigestSensor(BaseContainerEntity, SensorEntity):
+    """Sensor for container available image digest from registry."""
+
+    @property
+    def entity_type(self) -> str:
+        return "available_digest"
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        display_name = self._get_container_name_display()
+        if self.stack_info.get("is_stack_container"):
+            return f"Container Available Digest {display_name}"
+        else:
+            return f"Available Digest {display_name}"
+
+    @property
+    def state(self):
+        """Return the state of the sensor."""
+        # This will be updated by the coordinator
+        return getattr(self, '_state', STATE_UNKNOWN)
+
+    @property
+    def icon(self):
+        """Return the icon of the sensor."""
+        return "mdi:fingerprint-outline"
+
+    async def async_update(self):
+        """Update the sensor."""
+        try:
+            container_data = self._get_container_data()
+            if not container_data:
+                self._state = STATE_UNKNOWN
+                return
+
+            # Check if version sensors are enabled
+            if not self.coordinator.is_version_sensors_enabled():
+                self._state = STATE_UNKNOWN
+                return
+
+            # Get available digest from image API
+            available_digest = await self.coordinator.api.get_available_digest(
+                self.coordinator.endpoint_id, self.container_id
+            )
+            
+            if available_digest and available_digest != "unknown":
+                self._state = available_digest
+            else:
+                self._state = STATE_UNKNOWN
+                
+        except Exception as e:
+            _LOGGER.error("❌ Error updating available digest sensor for container %s: %s", self.container_id, e)
             self._state = STATE_UNKNOWN
 
     @property

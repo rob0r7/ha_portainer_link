@@ -48,8 +48,10 @@ A comprehensive Home Assistant integration for managing Docker containers and st
 4. Enter your Portainer details:
    - **Portainer URL**: Full URL (e.g., `https://192.168.1.100:9443`)
    - **Username/Password** or **API Key**: Your Portainer credentials
-   - **Endpoint ID**: Usually `1` for local Docker, check Portainer → Endpoints
+   - **Endpoint ID**: **Important!** Check your Portainer URL - if you see `https://192.168.1.100:9443/#!/1/docker/containers` then your endpoint ID is `1`. If you see `#!/2/docker/containers` then it's `2`, etc.
    - **Integration Mode**: Choose Lightweight or Full View
+
+**💡 Pro Tip**: Look at your Portainer URL when you're viewing containers. The number after `#!/` is your endpoint ID!
 
 ### Configuration Options
 
@@ -152,6 +154,8 @@ Force refresh container data for all integrations.
 - **Current Version**: Extracted version from image
 - **Available Version**: Latest available version (Full View only)
 - **Update Available**: Whether updates are available (Full View only)
+- **Current Digest**: Current image digest (first 12 characters of SHA256)
+- **Available Digest**: Available image digest from registry (Full View only)
 
 ### Stack Sensors
 - **Status**: Overall stack status
@@ -192,6 +196,8 @@ Force refresh container data for all integrations.
 - 🔧 Improved stack stop logic for fresh stacks
 - 🔧 Fixed entity category errors for version sensors
 - 🔧 Removed device registry warnings by eliminating via_device references
+- 🔍 Added Current Digest and Available Digest sensors for better image version tracking
+- 🔧 Fixed Docker Hub API detection to properly handle third-party images (like interaapps/pastefy)
 
 ### v0.3.7
 - 🔧 Fixed indentation error in stack update fallback logic

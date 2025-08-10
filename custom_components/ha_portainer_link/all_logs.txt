@@ -1,166 +1,235 @@
-﻿==== Home Assistant Logs — 2025-08-08 23:50:08 ====
+﻿==== Home Assistant Logs — 2025-08-09 00:07:05 ====
 
 ===== CORE LOGS =====
-2025-08-08 23:45:35.005 WARNING (SyncWorker_0) [homeassistant.loader] We found a custom integration ha_portainer_link which has not been tested by Home Assistant. This component might cause stability problems, be sure to disable it if you experience issues with Home Assistant
-2025-08-08 23:45:35.005 WARNING (SyncWorker_0) [homeassistant.loader] We found a custom integration hacs which has not been tested by Home Assistant. This component might cause stability problems, be sure to disable it if you experience issues with Home Assistant
-2025-08-08 23:45:35.416 INFO (MainThread) [homeassistant.setup] Setup of domain http took 0.03 seconds
-2025-08-08 23:45:35.416 INFO (MainThread) [homeassistant.setup] Setup of domain system_log took 0.03 seconds
-2025-08-08 23:45:35.416 INFO (MainThread) [homeassistant.setup] Setting up websocket_api
-2025-08-08 23:45:35.416 INFO (MainThread) [homeassistant.setup] Setup of domain websocket_api took 0.00 seconds
-2025-08-08 23:45:35.416 INFO (MainThread) [homeassistant.setup] Setup of domain logger took 0.03 seconds
-2025-08-08 23:45:35.416 INFO (MainThread) [homeassistant.setup] Setting up network
-2025-08-08 23:45:35.416 INFO (MainThread) [homeassistant.setup] Setup of domain network took 0.00 seconds
-2025-08-08 23:45:35.417 INFO (MainThread) [homeassistant.bootstrap] Setting up stage frontend: {'frontend'}; already set up: {}
-Dependencies: {'device_automation', 'diagnostics', 'lovelace', 'search', 'api', 'repairs', 'file_upload', 'auth', 'config', 'onboarding'}; already set up: {'websocket_api', 'system_log', 'http'}
-2025-08-08 23:45:35.417 INFO (MainThread) [homeassistant.setup] Setting up auth
-2025-08-08 23:45:35.417 INFO (MainThread) [homeassistant.setup] Setup of domain auth took 0.00 seconds
-2025-08-08 23:45:35.417 INFO (MainThread) [homeassistant.setup] Setting up device_automation
-2025-08-08 23:45:35.417 INFO (MainThread) [homeassistant.setup] Setup of domain device_automation took 0.00 seconds
-2025-08-08 23:45:35.417 INFO (MainThread) [homeassistant.setup] Setting up diagnostics
-2025-08-08 23:45:35.417 INFO (MainThread) [homeassistant.setup] Setup of domain diagnostics took 0.00 seconds
-2025-08-08 23:45:35.417 INFO (MainThread) [homeassistant.setup] Setting up onboarding
-2025-08-08 23:45:35.417 INFO (MainThread) [homeassistant.setup] Setup of domain onboarding took 0.00 seconds
-2025-08-08 23:45:35.418 INFO (MainThread) [homeassistant.setup] Setting up lovelace
-2025-08-08 23:45:35.418 INFO (MainThread) [homeassistant.setup] Setting up search
-2025-08-08 23:45:35.418 INFO (MainThread) [homeassistant.setup] Setup of domain search took 0.00 seconds
-2025-08-08 23:45:35.418 INFO (MainThread) [homeassistant.setup] Setting up api
-2025-08-08 23:45:35.418 INFO (MainThread) [homeassistant.setup] Setup of domain api took 0.00 seconds
-2025-08-08 23:45:35.418 INFO (MainThread) [homeassistant.setup] Setting up config
-2025-08-08 23:45:35.419 INFO (MainThread) [homeassistant.setup] Setup of domain config took 0.00 seconds
-2025-08-08 23:45:35.419 INFO (MainThread) [homeassistant.setup] Setting up file_upload
-2025-08-08 23:45:35.419 INFO (MainThread) [homeassistant.setup] Setup of domain file_upload took 0.00 seconds
-2025-08-08 23:45:35.419 INFO (MainThread) [homeassistant.setup] Setting up repairs
-2025-08-08 23:45:35.419 INFO (MainThread) [homeassistant.setup] Setup of domain repairs took 0.00 seconds
-2025-08-08 23:45:35.420 INFO (MainThread) [homeassistant.setup] Setup of domain lovelace took 0.00 seconds
-2025-08-08 23:45:35.420 INFO (MainThread) [homeassistant.setup] Setting up frontend
-2025-08-08 23:45:35.422 INFO (MainThread) [homeassistant.setup] Setup of domain frontend took 0.00 seconds
-2025-08-08 23:45:35.423 INFO (MainThread) [homeassistant.bootstrap] Setting up stage recorder: {'recorder'}; already set up: {}
+2025-08-09 00:04:02.300 WARNING (SyncWorker_0) [homeassistant.loader] We found a custom integration ha_portainer_link which has not been tested by Home Assistant. This component might cause stability problems, be sure to disable it if you experience issues with Home Assistant
+2025-08-09 00:04:02.301 WARNING (SyncWorker_0) [homeassistant.loader] We found a custom integration hacs which has not been tested by Home Assistant. This component might cause stability problems, be sure to disable it if you experience issues with Home Assistant
+2025-08-09 00:04:02.677 INFO (MainThread) [homeassistant.setup] Setting up system_log
+2025-08-09 00:04:02.702 INFO (MainThread) [homeassistant.setup] Setup of domain http took 0.03 seconds
+2025-08-09 00:04:02.702 INFO (MainThread) [homeassistant.setup] Setting up websocket_api
+2025-08-09 00:04:02.703 INFO (MainThread) [homeassistant.setup] Setup of domain websocket_api took 0.00 seconds
+2025-08-09 00:04:02.703 INFO (MainThread) [homeassistant.setup] Setup of domain logger took 0.03 seconds
+2025-08-09 00:04:02.703 INFO (MainThread) [homeassistant.setup] Setup of domain system_log took 0.03 seconds
+2025-08-09 00:04:02.704 INFO (MainThread) [homeassistant.setup] Setting up network
+2025-08-09 00:04:02.705 INFO (MainThread) [homeassistant.setup] Setup of domain network took 0.00 seconds
+2025-08-09 00:04:02.705 INFO (MainThread) [homeassistant.bootstrap] Setting up stage frontend: {'frontend'}; already set up: {}
+Dependencies: {'device_automation', 'config', 'file_upload', 'api', 'search', 'onboarding', 'lovelace', 'auth', 'repairs', 'diagnostics'}; already set up: {'websocket_api', 'http', 'system_log'}
+2025-08-09 00:04:02.705 INFO (MainThread) [homeassistant.setup] Setting up device_automation
+2025-08-09 00:04:02.705 INFO (MainThread) [homeassistant.setup] Setup of domain device_automation took 0.00 seconds
+2025-08-09 00:04:02.705 INFO (MainThread) [homeassistant.setup] Setting up config
+2025-08-09 00:04:02.706 INFO (MainThread) [homeassistant.setup] Setup of domain config took 0.00 seconds
+2025-08-09 00:04:02.706 INFO (MainThread) [homeassistant.setup] Setting up file_upload
+2025-08-09 00:04:02.706 INFO (MainThread) [homeassistant.setup] Setup of domain file_upload took 0.00 seconds
+2025-08-09 00:04:02.706 INFO (MainThread) [homeassistant.setup] Setting up api
+2025-08-09 00:04:02.706 INFO (MainThread) [homeassistant.setup] Setup of domain api took 0.00 seconds
+2025-08-09 00:04:02.706 INFO (MainThread) [homeassistant.setup] Setting up search
+2025-08-09 00:04:02.706 INFO (MainThread) [homeassistant.setup] Setup of domain search took 0.00 seconds
+2025-08-09 00:04:02.706 INFO (MainThread) [homeassistant.setup] Setting up auth
+2025-08-09 00:04:02.707 INFO (MainThread) [homeassistant.setup] Setup of domain auth took 0.00 seconds
+2025-08-09 00:04:02.707 INFO (MainThread) [homeassistant.setup] Setting up diagnostics
+2025-08-09 00:04:02.707 INFO (MainThread) [homeassistant.setup] Setup of domain diagnostics took 0.00 seconds
+2025-08-09 00:04:02.707 INFO (MainThread) [homeassistant.setup] Setting up onboarding
+2025-08-09 00:04:02.707 INFO (MainThread) [homeassistant.setup] Setup of domain onboarding took 0.00 seconds
+2025-08-09 00:04:02.707 INFO (MainThread) [homeassistant.setup] Setting up lovelace
+2025-08-09 00:04:02.707 INFO (MainThread) [homeassistant.setup] Setting up repairs
+2025-08-09 00:04:02.708 INFO (MainThread) [homeassistant.setup] Setup of domain repairs took 0.00 seconds
+2025-08-09 00:04:02.708 INFO (MainThread) [homeassistant.setup] Setup of domain lovelace took 0.00 seconds
+2025-08-09 00:04:02.708 INFO (MainThread) [homeassistant.setup] Setting up frontend
+2025-08-09 00:04:02.710 INFO (MainThread) [homeassistant.setup] Setup of domain frontend took 0.00 seconds
+2025-08-09 00:04:02.711 INFO (MainThread) [homeassistant.bootstrap] Setting up stage recorder: {'recorder'}; already set up: {}
 Dependencies: {}; already set up: {}
-2025-08-08 23:45:35.423 INFO (MainThread) [homeassistant.setup] Setting up recorder
-2025-08-08 23:45:35.424 INFO (MainThread) [homeassistant.components.http] Now listening on port 8123
-2025-08-08 23:45:35.424 INFO (MainThread) [homeassistant.setup] Setup of domain http took 0.00 seconds
-2025-08-08 23:45:35.438 INFO (MainThread) [homeassistant.setup] Setup of domain recorder took 0.02 seconds
-2025-08-08 23:45:35.438 INFO (MainThread) [homeassistant.bootstrap] Nothing to set up in stage debugger: {'debugpy'}
-2025-08-08 23:45:35.438 INFO (MainThread) [homeassistant.bootstrap] Setting up stage zeroconf: {'zeroconf'}; already set up: {}
-Dependencies: {}; already set up: {'websocket_api', 'network', 'api', 'http'}
-2025-08-08 23:45:35.438 INFO (MainThread) [homeassistant.setup] Setting up zeroconf
-2025-08-08 23:45:35.440 INFO (MainThread) [homeassistant.components.zeroconf] Starting Zeroconf broadcast
-2025-08-08 23:45:35.440 INFO (MainThread) [homeassistant.setup] Setup of domain zeroconf took 0.00 seconds
-2025-08-08 23:45:35.440 INFO (MainThread) [homeassistant.bootstrap] Setting up stage 1: {'dhcp', 'bluetooth', 'usb', 'cloud', 'ssdp', 'hassio'}; already set up: {}
-Dependencies: {'intent', 'backup', 'conversation', 'assist_pipeline', 'stt', 'ffmpeg', 'tts', 'webhook', 'wake_word'}; already set up: {'http', 'websocket_api', 'network', 'repairs', 'auth'}
-2025-08-08 23:45:35.441 INFO (MainThread) [homeassistant.setup] Setting up hassio
-2025-08-08 23:45:35.442 INFO (MainThread) [homeassistant.setup] Setting up webhook
-2025-08-08 23:45:35.442 INFO (MainThread) [homeassistant.setup] Setup of domain webhook took 0.00 seconds
-2025-08-08 23:45:35.455 INFO (MainThread) [homeassistant.setup] Setting up intent
-2025-08-08 23:45:35.455 INFO (MainThread) [homeassistant.setup] Setup of domain intent took 0.00 seconds
-2025-08-08 23:45:35.455 INFO (MainThread) [homeassistant.setup] Setting up stt
-2025-08-08 23:45:35.456 INFO (MainThread) [homeassistant.setup] Setup of domain stt took 0.00 seconds
-2025-08-08 23:45:35.457 INFO (MainThread) [homeassistant.setup] Setting up ffmpeg
-2025-08-08 23:45:35.457 INFO (MainThread) [homeassistant.setup] Setup of domain ffmpeg took 0.00 seconds
-2025-08-08 23:45:35.457 INFO (MainThread) [homeassistant.setup] Setting up wake_word
-2025-08-08 23:45:35.457 INFO (MainThread) [homeassistant.setup] Setup of domain wake_word took 0.00 seconds
-2025-08-08 23:45:35.505 INFO (MainThread) [homeassistant.setup] Setup of domain hassio took 0.06 seconds
-2025-08-08 23:45:35.514 INFO (MainThread) [homeassistant.setup] Setting up binary_sensor
-2025-08-08 23:45:35.514 INFO (MainThread) [homeassistant.setup] Setup of domain binary_sensor took 0.00 seconds
-2025-08-08 23:45:35.515 INFO (MainThread) [homeassistant.setup] Setting up sensor
-2025-08-08 23:45:35.515 INFO (MainThread) [homeassistant.setup] Setup of domain sensor took 0.00 seconds
-2025-08-08 23:45:35.515 INFO (MainThread) [homeassistant.setup] Setting up update
-2025-08-08 23:45:35.515 INFO (MainThread) [homeassistant.setup] Setup of domain update took 0.00 seconds
-2025-08-08 23:45:35.516 INFO (MainThread) [homeassistant.components.binary_sensor] Setting up hassio.binary_sensor
-2025-08-08 23:45:35.516 INFO (MainThread) [homeassistant.components.sensor] Setting up hassio.sensor
-2025-08-08 23:45:35.517 INFO (MainThread) [homeassistant.components.update] Setting up hassio.update
-2025-08-08 23:45:35.518 INFO (MainThread) [homeassistant.setup] Setting up backup
-2025-08-08 23:45:35.519 INFO (MainThread) [homeassistant.setup] Setup of domain backup took 0.00 seconds
-2025-08-08 23:45:35.628 INFO (MainThread) [homeassistant.components.websocket_api.http.connection] [140219832675968] Received unknown command: logbook/event_stream
-2025-08-08 23:45:35.811 INFO (MainThread) [homeassistant.setup] Setting up dhcp
-2025-08-08 23:45:35.811 INFO (MainThread) [homeassistant.setup] Setup of domain dhcp took 0.00 seconds
-2025-08-08 23:45:35.821 INFO (MainThread) [homeassistant.setup] Setting up usb
-2025-08-08 23:45:35.822 INFO (MainThread) [homeassistant.setup] Setup of domain usb took 0.00 seconds
-2025-08-08 23:45:35.856 INFO (MainThread) [homeassistant.setup] Setting up ssdp
-2025-08-08 23:45:35.862 INFO (MainThread) [homeassistant.setup] Setting up conversation
-2025-08-08 23:45:35.862 INFO (MainThread) [homeassistant.setup] Setup of domain conversation took 0.00 seconds
-2025-08-08 23:45:35.862 INFO (MainThread) [homeassistant.setup] Setting up tts
-2025-08-08 23:45:35.864 INFO (MainThread) [homeassistant.setup] Setup of domain ssdp took 0.01 seconds
-2025-08-08 23:45:35.865 INFO (MainThread) [homeassistant.setup] Setup of domain tts took 0.00 seconds
-2025-08-08 23:45:35.867 INFO (MainThread) [homeassistant.setup] Setting up assist_pipeline
-2025-08-08 23:45:35.867 INFO (MainThread) [homeassistant.setup] Setup of domain assist_pipeline took 0.00 seconds
-2025-08-08 23:45:35.874 INFO (MainThread) [homeassistant.setup] Setting up bluetooth
-2025-08-08 23:45:35.876 INFO (MainThread) [homeassistant.setup] Setting up event
-2025-08-08 23:45:35.877 INFO (MainThread) [homeassistant.setup] Setup of domain event took 0.00 seconds
-2025-08-08 23:45:35.877 INFO (MainThread) [homeassistant.components.event] Setting up backup.event
-2025-08-08 23:45:35.877 INFO (MainThread) [homeassistant.components.sensor] Setting up backup.sensor
-2025-08-08 23:45:35.889 INFO (MainThread) [homeassistant.setup] Setup of domain bluetooth took 0.02 seconds
-2025-08-08 23:45:35.904 INFO (MainThread) [homeassistant.setup] Setting up cloud
-2025-08-08 23:45:35.905 INFO (MainThread) [homeassistant.setup] Setup of domain cloud took 0.00 seconds
-2025-08-08 23:45:35.906 INFO (MainThread) [homeassistant.bootstrap] Setting up stage 2: {'input_select', 'thread', 'input_datetime', 'default_config', 'wled', 'input_boolean', 'sonos', 'application_credentials', 'timer', 'google_translate', 'analytics', 'system_health', 'input_button', 'go2rtc', 'automation', 'input_number', 'hacs', 'scene', 'radio_browser', 'input_text', 'hardware', 'zone', 'person', 'ha_portainer_link', 'counter', 'script', 'shopping_list', 'tag', 'sun', 'matter', 'schedule'}; already set up: {'backup', 'network', 'frontend', 'hassio', 'logger'}
-Dependencies: {'image_upload', 'trace', 'energy', 'blueprint', 'mobile_app', 'media_source', 'stream', 'camera', 'homeassistant_alerts', 'logbook', 'history', 'my'}; already set up: {'dhcp', 'bluetooth', 'conversation', 'device_automation', 'assist_pipeline', 'search', 'tts', 'frontend', 'persistent_notification', 'config', 'hassio', 'intent', 'backup', 'usb', 'recorder', 'stt', 'webhook', 'repairs', 'onboarding', 'lovelace', 'zeroconf', 'wake_word', 'auth', 'http', 'websocket_api', 'system_log', 'network', 'cloud', 'diagnostics', 'ssdp', 'api', 'ffmpeg', 'file_upload'}
-2025-08-08 23:45:35.906 INFO (MainThread) [homeassistant.setup] Setting up scene
-2025-08-08 23:45:35.906 INFO (MainThread) [homeassistant.components.scene] Setting up homeassistant.scene
-2025-08-08 23:45:35.907 INFO (MainThread) [homeassistant.setup] Setup of domain scene took 0.00 seconds
-2025-08-08 23:45:35.907 INFO (MainThread) [homeassistant.setup] Setting up camera
-2025-08-08 23:45:35.909 INFO (MainThread) [homeassistant.setup] Setup of domain camera took 0.00 seconds
-2025-08-08 23:45:35.909 INFO (MainThread) [homeassistant.setup] Setting up trace
-2025-08-08 23:45:35.909 INFO (MainThread) [homeassistant.setup] Setup of domain trace took 0.00 seconds
-2025-08-08 23:45:35.909 INFO (MainThread) [homeassistant.setup] Setting up input_select
-2025-08-08 23:45:35.910 INFO (MainThread) [homeassistant.setup] Setup of domain input_select took 0.00 seconds
-2025-08-08 23:45:35.910 INFO (MainThread) [homeassistant.setup] Setting up stream
-2025-08-08 23:45:35.910 INFO (MainThread) [homeassistant.setup] Setting up history
-2025-08-08 23:45:35.910 INFO (MainThread) [homeassistant.setup] Setup of domain history took 0.00 seconds
-2025-08-08 23:45:35.910 INFO (MainThread) [homeassistant.setup] Setting up logbook
-2025-08-08 23:45:35.910 INFO (MainThread) [homeassistant.setup] Setup of domain logbook took 0.00 seconds
-2025-08-08 23:45:35.911 INFO (MainThread) [homeassistant.setup] Setting up media_source
-2025-08-08 23:45:35.911 INFO (MainThread) [homeassistant.setup] Setup of domain media_source took 0.00 seconds
-2025-08-08 23:45:35.911 INFO (MainThread) [homeassistant.setup] Setting up image_upload
-2025-08-08 23:45:35.912 INFO (MainThread) [homeassistant.setup] Setup of domain image_upload took 0.00 seconds
-2025-08-08 23:45:35.912 INFO (MainThread) [homeassistant.setup] Setting up person
-2025-08-08 23:45:35.912 INFO (MainThread) [homeassistant.setup] Setting up input_boolean
-2025-08-08 23:45:35.912 INFO (MainThread) [homeassistant.setup] Setup of domain input_boolean took 0.00 seconds
-2025-08-08 23:45:35.912 INFO (MainThread) [homeassistant.setup] Setting up timer
-2025-08-08 23:45:35.913 INFO (MainThread) [homeassistant.setup] Setup of domain timer took 0.00 seconds
-2025-08-08 23:45:35.913 INFO (MainThread) [homeassistant.setup] Setting up system_health
-2025-08-08 23:45:35.913 INFO (MainThread) [homeassistant.setup] Setup of domain system_health took 0.00 seconds
-2025-08-08 23:45:35.913 INFO (MainThread) [homeassistant.setup] Setting up input_button
-2025-08-08 23:45:35.914 INFO (MainThread) [homeassistant.setup] Setup of domain input_button took 0.00 seconds
-2025-08-08 23:45:35.914 INFO (MainThread) [homeassistant.setup] Setting up blueprint
-2025-08-08 23:45:35.914 INFO (MainThread) [homeassistant.setup] Setup of domain blueprint took 0.00 seconds
-2025-08-08 23:45:35.914 INFO (MainThread) [homeassistant.setup] Setting up automation
-2025-08-08 23:45:35.914 INFO (MainThread) [homeassistant.setup] Setup of domain automation took 0.00 seconds
-2025-08-08 23:45:35.914 INFO (MainThread) [homeassistant.setup] Setting up input_number
-2025-08-08 23:45:35.915 INFO (MainThread) [homeassistant.setup] Setup of domain input_number took 0.00 seconds
-2025-08-08 23:45:35.915 INFO (MainThread) [homeassistant.setup] Setting up zone
-2025-08-08 23:45:35.915 INFO (MainThread) [homeassistant.setup] Setup of domain zone took 0.00 seconds
-2025-08-08 23:45:35.915 INFO (MainThread) [homeassistant.setup] Setting up script
-2025-08-08 23:45:35.916 INFO (MainThread) [homeassistant.setup] Setup of domain script took 0.00 seconds
-2025-08-08 23:45:35.917 INFO (MainThread) [homeassistant.setup] Setup of domain person took 0.00 seconds
-2025-08-08 23:45:35.965 INFO (MainThread) [homeassistant.setup] Setting up thread
-2025-08-08 23:45:35.965 INFO (MainThread) [homeassistant.setup] Setup of domain thread took 0.00 seconds
-2025-08-08 23:45:35.968 INFO (MainThread) [homeassistant.setup] Setting up input_datetime
-2025-08-08 23:45:35.969 INFO (MainThread) [homeassistant.setup] Setup of domain input_datetime took 0.00 seconds
-2025-08-08 23:45:35.982 INFO (MainThread) [homeassistant.setup] Setting up energy
-2025-08-08 23:45:35.982 INFO (MainThread) [homeassistant.setup] Setup of domain energy took 0.00 seconds
-2025-08-08 23:45:35.988 INFO (MainThread) [homeassistant.setup] Setup of domain stream took 0.08 seconds
-2025-08-08 23:45:36.008 INFO (MainThread) [homeassistant.setup] Setting up go2rtc
-2025-08-08 23:45:36.012 INFO (MainThread) [homeassistant.setup] Setting up homeassistant_alerts
-2025-08-08 23:45:36.012 INFO (MainThread) [homeassistant.setup] Setup of domain homeassistant_alerts took 0.00 seconds
-2025-08-08 23:45:36.014 INFO (MainThread) [homeassistant.setup] Setting up tag
-2025-08-08 23:45:36.014 INFO (MainThread) [homeassistant.setup] Setup of domain tag took 0.00 seconds
-2025-08-08 23:45:36.015 INFO (MainThread) [homeassistant.setup] Setting up my
-2025-08-08 23:45:36.015 INFO (MainThread) [homeassistant.setup] Setup of domain my took 0.00 seconds
-2025-08-08 23:45:36.022 INFO (MainThread) [homeassistant.setup] Setting up sun
-2025-08-08 23:45:36.022 INFO (MainThread) [homeassistant.setup] Setup of domain sun took 0.00 seconds
-2025-08-08 23:45:36.026 INFO (MainThread) [homeassistant.components.binary_sensor] Setting up sun.binary_sensor
-2025-08-08 23:45:36.028 INFO (MainThread) [homeassistant.components.sensor] Setting up sun.sensor
-2025-08-08 23:45:36.083 INFO (MainThread) [homeassistant.setup] Setup of domain go2rtc took 0.07 seconds
-2025-08-08 23:45:36.086 INFO (MainThread) [homeassistant.setup] Setting up wled
-2025-08-08 23:45:36.100 INFO (MainThread) [homeassistant.setup] Setting up sonos
-2025-08-08 23:45:36.100 INFO (MainThread) [homeassistant.setup] Setup of domain sonos took 0.00 seconds
-2025-08-08 23:45:36.103 INFO (MainThread) [homeassistant.setup] Setting up application_credentials
-2025-08-08 23:45:36.104 INFO (MainThread) [homeassistant.setup] Setup of domain application_credentials took 0.00 seconds
-2025-08-08 23:45:36.105 INFO (MainThread) [homeassistant.setup] Setting up google_translate
-2025-08-08 23:45:36.105 INFO (MainThread) [homeassistant.setup] Setup of domain google_translate took 0.00 seconds
-2025-08-08 23:45:36.122 INFO (MainThread) [homeassistant.setup] Setting up hacs
-2025-08-08 23:45:36.122 INFO (MainThread) [homeassistant.setup] Setup of domain hacs took 0.00 seconds
-2025-08-08 23:45:36.123 INFO (MainThread) [custom_components.hacs] 
+2025-08-09 00:04:02.711 INFO (MainThread) [homeassistant.setup] Setting up recorder
+2025-08-09 00:04:02.712 INFO (MainThread) [homeassistant.components.http] Now listening on port 8123
+2025-08-09 00:04:02.712 INFO (MainThread) [homeassistant.setup] Setup of domain http took 0.00 seconds
+2025-08-09 00:04:02.728 INFO (MainThread) [homeassistant.setup] Setup of domain recorder took 0.02 seconds
+2025-08-09 00:04:02.728 INFO (MainThread) [homeassistant.bootstrap] Nothing to set up in stage debugger: {'debugpy'}
+2025-08-09 00:04:02.728 INFO (MainThread) [homeassistant.bootstrap] Setting up stage zeroconf: {'zeroconf'}; already set up: {}
+Dependencies: {}; already set up: {'http', 'websocket_api', 'network', 'api'}
+2025-08-09 00:04:02.728 INFO (MainThread) [homeassistant.setup] Setting up zeroconf
+2025-08-09 00:04:02.730 INFO (MainThread) [homeassistant.components.zeroconf] Starting Zeroconf broadcast
+2025-08-09 00:04:02.730 INFO (MainThread) [homeassistant.setup] Setup of domain zeroconf took 0.00 seconds
+2025-08-09 00:04:02.730 INFO (MainThread) [homeassistant.bootstrap] Setting up stage 1: {'bluetooth', 'hassio', 'cloud', 'dhcp', 'ssdp', 'usb'}; already set up: {}
+Dependencies: {'conversation', 'wake_word', 'intent', 'assist_pipeline', 'tts', 'backup', 'stt', 'webhook', 'ffmpeg'}; already set up: {'network', 'websocket_api', 'http', 'auth', 'repairs'}
+2025-08-09 00:04:02.730 INFO (MainThread) [homeassistant.setup] Setting up hassio
+2025-08-09 00:04:02.735 INFO (MainThread) [homeassistant.setup] Setting up webhook
+2025-08-09 00:04:02.735 INFO (MainThread) [homeassistant.setup] Setup of domain webhook took 0.00 seconds
+2025-08-09 00:04:02.738 INFO (MainThread) [homeassistant.setup] Setting up intent
+2025-08-09 00:04:02.738 INFO (MainThread) [homeassistant.setup] Setup of domain intent took 0.00 seconds
+2025-08-09 00:04:02.744 INFO (MainThread) [homeassistant.setup] Setting up stt
+2025-08-09 00:04:02.744 INFO (MainThread) [homeassistant.setup] Setup of domain stt took 0.00 seconds
+2025-08-09 00:04:02.744 INFO (MainThread) [homeassistant.setup] Setting up wake_word
+2025-08-09 00:04:02.744 INFO (MainThread) [homeassistant.setup] Setup of domain wake_word took 0.00 seconds
+2025-08-09 00:04:02.746 INFO (MainThread) [homeassistant.setup] Setting up ffmpeg
+2025-08-09 00:04:02.746 INFO (MainThread) [homeassistant.setup] Setup of domain ffmpeg took 0.00 seconds
+2025-08-09 00:04:02.753 INFO (MainThread) [homeassistant.setup] Setting up usb
+2025-08-09 00:04:02.753 INFO (MainThread) [homeassistant.setup] Setup of domain usb took 0.00 seconds
+2025-08-09 00:04:02.785 INFO (MainThread) [homeassistant.setup] Setup of domain hassio took 0.05 seconds
+2025-08-09 00:04:02.793 INFO (MainThread) [homeassistant.setup] Setting up binary_sensor
+2025-08-09 00:04:02.793 INFO (MainThread) [homeassistant.setup] Setup of domain binary_sensor took 0.00 seconds
+2025-08-09 00:04:02.793 INFO (MainThread) [homeassistant.setup] Setting up sensor
+2025-08-09 00:04:02.793 INFO (MainThread) [homeassistant.setup] Setup of domain sensor took 0.00 seconds
+2025-08-09 00:04:02.793 INFO (MainThread) [homeassistant.setup] Setting up update
+2025-08-09 00:04:02.794 INFO (MainThread) [homeassistant.setup] Setup of domain update took 0.00 seconds
+2025-08-09 00:04:02.795 INFO (MainThread) [homeassistant.components.binary_sensor] Setting up hassio.binary_sensor
+2025-08-09 00:04:02.795 INFO (MainThread) [homeassistant.components.sensor] Setting up hassio.sensor
+2025-08-09 00:04:02.796 INFO (MainThread) [homeassistant.components.update] Setting up hassio.update
+2025-08-09 00:04:02.797 INFO (MainThread) [homeassistant.setup] Setting up backup
+2025-08-09 00:04:02.797 INFO (MainThread) [homeassistant.setup] Setup of domain backup took 0.00 seconds
+2025-08-09 00:04:02.942 INFO (MainThread) [homeassistant.setup] Setting up dhcp
+2025-08-09 00:04:02.943 INFO (MainThread) [homeassistant.setup] Setup of domain dhcp took 0.00 seconds
+2025-08-09 00:04:02.952 INFO (MainThread) [homeassistant.setup] Setting up ssdp
+2025-08-09 00:04:02.953 INFO (MainThread) [homeassistant.setup] Setup of domain ssdp took 0.00 seconds
+2025-08-09 00:04:02.986 INFO (MainThread) [homeassistant.setup] Setting up conversation
+2025-08-09 00:04:02.986 INFO (MainThread) [homeassistant.setup] Setup of domain conversation took 0.00 seconds
+2025-08-09 00:04:02.994 INFO (MainThread) [homeassistant.setup] Setting up tts
+2025-08-09 00:04:02.998 INFO (MainThread) [homeassistant.setup] Setup of domain tts took 0.00 seconds
+2025-08-09 00:04:03.000 INFO (MainThread) [homeassistant.setup] Setting up bluetooth
+2025-08-09 00:04:03.018 INFO (MainThread) [homeassistant.setup] Setting up assist_pipeline
+2025-08-09 00:04:03.018 INFO (MainThread) [homeassistant.setup] Setup of domain assist_pipeline took 0.00 seconds
+2025-08-09 00:04:03.019 INFO (MainThread) [homeassistant.setup] Setting up event
+2025-08-09 00:04:03.019 INFO (MainThread) [homeassistant.setup] Setup of domain event took 0.00 seconds
+2025-08-09 00:04:03.020 INFO (MainThread) [homeassistant.setup] Setup of domain bluetooth took 0.02 seconds
+2025-08-09 00:04:03.020 INFO (MainThread) [homeassistant.components.event] Setting up backup.event
+2025-08-09 00:04:03.021 INFO (MainThread) [homeassistant.components.sensor] Setting up backup.sensor
+2025-08-09 00:04:03.150 INFO (MainThread) [homeassistant.setup] Setting up cloud
+2025-08-09 00:04:03.151 INFO (MainThread) [homeassistant.setup] Setup of domain cloud took 0.00 seconds
+2025-08-09 00:04:03.151 INFO (MainThread) [homeassistant.bootstrap] Setting up stage 2: {'ha_portainer_link', 'input_datetime', 'shopping_list', 'hardware', 'google_translate', 'matter', 'input_text', 'input_select', 'radio_browser', 'wled', 'script', 'application_credentials', 'analytics', 'input_button', 'thread', 'sonos', 'input_number', 'timer', 'zone', 'person', 'input_boolean', 'tag', 'system_health', 'counter', 'hacs', 'schedule', 'sun', 'scene', 'default_config', 'go2rtc', 'automation'}; already set up: {'network', 'hassio', 'frontend', 'backup', 'logger'}
+Dependencies: {'image_upload', 'blueprint', 'history', 'logbook', 'mobile_app', 'my', 'energy', 'camera', 'stream', 'homeassistant_alerts', 'trace', 'media_source'}; already set up: {'persistent_notification', 'device_automation', 'config', 'zeroconf', 'websocket_api', 'wake_word', 'http', 'tts', 'cloud', 'lovelace', 'ffmpeg', 'api', 'system_log', 'bluetooth', 'assist_pipeline', 'stt', 'ssdp', 'repairs', 'usb', 'network', 'search', 'hassio', 'onboarding', 'auth', 'intent', 'conversation', 'file_upload', 'frontend', 'dhcp', 'recorder', 'backup', 'webhook', 'diagnostics'}
+2025-08-09 00:04:03.151 INFO (MainThread) [homeassistant.setup] Setting up camera
+2025-08-09 00:04:03.152 INFO (MainThread) [homeassistant.setup] Setup of domain camera took 0.00 seconds
+2025-08-09 00:04:03.152 INFO (MainThread) [homeassistant.setup] Setting up scene
+2025-08-09 00:04:03.152 INFO (MainThread) [homeassistant.setup] Setup of domain scene took 0.00 seconds
+2025-08-09 00:04:03.152 INFO (MainThread) [homeassistant.setup] Setting up image_upload
+2025-08-09 00:04:03.153 INFO (MainThread) [homeassistant.setup] Setup of domain image_upload took 0.00 seconds
+2025-08-09 00:04:03.153 INFO (MainThread) [homeassistant.setup] Setting up media_source
+2025-08-09 00:04:03.153 INFO (MainThread) [homeassistant.setup] Setup of domain media_source took 0.00 seconds
+2025-08-09 00:04:03.153 INFO (MainThread) [homeassistant.setup] Setting up input_select
+2025-08-09 00:04:03.154 INFO (MainThread) [homeassistant.setup] Setup of domain input_select took 0.00 seconds
+2025-08-09 00:04:03.154 INFO (MainThread) [homeassistant.setup] Setting up history
+2025-08-09 00:04:03.154 INFO (MainThread) [homeassistant.setup] Setup of domain history took 0.00 seconds
+2025-08-09 00:04:03.154 INFO (MainThread) [homeassistant.setup] Setting up blueprint
+2025-08-09 00:04:03.154 INFO (MainThread) [homeassistant.setup] Setup of domain blueprint took 0.00 seconds
+2025-08-09 00:04:03.154 INFO (MainThread) [homeassistant.setup] Setting up trace
+2025-08-09 00:04:03.154 INFO (MainThread) [homeassistant.setup] Setup of domain trace took 0.00 seconds
+2025-08-09 00:04:03.154 INFO (MainThread) [homeassistant.setup] Setting up script
+2025-08-09 00:04:03.154 INFO (MainThread) [homeassistant.setup] Setup of domain script took 0.00 seconds
+2025-08-09 00:04:03.154 INFO (MainThread) [homeassistant.setup] Setting up input_button
+2025-08-09 00:04:03.155 INFO (MainThread) [homeassistant.setup] Setup of domain input_button took 0.00 seconds
+2025-08-09 00:04:03.155 INFO (MainThread) [homeassistant.setup] Setting up stream
+2025-08-09 00:04:03.155 INFO (MainThread) [homeassistant.setup] Setting up input_number
+2025-08-09 00:04:03.155 INFO (MainThread) [homeassistant.setup] Setup of domain input_number took 0.00 seconds
+2025-08-09 00:04:03.155 INFO (MainThread) [homeassistant.setup] Setting up timer
+2025-08-09 00:04:03.156 INFO (MainThread) [homeassistant.setup] Setup of domain timer took 0.00 seconds
+2025-08-09 00:04:03.156 INFO (MainThread) [homeassistant.setup] Setting up zone
+2025-08-09 00:04:03.157 INFO (MainThread) [homeassistant.setup] Setup of domain zone took 0.00 seconds
+2025-08-09 00:04:03.157 INFO (MainThread) [homeassistant.setup] Setting up logbook
+2025-08-09 00:04:03.157 INFO (MainThread) [homeassistant.setup] Setup of domain logbook took 0.00 seconds
+2025-08-09 00:04:03.157 INFO (MainThread) [homeassistant.setup] Setting up person
+2025-08-09 00:04:03.158 INFO (MainThread) [homeassistant.setup] Setting up input_boolean
+2025-08-09 00:04:03.158 INFO (MainThread) [homeassistant.setup] Setup of domain input_boolean took 0.00 seconds
+2025-08-09 00:04:03.158 INFO (MainThread) [homeassistant.setup] Setting up system_health
+2025-08-09 00:04:03.158 INFO (MainThread) [homeassistant.setup] Setup of domain system_health took 0.00 seconds
+2025-08-09 00:04:03.158 INFO (MainThread) [homeassistant.setup] Setting up automation
+2025-08-09 00:04:03.159 INFO (MainThread) [homeassistant.setup] Setup of domain automation took 0.00 seconds
+2025-08-09 00:04:03.159 INFO (MainThread) [homeassistant.setup] Setup of domain person took 0.00 seconds
+2025-08-09 00:04:03.162 INFO (MainThread) [homeassistant.components.scene] Setting up homeassistant.scene
+2025-08-09 00:04:03.195 INFO (MainThread) [homeassistant.setup] Setup of domain stream took 0.04 seconds
+2025-08-09 00:04:03.195 INFO (MainThread) [homeassistant.setup] Setting up ha_portainer_link
+2025-08-09 00:04:03.195 INFO (MainThread) [homeassistant.setup] Setup of domain ha_portainer_link took 0.00 seconds
+2025-08-09 00:04:03.195 INFO (MainThread) [custom_components.ha_portainer_link] ð Setting up HA Portainer Link for entry 01K25CZ18B6ACHQY6XT8YZD3P0 (endpoint 2)
+2025-08-09 00:04:03.195 INFO (MainThread) [custom_components.ha_portainer_link] ð Applied full mode features: ['enable_stack_view', 'enable_resource_sensors', 'enable_version_sensors', 'enable_update_sensors', 'enable_stack_buttons', 'enable_container_buttons', 'update_interval']
+2025-08-09 00:04:03.195 INFO (MainThread) [custom_components.ha_portainer_link.portainer_api] ð§ Trying connection with SSL verification enabled
+2025-08-09 00:04:03.196 INFO (MainThread) [custom_components.ha_portainer_link.auth] â Using API key authentication
+2025-08-09 00:04:03.196 INFO (MainThread) [custom_components.ha_portainer_link.container_api] ð Checking if endpoint 2 exists: https://192.168.0.6:9443/api/endpoints/2
+2025-08-09 00:04:03.197 INFO (MainThread) [homeassistant.setup] Setting up input_datetime
+2025-08-09 00:04:03.198 INFO (MainThread) [homeassistant.setup] Setup of domain input_datetime took 0.00 seconds
+2025-08-09 00:04:03.200 INFO (MainThread) [custom_components.ha_portainer_link.container_api] ð§ SSL certificate error, retrying with SSL disabled: Cannot connect to host 192.168.0.6:9443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1028)')]
+2025-08-09 00:04:03.200 INFO (MainThread) [homeassistant.setup] Setting up shopping_list
+2025-08-09 00:04:03.200 INFO (MainThread) [homeassistant.setup] Setup of domain shopping_list took 0.00 seconds
+2025-08-09 00:04:03.203 INFO (MainThread) [homeassistant.setup] Setting up hardware
+2025-08-09 00:04:03.207 INFO (MainThread) [custom_components.ha_portainer_link.container_api] â Successfully connected with SSL disabled
+2025-08-09 00:04:03.210 INFO (MainThread) [homeassistant.setup] Setting up google_translate
+2025-08-09 00:04:03.210 INFO (MainThread) [homeassistant.setup] Setup of domain google_translate took 0.00 seconds
+2025-08-09 00:04:03.212 INFO (MainThread) [custom_components.ha_portainer_link.container_api] â Endpoint 2 exists: local
+2025-08-09 00:04:03.213 INFO (MainThread) [custom_components.ha_portainer_link.container_api] ð Getting containers from URL: https://192.168.0.6:9443/api/endpoints/2/docker/containers/json?all=1
+2025-08-09 00:04:03.227 INFO (MainThread) [custom_components.ha_portainer_link.container_api] â Got 19 containers from endpoint 2
+2025-08-09 00:04:03.227 INFO (MainThread) [custom_components.ha_portainer_link.portainer_api] â Connection successful with SSL verification enabled
+2025-08-09 00:04:03.228 INFO (MainThread) [custom_components.ha_portainer_link.container_api] ð Checking if endpoint 2 exists: https://192.168.0.6:9443/api/endpoints/2
+2025-08-09 00:04:03.229 INFO (MainThread) [homeassistant.setup] Setup of domain hardware took 0.03 seconds
+2025-08-09 00:04:03.269 INFO (MainThread) [custom_components.ha_portainer_link.container_api] â Endpoint 2 exists: local
+2025-08-09 00:04:03.269 INFO (MainThread) [custom_components.ha_portainer_link.container_api] ð Getting containers from URL: https://192.168.0.6:9443/api/endpoints/2/docker/containers/json?all=1
+2025-08-09 00:04:03.286 INFO (MainThread) [custom_components.ha_portainer_link.container_api] â Got 19 containers from endpoint 2
+2025-08-09 00:04:03.314 INFO (MainThread) [custom_components.ha_portainer_link.stack_api] ð§ SSL certificate error, retrying with SSL disabled: Cannot connect to host 192.168.0.6:9443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1028)')]
+2025-08-09 00:04:03.388 INFO (MainThread) [custom_components.ha_portainer_link.image_api] ð§ SSL certificate error, retrying with SSL disabled: Cannot connect to host 192.168.0.6:9443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1028)')]
+2025-08-09 00:04:03.420 INFO (MainThread) [custom_components.ha_portainer_link.image_api] â Successfully connected with SSL disabled
+2025-08-09 00:04:03.781 INFO (MainThread) [homeassistant.setup] Setting up matter
+2025-08-09 00:04:03.781 INFO (MainThread) [homeassistant.setup] Setup of domain matter took 0.00 seconds
+2025-08-09 00:04:03.783 INFO (MainThread) [homeassistant.setup] Setting up input_text
+2025-08-09 00:04:03.784 INFO (MainThread) [homeassistant.setup] Setup of domain input_text took 0.00 seconds
+2025-08-09 00:04:03.803 INFO (MainThread) [matter_server.client.connection] Connected to Matter Fabric 2 (1660280730015909318), Schema version 11, CHIP SDK Version 2025.4.0
+2025-08-09 00:04:03.804 INFO (MainThread) [matter_server.client] Matter client initialized.
+2025-08-09 00:04:03.804 INFO (MainThread) [homeassistant.setup] Setting up radio_browser
+2025-08-09 00:04:03.805 INFO (MainThread) [homeassistant.setup] Setup of domain radio_browser took 0.00 seconds
+2025-08-09 00:04:03.805 INFO (MainThread) [homeassistant.setup] Setting up button
+2025-08-09 00:04:03.805 INFO (MainThread) [homeassistant.setup] Setup of domain button took 0.00 seconds
+2025-08-09 00:04:03.806 INFO (MainThread) [homeassistant.setup] Setting up climate
+2025-08-09 00:04:03.806 INFO (MainThread) [homeassistant.setup] Setup of domain climate took 0.00 seconds
+2025-08-09 00:04:03.806 INFO (MainThread) [homeassistant.setup] Setting up cover
+2025-08-09 00:04:03.806 INFO (MainThread) [homeassistant.setup] Setup of domain cover took 0.00 seconds
+2025-08-09 00:04:03.807 INFO (MainThread) [homeassistant.setup] Setting up fan
+2025-08-09 00:04:03.807 INFO (MainThread) [homeassistant.setup] Setup of domain fan took 0.00 seconds
+2025-08-09 00:04:03.807 INFO (MainThread) [homeassistant.setup] Setting up light
+2025-08-09 00:04:03.808 INFO (MainThread) [homeassistant.setup] Setup of domain light took 0.00 seconds
+2025-08-09 00:04:03.808 INFO (MainThread) [homeassistant.setup] Setting up lock
+2025-08-09 00:04:03.808 INFO (MainThread) [homeassistant.setup] Setup of domain lock took 0.00 seconds
+2025-08-09 00:04:03.808 INFO (MainThread) [homeassistant.setup] Setting up number
+2025-08-09 00:04:03.809 INFO (MainThread) [homeassistant.setup] Setup of domain number took 0.00 seconds
+2025-08-09 00:04:03.809 INFO (MainThread) [homeassistant.setup] Setting up select
+2025-08-09 00:04:03.809 INFO (MainThread) [homeassistant.setup] Setup of domain select took 0.00 seconds
+2025-08-09 00:04:03.809 INFO (MainThread) [homeassistant.setup] Setting up switch
+2025-08-09 00:04:03.809 INFO (MainThread) [homeassistant.setup] Setup of domain switch took 0.00 seconds
+2025-08-09 00:04:03.809 INFO (MainThread) [homeassistant.setup] Setting up vacuum
+2025-08-09 00:04:03.809 INFO (MainThread) [homeassistant.setup] Setup of domain vacuum took 0.00 seconds
+2025-08-09 00:04:03.810 INFO (MainThread) [homeassistant.setup] Setting up valve
+2025-08-09 00:04:03.810 INFO (MainThread) [homeassistant.setup] Setup of domain valve took 0.00 seconds
+2025-08-09 00:04:03.810 INFO (MainThread) [homeassistant.setup] Setting up water_heater
+2025-08-09 00:04:03.810 INFO (MainThread) [homeassistant.setup] Setup of domain water_heater took 0.00 seconds
+2025-08-09 00:04:03.811 INFO (MainThread) [homeassistant.components.binary_sensor] Setting up matter.binary_sensor
+2025-08-09 00:04:03.811 INFO (MainThread) [homeassistant.components.button] Setting up matter.button
+2025-08-09 00:04:03.811 INFO (MainThread) [homeassistant.components.climate] Setting up matter.climate
+2025-08-09 00:04:03.811 INFO (MainThread) [homeassistant.components.cover] Setting up matter.cover
+2025-08-09 00:04:03.811 INFO (MainThread) [homeassistant.components.event] Setting up matter.event
+2025-08-09 00:04:03.811 INFO (MainThread) [homeassistant.components.fan] Setting up matter.fan
+2025-08-09 00:04:03.811 INFO (MainThread) [homeassistant.components.light] Setting up matter.light
+2025-08-09 00:04:03.811 INFO (MainThread) [homeassistant.components.lock] Setting up matter.lock
+2025-08-09 00:04:03.811 INFO (MainThread) [homeassistant.components.number] Setting up matter.number
+2025-08-09 00:04:03.811 INFO (MainThread) [homeassistant.components.select] Setting up matter.select
+2025-08-09 00:04:03.811 INFO (MainThread) [homeassistant.components.sensor] Setting up matter.sensor
+2025-08-09 00:04:03.811 INFO (MainThread) [homeassistant.components.switch] Setting up matter.switch
+2025-08-09 00:04:03.811 INFO (MainThread) [homeassistant.components.update] Setting up matter.update
+2025-08-09 00:04:03.811 INFO (MainThread) [homeassistant.components.vacuum] Setting up matter.vacuum
+2025-08-09 00:04:03.811 INFO (MainThread) [homeassistant.components.valve] Setting up matter.valve
+2025-08-09 00:04:03.811 INFO (MainThread) [homeassistant.components.water_heater] Setting up matter.water_heater
+2025-08-09 00:04:03.878 INFO (MainThread) [homeassistant.setup] Setting up wled
+2025-08-09 00:04:03.895 INFO (MainThread) [homeassistant.setup] Setting up energy
+2025-08-09 00:04:03.895 INFO (MainThread) [homeassistant.setup] Setup of domain energy took 0.00 seconds
+2025-08-09 00:04:03.896 INFO (MainThread) [homeassistant.setup] Setting up application_credentials
+2025-08-09 00:04:03.897 INFO (MainThread) [homeassistant.setup] Setup of domain application_credentials took 0.00 seconds
+2025-08-09 00:04:03.932 INFO (MainThread) [homeassistant.setup] Setting up thread
+2025-08-09 00:04:03.932 INFO (MainThread) [homeassistant.setup] Setup of domain thread took 0.00 seconds
+2025-08-09 00:04:03.971 INFO (MainThread) [homeassistant.setup] Setup of domain wled took 0.09 seconds
+2025-08-09 00:04:03.983 INFO (MainThread) [homeassistant.setup] Setting up sonos
+2025-08-09 00:04:03.983 INFO (MainThread) [homeassistant.setup] Setup of domain sonos took 0.00 seconds
+2025-08-09 00:04:03.986 INFO (MainThread) [homeassistant.setup] Setting up tag
+2025-08-09 00:04:03.986 INFO (MainThread) [homeassistant.setup] Setup of domain tag took 0.00 seconds
+2025-08-09 00:04:03.987 INFO (MainThread) [homeassistant.setup] Setting up my
+2025-08-09 00:04:03.987 INFO (MainThread) [homeassistant.setup] Setup of domain my took 0.00 seconds
+2025-08-09 00:04:03.988 INFO (MainThread) [homeassistant.setup] Setting up homeassistant_alerts
+2025-08-09 00:04:03.988 INFO (MainThread) [homeassistant.setup] Setup of domain homeassistant_alerts took 0.00 seconds
+2025-08-09 00:04:03.989 INFO (MainThread) [homeassistant.setup] Setting up counter
+2025-08-09 00:04:03.990 INFO (MainThread) [homeassistant.setup] Setup of domain counter took 0.00 seconds
+2025-08-09 00:04:04.135 INFO (MainThread) [homeassistant.setup] Setting up hacs
+2025-08-09 00:04:04.135 INFO (MainThread) [homeassistant.setup] Setup of domain hacs took 0.00 seconds
+2025-08-09 00:04:04.136 INFO (MainThread) [custom_components.hacs] 
 -------------------------------------------------------------------
 HACS (Home Assistant Community Store)
 
@@ -170,317 +239,73 @@ If you have any issues with this you need to open an issue here:
 https://github.com/hacs/integration/issues
 -------------------------------------------------------------------
 
-2025-08-08 23:45:36.129 INFO (MainThread) [custom_components.hacs] <HacsData restore> Restore started
-2025-08-08 23:45:36.153 INFO (MainThread) [custom_components.hacs] <HacsData restore> Restore done
-2025-08-08 23:45:36.153 INFO (MainThread) [custom_components.hacs] Enable category: integration
-2025-08-08 23:45:36.154 INFO (MainThread) [custom_components.hacs] Enable category: plugin
-2025-08-08 23:45:36.154 INFO (MainThread) [custom_components.hacs] Enable category: template
-2025-08-08 23:45:36.154 INFO (MainThread) [custom_components.hacs] Enable category: theme
-2025-08-08 23:45:36.174 INFO (MainThread) [homeassistant.setup] Setup of domain wled took 0.09 seconds
-2025-08-08 23:45:36.176 INFO (MainThread) [homeassistant.setup] Setting up radio_browser
-2025-08-08 23:45:36.176 INFO (MainThread) [homeassistant.setup] Setup of domain radio_browser took 0.00 seconds
-2025-08-08 23:45:36.179 INFO (MainThread) [homeassistant.setup] Setting up input_text
-2025-08-08 23:45:36.179 INFO (MainThread) [homeassistant.setup] Setup of domain input_text took 0.00 seconds
-2025-08-08 23:45:36.180 INFO (MainThread) [homeassistant.setup] Setting up hardware
-2025-08-08 23:45:36.188 INFO (MainThread) [homeassistant.setup] Setup of domain hardware took 0.01 seconds
-2025-08-08 23:45:36.189 INFO (MainThread) [homeassistant.setup] Setting up ha_portainer_link
-2025-08-08 23:45:36.189 INFO (MainThread) [homeassistant.setup] Setup of domain ha_portainer_link took 0.00 seconds
-2025-08-08 23:45:36.189 INFO (MainThread) [custom_components.ha_portainer_link] ð§ Setting up Portainer API with host: https://192.168.0.6:9443
-2025-08-08 23:45:36.189 INFO (MainThread) [custom_components.ha_portainer_link.portainer_api] ð§ Trying connection with SSL verification enabled
-2025-08-08 23:45:36.189 INFO (MainThread) [custom_components.ha_portainer_link.auth] â Using API key authentication
-2025-08-08 23:45:36.189 INFO (MainThread) [custom_components.ha_portainer_link.container_api] ð Checking if endpoint 2 exists: https://192.168.0.6:9443/api/endpoints/2
-2025-08-08 23:45:36.192 INFO (MainThread) [homeassistant.setup] Setting up counter
-2025-08-08 23:45:36.193 INFO (MainThread) [homeassistant.setup] Setup of domain counter took 0.00 seconds
-2025-08-08 23:45:36.193 INFO (MainThread) [custom_components.ha_portainer_link.container_api] ð§ SSL certificate error, retrying with SSL disabled: Cannot connect to host 192.168.0.6:9443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1028)')]
-2025-08-08 23:45:36.193 INFO (MainThread) [homeassistant.setup] Setting up shopping_list
-2025-08-08 23:45:36.193 INFO (MainThread) [homeassistant.setup] Setup of domain shopping_list took 0.00 seconds
-2025-08-08 23:45:36.209 INFO (MainThread) [custom_components.ha_portainer_link.container_api] â Successfully connected with SSL disabled
-2025-08-08 23:45:36.212 INFO (MainThread) [custom_components.ha_portainer_link.container_api] â Endpoint 2 exists: local
-2025-08-08 23:45:36.212 INFO (MainThread) [custom_components.ha_portainer_link.container_api] ð Getting containers from URL: https://192.168.0.6:9443/api/endpoints/2/docker/containers/json?all=1
-2025-08-08 23:45:36.239 INFO (MainThread) [custom_components.ha_portainer_link.container_api] â Got 20 containers from endpoint 2
-2025-08-08 23:45:36.239 INFO (MainThread) [custom_components.ha_portainer_link.portainer_api] â Connection successful with SSL verification enabled
-2025-08-08 23:45:36.893 INFO (MainThread) [homeassistant.setup] Setting up matter
-2025-08-08 23:45:36.893 INFO (MainThread) [homeassistant.setup] Setup of domain matter took 0.00 seconds
-2025-08-08 23:45:36.896 INFO (MainThread) [homeassistant.setup] Setting up schedule
-2025-08-08 23:45:36.897 INFO (MainThread) [homeassistant.setup] Setup of domain schedule took 0.00 seconds
-2025-08-08 23:45:36.899 INFO (MainThread) [homeassistant.components.sensor] Setting up energy.sensor
-2025-08-08 23:45:36.899 INFO (MainThread) [matter_server.client.connection] Connected to Matter Fabric 2 (1660280730015909318), Schema version 11, CHIP SDK Version 2025.4.0
-2025-08-08 23:45:36.900 INFO (MainThread) [matter_server.client] Matter client initialized.
-2025-08-08 23:45:36.900 INFO (MainThread) [homeassistant.setup] Setting up analytics
-2025-08-08 23:45:36.900 INFO (MainThread) [homeassistant.setup] Setup of domain analytics took 0.00 seconds
-2025-08-08 23:45:36.901 INFO (MainThread) [homeassistant.setup] Setting up button
-2025-08-08 23:45:36.901 INFO (MainThread) [homeassistant.setup] Setup of domain button took 0.00 seconds
-2025-08-08 23:45:36.901 INFO (MainThread) [homeassistant.setup] Setting up climate
-2025-08-08 23:45:36.902 INFO (MainThread) [homeassistant.setup] Setup of domain climate took 0.00 seconds
-2025-08-08 23:45:36.902 INFO (MainThread) [homeassistant.setup] Setting up cover
-2025-08-08 23:45:36.902 INFO (MainThread) [homeassistant.setup] Setup of domain cover took 0.00 seconds
-2025-08-08 23:45:36.902 INFO (MainThread) [homeassistant.setup] Setting up fan
-2025-08-08 23:45:36.903 INFO (MainThread) [homeassistant.setup] Setup of domain fan took 0.00 seconds
-2025-08-08 23:45:36.903 INFO (MainThread) [homeassistant.setup] Setting up light
-2025-08-08 23:45:36.904 INFO (MainThread) [homeassistant.setup] Setup of domain light took 0.00 seconds
-2025-08-08 23:45:36.904 INFO (MainThread) [homeassistant.setup] Setting up lock
-2025-08-08 23:45:36.904 INFO (MainThread) [homeassistant.setup] Setup of domain lock took 0.00 seconds
-2025-08-08 23:45:36.904 INFO (MainThread) [homeassistant.setup] Setting up number
-2025-08-08 23:45:36.907 INFO (MainThread) [homeassistant.setup] Setup of domain number took 0.00 seconds
-2025-08-08 23:45:36.907 INFO (MainThread) [homeassistant.setup] Setting up select
-2025-08-08 23:45:36.907 INFO (MainThread) [homeassistant.setup] Setup of domain select took 0.00 seconds
-2025-08-08 23:45:36.907 INFO (MainThread) [homeassistant.setup] Setting up switch
-2025-08-08 23:45:36.907 INFO (MainThread) [homeassistant.setup] Setup of domain switch took 0.00 seconds
-2025-08-08 23:45:36.907 INFO (MainThread) [homeassistant.setup] Setting up vacuum
-2025-08-08 23:45:36.908 INFO (MainThread) [homeassistant.setup] Setup of domain vacuum took 0.00 seconds
-2025-08-08 23:45:36.908 INFO (MainThread) [homeassistant.setup] Setting up valve
-2025-08-08 23:45:36.908 INFO (MainThread) [homeassistant.setup] Setup of domain valve took 0.00 seconds
-2025-08-08 23:45:36.908 INFO (MainThread) [homeassistant.setup] Setting up water_heater
-2025-08-08 23:45:36.908 INFO (MainThread) [homeassistant.setup] Setup of domain water_heater took 0.00 seconds
-2025-08-08 23:45:36.911 INFO (MainThread) [homeassistant.components.binary_sensor] Setting up matter.binary_sensor
-2025-08-08 23:45:36.911 INFO (MainThread) [homeassistant.components.button] Setting up matter.button
-2025-08-08 23:45:36.911 INFO (MainThread) [homeassistant.components.climate] Setting up matter.climate
-2025-08-08 23:45:36.911 INFO (MainThread) [homeassistant.components.cover] Setting up matter.cover
-2025-08-08 23:45:36.911 INFO (MainThread) [homeassistant.components.event] Setting up matter.event
-2025-08-08 23:45:36.911 INFO (MainThread) [homeassistant.components.fan] Setting up matter.fan
-2025-08-08 23:45:36.911 INFO (MainThread) [homeassistant.components.light] Setting up matter.light
-2025-08-08 23:45:36.911 INFO (MainThread) [homeassistant.components.lock] Setting up matter.lock
-2025-08-08 23:45:36.911 INFO (MainThread) [homeassistant.components.number] Setting up matter.number
-2025-08-08 23:45:36.911 INFO (MainThread) [homeassistant.components.select] Setting up matter.select
-2025-08-08 23:45:36.911 INFO (MainThread) [homeassistant.components.sensor] Setting up matter.sensor
-2025-08-08 23:45:36.911 INFO (MainThread) [homeassistant.components.switch] Setting up matter.switch
-2025-08-08 23:45:36.911 INFO (MainThread) [homeassistant.components.update] Setting up matter.update
-2025-08-08 23:45:36.911 INFO (MainThread) [homeassistant.components.vacuum] Setting up matter.vacuum
-2025-08-08 23:45:36.911 INFO (MainThread) [homeassistant.components.valve] Setting up matter.valve
-2025-08-08 23:45:36.911 INFO (MainThread) [homeassistant.components.water_heater] Setting up matter.water_heater
-2025-08-08 23:45:36.917 INFO (MainThread) [homeassistant.setup] Setting up mobile_app
-2025-08-08 23:45:36.917 INFO (MainThread) [homeassistant.setup] Setting up notify
-2025-08-08 23:45:36.918 INFO (MainThread) [homeassistant.setup] Setup of domain notify took 0.00 seconds
-2025-08-08 23:45:36.918 INFO (MainThread) [homeassistant.setup] Setup of domain mobile_app took 0.00 seconds
-2025-08-08 23:45:36.918 INFO (MainThread) [homeassistant.components.notify] Setting up notify.mobile_app
-2025-08-08 23:45:36.918 INFO (MainThread) [homeassistant.setup] Setting up default_config
-2025-08-08 23:45:36.918 INFO (MainThread) [homeassistant.setup] Setup of domain default_config took 0.00 seconds
-2025-08-08 23:45:37.069 INFO (MainThread) [homeassistant.setup] Setting up media_player
-2025-08-08 23:45:37.073 INFO (MainThread) [homeassistant.setup] Setup of domain media_player took 0.00 seconds
-2025-08-08 23:45:37.074 INFO (MainThread) [homeassistant.components.binary_sensor] Setting up sonos.binary_sensor
-2025-08-08 23:45:37.074 INFO (MainThread) [homeassistant.components.media_player] Setting up sonos.media_player
-2025-08-08 23:45:37.074 INFO (MainThread) [homeassistant.components.number] Setting up sonos.number
-2025-08-08 23:45:37.074 INFO (MainThread) [homeassistant.components.sensor] Setting up sonos.sensor
-2025-08-08 23:45:37.074 INFO (MainThread) [homeassistant.components.switch] Setting up sonos.switch
-2025-08-08 23:45:37.077 INFO (MainThread) [homeassistant.components.tts] Setting up google_translate.tts
-2025-08-08 23:45:37.079 INFO (MainThread) [homeassistant.components.switch] Setting up hacs.switch
-2025-08-08 23:45:37.079 INFO (MainThread) [homeassistant.components.update] Setting up hacs.update
-2025-08-08 23:45:37.080 INFO (MainThread) [custom_components.hacs] Stage changed: setup
-2025-08-08 23:45:37.080 INFO (MainThread) [custom_components.hacs] Stage changed: waiting
-2025-08-08 23:45:37.080 INFO (MainThread) [custom_components.hacs] Setup complete, waiting for Home Assistant before startup tasks starts
-2025-08-08 23:45:37.081 INFO (MainThread) [homeassistant.setup] Setting up todo
-2025-08-08 23:45:37.082 INFO (MainThread) [homeassistant.setup] Setup of domain todo took 0.00 seconds
-2025-08-08 23:45:37.083 INFO (MainThread) [homeassistant.components.todo] Setting up shopping_list.todo
-2025-08-08 23:45:37.083 INFO (ImportExecutor_0) [custom_components.ha_portainer_link.sensor] Loaded Portainer sensor integration.
-2025-08-08 23:45:37.085 INFO (ImportExecutor_0) [custom_components.ha_portainer_link.button] Loaded Portainer button integration.
-2025-08-08 23:45:37.086 INFO (MainThread) [homeassistant.components.sensor] Setting up ha_portainer_link.sensor
-2025-08-08 23:45:37.086 INFO (MainThread) [custom_components.ha_portainer_link.sensor] ð Setting up HA Portainer Link sensors for entry 01K25CZ18B6ACHQY6XT8YZD3P0 (endpoint 2)
-2025-08-08 23:45:37.086 INFO (MainThread) [custom_components.ha_portainer_link.sensor] ð Sensor configuration: Resource sensors=True, Version sensors=True
-2025-08-08 23:45:37.086 INFO (MainThread) [custom_components.ha_portainer_link.container_api] ð Checking if endpoint 2 exists: https://192.168.0.6:9443/api/endpoints/2
-2025-08-08 23:45:37.087 INFO (MainThread) [homeassistant.components.binary_sensor] Setting up ha_portainer_link.binary_sensor
-2025-08-08 23:45:37.087 INFO (MainThread) [custom_components.ha_portainer_link.binary_sensor] ð Setting up HA Portainer Link binary sensors for entry 01K25CZ18B6ACHQY6XT8YZD3P0 (endpoint 2)
-2025-08-08 23:45:37.087 INFO (MainThread) [custom_components.ha_portainer_link.binary_sensor] ð Binary sensor configuration: Update sensors=True
-2025-08-08 23:45:37.087 INFO (MainThread) [custom_components.ha_portainer_link.container_api] ð Checking if endpoint 2 exists: https://192.168.0.6:9443/api/endpoints/2
-2025-08-08 23:45:37.089 INFO (MainThread) [homeassistant.components.switch] Setting up ha_portainer_link.switch
-2025-08-08 23:45:37.089 INFO (MainThread) [custom_components.ha_portainer_link.switch] ð Setting up HA Portainer Link switches for entry 01K25CZ18B6ACHQY6XT8YZD3P0 (endpoint 2)
-2025-08-08 23:45:37.089 INFO (MainThread) [custom_components.ha_portainer_link.switch] ð§ Configuration debug:
-2025-08-08 23:45:37.089 INFO (MainThread) [custom_components.ha_portainer_link.switch]   - Integration mode: full
-2025-08-08 23:45:37.089 INFO (MainThread) [custom_components.ha_portainer_link.switch]   - Container buttons enabled: True
-2025-08-08 23:45:37.089 INFO (MainThread) [custom_components.ha_portainer_link.switch]   - Stack view enabled: True
-2025-08-08 23:45:37.089 INFO (MainThread) [custom_components.ha_portainer_link.switch]   - Update interval: 5 minutes
-2025-08-08 23:45:37.089 INFO (MainThread) [custom_components.ha_portainer_link.switch] ð Switch configuration: Container switches are always enabled (core functionality)
-2025-08-08 23:45:37.089 INFO (MainThread) [custom_components.ha_portainer_link.container_api] ð Checking if endpoint 2 exists: https://192.168.0.6:9443/api/endpoints/2
-2025-08-08 23:45:37.091 INFO (MainThread) [homeassistant.components.button] Setting up ha_portainer_link.button
-2025-08-08 23:45:37.091 INFO (MainThread) [custom_components.ha_portainer_link.button] ð Setting up HA Portainer Link buttons for entry 01K25CZ18B6ACHQY6XT8YZD3P0 (endpoint 2)
-2025-08-08 23:45:37.091 INFO (MainThread) [custom_components.ha_portainer_link.button] ð Button configuration: Container buttons=True, Stack buttons=True
-2025-08-08 23:45:37.091 INFO (MainThread) [custom_components.ha_portainer_link.container_api] ð Checking if endpoint 2 exists: https://192.168.0.6:9443/api/endpoints/2
-2025-08-08 23:45:37.094 INFO (MainThread) [custom_components.ha_portainer_link.container_api] â Endpoint 2 exists: local
-2025-08-08 23:45:37.095 INFO (MainThread) [custom_components.ha_portainer_link.container_api] ð Getting containers from URL: https://192.168.0.6:9443/api/endpoints/2/docker/containers/json?all=1
-2025-08-08 23:45:37.096 INFO (MainThread) [homeassistant.components.button] Setting up wled.button
-2025-08-08 23:45:37.096 INFO (MainThread) [homeassistant.components.light] Setting up wled.light
-2025-08-08 23:45:37.099 INFO (MainThread) [homeassistant.components.number] Setting up wled.number
-2025-08-08 23:45:37.100 INFO (MainThread) [homeassistant.components.select] Setting up wled.select
-2025-08-08 23:45:37.101 INFO (MainThread) [custom_components.ha_portainer_link.container_api] â Got 20 containers from endpoint 2
-2025-08-08 23:45:37.102 INFO (MainThread) [homeassistant.components.sensor] Setting up wled.sensor
-2025-08-08 23:45:37.103 INFO (MainThread) [custom_components.ha_portainer_link.stack_api] ð§ SSL certificate error, retrying with SSL disabled: Cannot connect to host 192.168.0.6:9443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1028)')]
-2025-08-08 23:45:37.103 INFO (MainThread) [homeassistant.components.switch] Setting up wled.switch
-2025-08-08 23:45:37.104 INFO (MainThread) [homeassistant.components.update] Setting up wled.update
-2025-08-08 23:45:37.104 INFO (MainThread) [homeassistant.components.button] Setting up wled.button
-2025-08-08 23:45:37.105 INFO (MainThread) [homeassistant.components.light] Setting up wled.light
-2025-08-08 23:45:37.106 INFO (MainThread) [homeassistant.components.number] Setting up wled.number
-2025-08-08 23:45:37.107 INFO (MainThread) [custom_components.ha_portainer_link.container_api] â Endpoint 2 exists: local
-2025-08-08 23:45:37.108 INFO (MainThread) [custom_components.ha_portainer_link.container_api] â Endpoint 2 exists: local
-2025-08-08 23:45:37.109 INFO (MainThread) [homeassistant.components.select] Setting up wled.select
-2025-08-08 23:45:37.109 INFO (MainThread) [custom_components.ha_portainer_link.container_api] ð Getting containers from URL: https://192.168.0.6:9443/api/endpoints/2/docker/containers/json?all=1
-2025-08-08 23:45:37.109 INFO (MainThread) [custom_components.ha_portainer_link.container_api] ð Getting containers from URL: https://192.168.0.6:9443/api/endpoints/2/docker/containers/json?all=1
-2025-08-08 23:45:37.110 INFO (MainThread) [homeassistant.components.sensor] Setting up wled.sensor
-2025-08-08 23:45:37.111 INFO (MainThread) [custom_components.ha_portainer_link.container_api] â Endpoint 2 exists: local
-2025-08-08 23:45:37.112 INFO (MainThread) [homeassistant.components.switch] Setting up wled.switch
-2025-08-08 23:45:37.112 INFO (MainThread) [custom_components.ha_portainer_link.container_api] ð Getting containers from URL: https://192.168.0.6:9443/api/endpoints/2/docker/containers/json?all=1
-2025-08-08 23:45:37.113 INFO (MainThread) [homeassistant.components.update] Setting up wled.update
-2025-08-08 23:45:37.114 INFO (MainThread) [homeassistant.components.button] Setting up wled.button
-2025-08-08 23:45:37.114 INFO (MainThread) [custom_components.ha_portainer_link.container_api] â Got 20 containers from endpoint 2
-2025-08-08 23:45:37.115 INFO (MainThread) [custom_components.ha_portainer_link.container_api] â Got 20 containers from endpoint 2
-2025-08-08 23:45:37.115 INFO (MainThread) [custom_components.ha_portainer_link.image_api] ð§ SSL certificate error, retrying with SSL disabled: Cannot connect to host 192.168.0.6:9443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1028)')]
-2025-08-08 23:45:37.115 INFO (MainThread) [homeassistant.components.light] Setting up wled.light
-2025-08-08 23:45:37.116 INFO (MainThread) [homeassistant.components.number] Setting up wled.number
-2025-08-08 23:45:37.117 INFO (MainThread) [custom_components.ha_portainer_link.container_api] â Got 20 containers from endpoint 2
-2025-08-08 23:45:37.117 INFO (MainThread) [custom_components.ha_portainer_link.image_api] â Successfully connected with SSL disabled
-2025-08-08 23:45:37.118 INFO (MainThread) [homeassistant.components.select] Setting up wled.select
-2025-08-08 23:45:37.118 INFO (MainThread) [homeassistant.components.sensor] Setting up wled.sensor
-2025-08-08 23:45:37.119 INFO (MainThread) [homeassistant.components.switch] Setting up wled.switch
-2025-08-08 23:45:37.120 INFO (MainThread) [homeassistant.components.update] Setting up wled.update
-2025-08-08 23:45:37.121 INFO (MainThread) [custom_components.ha_portainer_link.image_api] ð§ SSL certificate error, retrying with SSL disabled: Cannot connect to host 192.168.0.6:9443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1028)')]
-2025-08-08 23:45:37.122 INFO (MainThread) [custom_components.ha_portainer_link.image_api] â Successfully connected with SSL disabled
-2025-08-08 23:45:46.639 ERROR (MainThread) [homeassistant.components.wled] Error fetching wled data: Invalid response from API: (503, {'error': 3})
-2025-08-08 23:45:47.087 WARNING (MainThread) [homeassistant.components.sensor] Setup of sensor platform ha_portainer_link is taking over 10 seconds.
-2025-08-08 23:45:47.088 WARNING (MainThread) [homeassistant.components.binary_sensor] Setup of binary_sensor platform ha_portainer_link is taking over 10 seconds.
-2025-08-08 23:45:47.089 WARNING (MainThread) [homeassistant.components.switch] Setup of switch platform ha_portainer_link is taking over 10 seconds.
-2025-08-08 23:45:47.091 WARNING (MainThread) [homeassistant.components.button] Setup of button platform ha_portainer_link is taking over 10 seconds.
-2025-08-08 23:46:35.437 WARNING (MainThread) [homeassistant.bootstrap] Waiting on integrations to complete setup: {('ha_portainer_link', '01K25CZ18B6ACHQY6XT8YZD3P0'): 142754.982146592}
-2025-08-08 23:46:37.088 ERROR (MainThread) [homeassistant.components.sensor] Setup of platform ha_portainer_link is taking longer than 60 seconds. Startup will proceed without waiting any longer.
-2025-08-08 23:46:37.090 ERROR (MainThread) [homeassistant.components.binary_sensor] Setup of platform ha_portainer_link is taking longer than 60 seconds. Startup will proceed without waiting any longer.
-2025-08-08 23:46:37.092 ERROR (MainThread) [homeassistant.components.switch] Setup of platform ha_portainer_link is taking longer than 60 seconds. Startup will proceed without waiting any longer.
-2025-08-08 23:46:37.093 ERROR (MainThread) [homeassistant.components.button] Setup of platform ha_portainer_link is taking longer than 60 seconds. Startup will proceed without waiting any longer.
-2025-08-08 23:46:37.093 INFO (MainThread) [homeassistant.bootstrap] Home Assistant initialized in 62.09s
-2025-08-08 23:46:37.094 INFO (MainThread) [homeassistant.core] Starting Home Assistant 2025.8.0
-2025-08-08 23:46:37.105 INFO (MainThread) [custom_components.hacs] Stage changed: startup
-2025-08-08 23:46:37.106 INFO (MainThread) [custom_components.hacs] Loading removed repositories
-2025-08-08 23:46:37.164 INFO (MainThread) [custom_components.hacs] Loading known repositories
-2025-08-08 23:46:37.258 INFO (MainThread) [custom_components.hacs] Stage changed: running
-2025-08-08 23:46:37.275 INFO (SyncWorker_5) [homeassistant.loader] Loaded music_assistant from homeassistant.components.music_assistant
-2025-08-08 23:46:37.275 INFO (SyncWorker_3) [homeassistant.loader] Loaded apple_tv from homeassistant.components.apple_tv
-2025-08-08 23:46:37.276 INFO (SyncWorker_1) [homeassistant.loader] Loaded homekit_controller from homeassistant.components.homekit_controller
-2025-08-08 23:46:37.280 INFO (SyncWorker_4) [homeassistant.loader] Loaded hue from homeassistant.components.hue
-2025-08-08 23:46:37.282 INFO (SyncWorker_1) [homeassistant.loader] Loaded bluetooth_adapters from homeassistant.components.bluetooth_adapters
-2025-08-08 23:46:37.284 INFO (SyncWorker_6) [homeassistant.loader] Loaded esphome from homeassistant.components.esphome
-2025-08-08 23:46:37.330 INFO (SyncWorker_1) [homeassistant.loader] Loaded mqtt from homeassistant.components.mqtt
-2025-08-08 23:46:37.337 INFO (SyncWorker_6) [homeassistant.loader] Loaded ruuvi_gateway from homeassistant.components.ruuvi_gateway
-2025-08-08 23:46:37.348 INFO (SyncWorker_5) [homeassistant.loader] Loaded shelly from homeassistant.components.shelly
-2025-08-08 23:46:37.452 INFO (MainThread) [music_assistant_client] Connected to Music Assistant Server 7993d9dd4dc04ab8913f35901faa14bf, Version 2.6.0b14, Schema Version 26
-2025-08-08 23:46:37.521 WARNING (ImportExecutor_0) [py.warnings] /usr/local/lib/python3.13/site-packages/google/__init__.py:2: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
-  __import__('pkg_resources').declare_namespace(__name__)
-
-2025-08-08 23:46:38.005 INFO (SyncWorker_0) [homeassistant.loader] Loaded dlna_dms from homeassistant.components.dlna_dms
-2025-08-08 23:46:38.006 INFO (SyncWorker_1) [homeassistant.loader] Loaded fritz from homeassistant.components.fritz
-2025-08-08 23:46:38.006 INFO (SyncWorker_2) [homeassistant.loader] Loaded upnp from homeassistant.components.upnp
-2025-08-08 23:46:38.006 INFO (SyncWorker_5) [homeassistant.loader] Loaded fritzbox from homeassistant.components.fritzbox
-2025-08-08 23:46:38.051 INFO (MainThread) [homeassistant.setup] Setting up bluetooth_adapters
-2025-08-08 23:46:38.060 INFO (SyncWorker_1) [homeassistant.loader] Loaded smlight from homeassistant.components.smlight
-2025-08-08 23:46:38.116 INFO (SyncWorker_0) [homeassistant.loader] Loaded zha from homeassistant.components.zha
-2025-08-08 23:46:38.119 INFO (SyncWorker_2) [homeassistant.loader] Loaded homeassistant_hardware from homeassistant.components.homeassistant_hardware
-2025-08-08 23:46:38.119 INFO (SyncWorker_1) [homeassistant.loader] Loaded xiaomi_aqara from homeassistant.components.xiaomi_aqara
-2025-08-08 23:46:38.122 INFO (SyncWorker_5) [homeassistant.loader] Loaded xiaomi_miio from homeassistant.components.xiaomi_miio
-2025-08-08 23:46:38.126 INFO (SyncWorker_4) [homeassistant.loader] Loaded home_connect from homeassistant.components.home_connect
-2025-08-08 23:46:38.194 INFO (MainThread) [homeassistant.components.shelly] Starting CoAP context with UDP port 5683
-2025-08-08 23:46:38.286 INFO (ImportExecutor_0) [zigpy.serial] Using pyserial-asyncio-fast in place of pyserial-asyncio
-2025-08-08 23:46:38.334 INFO (MainThread) [homeassistant.setup] Setting up homeassistant_hardware
-2025-08-08 23:46:38.345 WARNING (ImportExecutor_0) [py.warnings] /usr/local/lib/python3.13/site-packages/miio/miot_device.py:23: FutureWarning: functools.partial will be a method descriptor in future Python versions; wrap it in enum.member() if you want to preserve the old behavior
-  Bool = partial(_str2bool)
-
-2025-08-08 23:46:48.146 INFO (SyncWorker_3) [homeassistant.loader] Loaded fronius from homeassistant.components.fronius
-2025-08-08 23:46:48.147 INFO (SyncWorker_2) [homeassistant.loader] Loaded reolink from homeassistant.components.reolink
-2025-08-08 23:46:51.013 INFO (MainThread) [custom_components.ha_portainer_link.coordinator] â Updated Portainer data: 20 containers (19 stack, 1 standalone), 23 stacks
-2025-08-08 23:46:51.013 INFO (MainThread) [custom_components.ha_portainer_link.switch] ð Found 20 containers in coordinator
-2025-08-08 23:46:51.014 INFO (MainThread) [custom_components.ha_portainer_link.switch] â Created 20 switch entities
-2025-08-08 23:46:51.066 INFO (MainThread) [custom_components.ha_portainer_link.coordinator] â Updated Portainer data: 20 containers (19 stack, 1 standalone), 23 stacks
-2025-08-08 23:46:51.066 INFO (MainThread) [custom_components.ha_portainer_link.binary_sensor] â Created 20 binary sensor entities
-2025-08-08 23:46:51.068 INFO (MainThread) [custom_components.ha_portainer_link.coordinator] â Updated Portainer data: 20 containers (19 stack, 1 standalone), 23 stacks
-2025-08-08 23:46:51.069 INFO (MainThread) [custom_components.ha_portainer_link.sensor] â Created 186 sensor entities
-2025-08-08 23:46:51.169 INFO (MainThread) [custom_components.ha_portainer_link.coordinator] â Updated Portainer data: 20 containers (19 stack, 1 standalone), 23 stacks
-2025-08-08 23:46:51.170 INFO (MainThread) [custom_components.ha_portainer_link.button] â Created 109 button entities
-2025-08-08 23:46:59.494 INFO (MainThread) [custom_components.ha_portainer_link.button] ð Force updating stack pastefy
-2025-08-08 23:46:59.494 INFO (MainThread) [custom_components.ha_portainer_link.stack_api] ð Starting comprehensive update for stack pastefy
-2025-08-08 23:46:59.495 INFO (MainThread) [custom_components.ha_portainer_link.stack_api] ð Trying to get compose content from stack file endpoint for pastefy
-2025-08-08 23:47:00.302 INFO (MainThread) [custom_components.ha_portainer_link.stack_api] ð Stopped 2/2 containers in stack pastefy
-2025-08-08 23:47:06.400 INFO (MainThread) [custom_components.ha_portainer_link.stack_api] â Stack update PUT successful for pastefy
-2025-08-08 23:47:06.408 INFO (MainThread) [custom_components.ha_portainer_link.stack_api] â Stack pastefy update completed: {'stack': 'pastefy', 'stopped': True, 'deleted': ['955610b06e2f7cb9544037570e0072c726cad616d4abb6018b6124c55c68e26c', '3e9620e48f00f9a42b77c7a867c68af991c8c27ce60653a6f8e7344c38131a79'], 'update_put': {'ok': True, 'status': 200, 'body': '{"Id":27,"Name":"pastefy","Type":2,"EndpointId":2,"SwarmId":"","EntryPoint":"docker-compose.yml","Env":[],"ResourceControl":null,"Status":1,"ProjectPath":"/data/compose/27","CreationDate":1731150893,"CreatedBy":"admin","UpdateDate":1754689626,"UpdatedBy":"admin","AdditionalFiles":null,"AutoUpdate":null,"Option":null,"GitConfig":null,"FromAppTemplate":false,"Namespace":""}'}, 'started': False, 'wait_ready': True}
-2025-08-08 23:47:06.408 INFO (MainThread) [custom_components.ha_portainer_link.button] â Stack pastefy updated successfully: {'stack': 'pastefy', 'stopped': True, 'deleted': ['955610b06e2f7cb9544037570e0072c726cad616d4abb6018b6124c55c68e26c', '3e9620e48f00f9a42b77c7a867c68af991c8c27ce60653a6f8e7344c38131a79'], 'update_put': {'ok': True, 'status': 200, 'body': '{"Id":27,"Name":"pastefy","Type":2,"EndpointId":2,"SwarmId":"","EntryPoint":"docker-compose.yml","Env":[],"ResourceControl":null,"Status":1,"ProjectPath":"/data/compose/27","CreationDate":1731150893,"CreatedBy":"admin","UpdateDate":1754689626,"UpdatedBy":"admin","AdditionalFiles":null,"AutoUpdate":null,"Option":null,"GitConfig":null,"FromAppTemplate":false,"Namespace":""}'}, 'started': False, 'wait_ready': True}
-2025-08-08 23:47:06.408 INFO (MainThread) [custom_components.ha_portainer_link.container_api] ð Checking if endpoint 2 exists: https://192.168.0.6:9443/api/endpoints/2
-2025-08-08 23:47:06.414 INFO (MainThread) [custom_components.ha_portainer_link.container_api] â Endpoint 2 exists: local
-2025-08-08 23:47:06.415 INFO (MainThread) [custom_components.ha_portainer_link.container_api] ð Getting containers from URL: https://192.168.0.6:9443/api/endpoints/2/docker/containers/json?all=1
-2025-08-08 23:47:06.419 INFO (MainThread) [custom_components.ha_portainer_link.container_api] â Got 20 containers from endpoint 2
-2025-08-08 23:47:06.419 INFO (MainThread) [custom_components.ha_portainer_link.coordinator] â Updated Portainer data: 20 containers (19 stack, 1 standalone), 23 stacks
-2025-08-08 23:47:06.419 WARNING (MainThread) [custom_components.ha_portainer_link.switch] â ï¸ Container data not found for ID: 955610b06e2f7cb9544037570e0072c726cad616d4abb6018b6124c55c68e26c
-2025-08-08 23:47:06.419 WARNING (MainThread) [custom_components.ha_portainer_link.switch] â ï¸ No container data available for 955610b06e2f7cb9544037570e0072c726cad616d4abb6018b6124c55c68e26c
-2025-08-08 23:47:06.419 WARNING (MainThread) [custom_components.ha_portainer_link.switch] â ï¸ Container data not found for ID: 955610b06e2f7cb9544037570e0072c726cad616d4abb6018b6124c55c68e26c
-2025-08-08 23:47:06.419 WARNING (MainThread) [custom_components.ha_portainer_link.switch] â ï¸ No container data available for 955610b06e2f7cb9544037570e0072c726cad616d4abb6018b6124c55c68e26c
-2025-08-08 23:47:06.419 WARNING (MainThread) [custom_components.ha_portainer_link.switch] â ï¸ Container data not found for ID: 3e9620e48f00f9a42b77c7a867c68af991c8c27ce60653a6f8e7344c38131a79
-2025-08-08 23:47:06.420 WARNING (MainThread) [custom_components.ha_portainer_link.switch] â ï¸ No container data available for 3e9620e48f00f9a42b77c7a867c68af991c8c27ce60653a6f8e7344c38131a79
-2025-08-08 23:47:06.420 WARNING (MainThread) [custom_components.ha_portainer_link.switch] â ï¸ Container data not found for ID: 3e9620e48f00f9a42b77c7a867c68af991c8c27ce60653a6f8e7344c38131a79
-2025-08-08 23:47:06.420 WARNING (MainThread) [custom_components.ha_portainer_link.switch] â ï¸ No container data available for 3e9620e48f00f9a42b77c7a867c68af991c8c27ce60653a6f8e7344c38131a79
-2025-08-08 23:49:10.313 INFO (MainThread) [custom_components.ha_portainer_link.button] ð Force updating stack gogs
-2025-08-08 23:49:10.313 INFO (MainThread) [custom_components.ha_portainer_link.stack_api] ð Starting comprehensive update for stack gogs
-2025-08-08 23:49:10.317 INFO (MainThread) [custom_components.ha_portainer_link.stack_api] ð Trying to get compose content from stack file endpoint for gogs
-2025-08-08 23:49:10.324 INFO (MainThread) [custom_components.ha_portainer_link.stack_api] â¹ï¸ No containers found for stack gogs (may be fresh stack)
-2025-08-08 23:49:14.527 ERROR (MainThread) [custom_components.ha_portainer_link.stack_api] â Stack update PUT failed: HTTP 500 {"message":"failed to deploy a stack: compose up operation failed: Error response from daemon: failed to set up container networking: driver failed programming external connectivity on endpoint gogs-gogs-1 (9e58c056cd1fc281cff7bb868ca4f37c511e8f4fbb2ef5ea39ffceb01bdc488b): Bind for 0.0.0.0:3000 failed: port is already allocated","details":"Failed to deploy a stack: compose up operation failed: Error response from daemon: failed to set up container networking: driver failed programming external connectivity on endpoint gogs-gogs-1 (9e58c056cd1fc281cff7bb868ca4f37c511e8f4fbb2ef5ea39ffceb01bdc488b): Bind for 0.0.0.0:3000 failed: port is already allocated"}
-2025-08-08 23:49:14.527 INFO (MainThread) [custom_components.ha_portainer_link.stack_api] ð Trying fallback start for stack gogs
-2025-08-08 23:49:14.531 ERROR (MainThread) [custom_components.ha_portainer_link.stack_api] â Failed to start stack gogs: HTTP 400 - {"message":"Stack is already active","details":"Stack is already active"}
-2025-08-08 23:49:14.531 ERROR (MainThread) [custom_components.ha_portainer_link.stack_api] â Fallback start also failed for stack gogs
-2025-08-08 23:49:14.531 ERROR (MainThread) [custom_components.ha_portainer_link.button] â Stack gogs update failed: {'stack': 'gogs', 'stopped': True, 'deleted': [], 'update_put': {'ok': False, 'status': 500, 'body': '{"message":"failed to deploy a stack: compose up operation failed: Error response from daemon: failed to set up container networking: driver failed programming external connectivity on endpoint gogs-gogs-1 (9e58c056cd1fc281cff7bb868ca4f37c511e8f4fbb2ef5ea39ffceb01bdc488b): Bind for 0.0.0.0:3000 failed: port is already allocated","details":"Failed to deploy a stack: compose up operation failed: Error response from daemon: failed to set up container networking: driver failed programming external connectivity on endpoint gogs-gogs-1 (9e58c056cd1fc281cff7bb868ca4f37c511e8f4fbb2ef5ea39ffceb01bdc488b): Bind for 0.0.0.0:3000 failed: port is already allocated"}'}, 'started': False, 'wait_ready': False}
-2025-08-08 23:49:14.531 WARNING (MainThread) [custom_components.ha_portainer_link.button] â ï¸ Stack update failed but continuing - check logs for details
-2025-08-08 23:49:14.531 INFO (MainThread) [custom_components.ha_portainer_link.container_api] ð Checking if endpoint 2 exists: https://192.168.0.6:9443/api/endpoints/2
-2025-08-08 23:49:14.535 INFO (MainThread) [custom_components.ha_portainer_link.container_api] â Endpoint 2 exists: local
-2025-08-08 23:49:14.535 INFO (MainThread) [custom_components.ha_portainer_link.container_api] ð Getting containers from URL: https://192.168.0.6:9443/api/endpoints/2/docker/containers/json?all=1
-2025-08-08 23:49:14.539 INFO (MainThread) [custom_components.ha_portainer_link.container_api] â Got 20 containers from endpoint 2
-2025-08-08 23:49:14.539 INFO (MainThread) [custom_components.ha_portainer_link.coordinator] â Updated Portainer data: 20 containers (19 stack, 1 standalone), 23 stacks
-2025-08-08 23:49:14.539 WARNING (MainThread) [custom_components.ha_portainer_link.switch] â ï¸ Container data not found for ID: 955610b06e2f7cb9544037570e0072c726cad616d4abb6018b6124c55c68e26c
-2025-08-08 23:49:14.539 WARNING (MainThread) [custom_components.ha_portainer_link.switch] â ï¸ No container data available for 955610b06e2f7cb9544037570e0072c726cad616d4abb6018b6124c55c68e26c
-2025-08-08 23:49:14.539 WARNING (MainThread) [custom_components.ha_portainer_link.switch] â ï¸ Container data not found for ID: 955610b06e2f7cb9544037570e0072c726cad616d4abb6018b6124c55c68e26c
-2025-08-08 23:49:14.539 WARNING (MainThread) [custom_components.ha_portainer_link.switch] â ï¸ No container data available for 955610b06e2f7cb9544037570e0072c726cad616d4abb6018b6124c55c68e26c
-2025-08-08 23:49:14.539 WARNING (MainThread) [custom_components.ha_portainer_link.switch] â ï¸ Container data not found for ID: 3e9620e48f00f9a42b77c7a867c68af991c8c27ce60653a6f8e7344c38131a79
-2025-08-08 23:49:14.539 WARNING (MainThread) [custom_components.ha_portainer_link.switch] â ï¸ No container data available for 3e9620e48f00f9a42b77c7a867c68af991c8c27ce60653a6f8e7344c38131a79
-2025-08-08 23:49:14.539 WARNING (MainThread) [custom_components.ha_portainer_link.switch] â ï¸ Container data not found for ID: 3e9620e48f00f9a42b77c7a867c68af991c8c27ce60653a6f8e7344c38131a79
-2025-08-08 23:49:14.539 WARNING (MainThread) [custom_components.ha_portainer_link.switch] â ï¸ No container data available for 3e9620e48f00f9a42b77c7a867c68af991c8c27ce60653a6f8e7344c38131a79
+2025-08-09 00:04:04.137 INFO (MainThread) [homeassistant.setup] Setting up schedule
+2025-08-09 00:04:04.138 INFO (MainThread) [homeassistant.setup] Setup of domain schedule took 0.00 seconds
+2025-08-09 00:04:04.146 INFO (MainThread) [homeassistant.setup] Setting up sun
+2025-08-09 00:04:04.146 INFO (MainThread) [homeassistant.setup] Setup of domain sun took 0.00 seconds
+2025-08-09 00:04:04.154 INFO (MainThread) [homeassistant.components.binary_sensor] Setting up sun.binary_sensor
+2025-08-09 00:04:04.154 INFO (MainThread) [homeassistant.components.sensor] Setting up sun.sensor
+2025-08-09 00:04:04.161 INFO (MainThread) [custom_components.hacs] <HacsData restore> Restore started
+2025-08-09 00:04:04.186 INFO (MainThread) [custom_components.hacs] <HacsData restore> Restore done
+2025-08-09 00:04:04.186 INFO (MainThread) [custom_components.hacs] Enable category: integration
+2025-08-09 00:04:04.186 INFO (MainThread) [custom_components.hacs] Enable category: plugin
+2025-08-09 00:04:04.186 INFO (MainThread) [custom_components.hacs] Enable category: template
+2025-08-09 00:04:04.187 INFO (MainThread) [custom_components.hacs] Enable category: theme
+2025-08-09 00:04:04.187 INFO (MainThread) [homeassistant.setup] Setting up go2rtc
+2025-08-09 00:04:04.189 INFO (MainThread) [homeassistant.setup] Setting up todo
+2025-08-09 00:04:04.190 INFO (MainThread) [homeassistant.setup] Setup of domain todo took 0.00 seconds
+2025-08-09 00:04:04.190 INFO (MainThread) [homeassistant.components.todo] Setting up shopping_list.todo
+2025-08-09 00:04:04.195 INFO (MainThread) [homeassistant.components.tts] Setting up google_translate.tts
+2025-08-09 00:04:04.197 INFO (MainThread) [homeassistant.components.sensor] Setting up energy.sensor
+2025-08-09 00:04:04.200 INFO (MainThread) [homeassistant.setup] Setting up analytics
+2025-08-09 00:04:04.200 INFO (MainThread) [homeassistant.setup] Setup of domain analytics took 0.00 seconds
+2025-08-09 00:04:04.332 INFO (MainThread) [homeassistant.setup] Setup of domain go2rtc took 0.14 seconds
+2025-08-09 00:04:04.360 INFO (MainThread) [homeassistant.setup] Setting up media_player
+2025-08-09 00:04:04.365 INFO (MainThread) [homeassistant.setup] Setup of domain media_player took 0.00 seconds
+2025-08-09 00:04:04.365 INFO (MainThread) [homeassistant.components.binary_sensor] Setting up sonos.binary_sensor
+2025-08-09 00:04:04.366 INFO (MainThread) [homeassistant.components.media_player] Setting up sonos.media_player
+2025-08-09 00:04:04.367 INFO (MainThread) [homeassistant.components.number] Setting up sonos.number
+2025-08-09 00:04:04.367 INFO (MainThread) [homeassistant.components.sensor] Setting up sonos.sensor
+2025-08-09 00:04:04.367 INFO (MainThread) [homeassistant.components.switch] Setting up sonos.switch
+2025-08-09 00:04:04.373 INFO (MainThread) [homeassistant.setup] Setting up mobile_app
+2025-08-09 00:04:04.374 INFO (MainThread) [homeassistant.setup] Setting up notify
+2025-08-09 00:04:04.374 INFO (MainThread) [homeassistant.setup] Setup of domain notify took 0.00 seconds
+2025-08-09 00:04:04.374 INFO (MainThread) [homeassistant.setup] Setup of domain mobile_app took 0.00 seconds
+2025-08-09 00:04:04.374 INFO (MainThread) [homeassistant.components.notify] Setting up notify.mobile_app
+2025-08-09 00:04:04.374 INFO (MainThread) [homeassistant.setup] Setting up default_config
+2025-08-09 00:04:04.374 INFO (MainThread) [homeassistant.setup] Setup of domain default_config took 0.00 seconds
+2025-08-09 00:04:04.377 INFO (MainThread) [homeassistant.components.switch] Setting up hacs.switch
+2025-08-09 00:04:04.377 INFO (MainThread) [homeassistant.components.update] Setting up hacs.update
+2025-08-09 00:04:04.378 INFO (MainThread) [custom_components.hacs] Stage changed: setup
+2025-08-09 00:04:04.378 INFO (MainThread) [custom_components.hacs] Stage changed: waiting
+2025-08-09 00:04:04.378 INFO (MainThread) [custom_components.hacs] Setup complete, waiting for Home Assistant before startup tasks starts
+2025-08-09 00:04:04.383 INFO (MainThread) [homeassistant.components.button] Setting up wled.button
+2025-08-09 00:04:04.384 INFO (MainThread) [homeassistant.components.light] Setting up wled.light
+2025-08-09 00:04:04.384 INFO (MainThread) [homeassistant.components.number] Setting up wled.number
+2025-08-09 00:04:04.384 INFO (MainThread) [homeassistant.components.select] Setting up wled.select
+2025-08-09 00:04:04.385 INFO (MainThread) [homeassistant.components.sensor] Setting up wled.sensor
+2025-08-09 00:04:04.385 INFO (MainThread) [homeassistant.components.switch] Setting up wled.switch
+2025-08-09 00:04:04.386 INFO (MainThread) [homeassistant.components.update] Setting up wled.update
+2025-08-09 00:04:04.386 INFO (MainThread) [homeassistant.components.button] Setting up wled.button
+2025-08-09 00:04:04.386 INFO (MainThread) [homeassistant.components.light] Setting up wled.light
+2025-08-09 00:04:04.386 INFO (MainThread) [homeassistant.components.number] Setting up wled.number
+2025-08-09 00:04:04.386 INFO (MainThread) [homeassistant.components.select] Setting up wled.select
+2025-08-09 00:04:04.387 INFO (MainThread) [homeassistant.components.sensor] Setting up wled.sensor
+2025-08-09 00:04:04.387 INFO (MainThread) [homeassistant.components.switch] Setting up wled.switch
+2025-08-09 00:04:04.387 INFO (MainThread) [homeassistant.components.update] Setting up wled.update
+2025-08-09 00:04:04.388 INFO (MainThread) [homeassistant.components.button] Setting up wled.button
+2025-08-09 00:04:04.388 INFO (MainThread) [homeassistant.components.light] Setting up wled.light
+2025-08-09 00:04:04.388 INFO (MainThread) [homeassistant.components.number] Setting up wled.number
+2025-08-09 00:04:04.388 INFO (MainThread) [homeassistant.components.select] Setting up wled.select
+2025-08-09 00:04:04.388 INFO (MainThread) [homeassistant.components.sensor] Setting up wled.sensor
+2025-08-09 00:04:04.389 INFO (MainThread) [homeassistant.components.switch] Setting up wled.switch
+2025-08-09 00:04:04.389 INFO (MainThread) [homeassistant.components.update] Setting up wled.update
+2025-08-09 00:05:02.729 WARNING (MainThread) [homeassistant.bootstrap] Waiting on integrations to complete setup: {('ha_portainer_link', '01K25CZ18B6ACHQY6XT8YZD3P0'): 143861.98838382}
+2025-08-09 00:06:02.783 WARNING (MainThread) [homeassistant.bootstrap] Waiting on integrations to complete setup: {('ha_portainer_link', '01K25CZ18B6ACHQY6XT8YZD3P0'): 143861.98838382}
+2025-08-09 00:07:02.835 WARNING (MainThread) [homeassistant.bootstrap] Waiting on integrations to complete setup: {('ha_portainer_link', '01K25CZ18B6ACHQY6XT8YZD3P0'): 143861.98838382}
 
 
 ===== SUPERVISOR LOGS =====
-[32m2025-08-08 21:06:31.852 INFO (MainThread) [supervisor.resolution.fixup] System autofix complete[0m
-[32m2025-08-08 21:10:16.183 INFO (MainThread) [supervisor.homeassistant.api] Updated Home Assistant API token[0m
-[32m2025-08-08 21:21:59.962 INFO (SyncWorker_3) [supervisor.docker.manager] Restarting homeassistant[0m
-[32m2025-08-08 21:22:06.492 INFO (MainThread) [supervisor.homeassistant.core] Wait until Home Assistant is ready[0m
-[32m2025-08-08 21:22:07.787 INFO (MainThread) [supervisor.resolution.evaluate] Starting system evaluation with state running[0m
-[32m2025-08-08 21:22:07.810 INFO (MainThread) [supervisor.resolution.evaluate] System evaluation complete[0m
-[32m2025-08-08 21:22:11.497 INFO (MainThread) [supervisor.homeassistant.core] Home Assistant Core state changed to APIState(core_state='NOT_RUNNING', offline_db_migration=False)[0m
-[32m2025-08-08 21:22:46.535 INFO (MainThread) [supervisor.homeassistant.core] Home Assistant Core state changed to APIState(core_state='STARTING', offline_db_migration=False)[0m
-[32m2025-08-08 21:22:51.541 INFO (MainThread) [supervisor.homeassistant.core] Home Assistant Core state changed to APIState(core_state='RUNNING', offline_db_migration=False)[0m
-[32m2025-08-08 21:22:51.541 INFO (MainThread) [supervisor.homeassistant.core] Detect a running Home Assistant instance[0m
-[32m2025-08-08 21:38:15.583 INFO (SyncWorker_0) [supervisor.docker.manager] Restarting homeassistant[0m
-[32m2025-08-08 21:38:22.633 INFO (MainThread) [supervisor.homeassistant.core] Wait until Home Assistant is ready[0m
-[32m2025-08-08 21:38:24.004 INFO (MainThread) [supervisor.resolution.evaluate] Starting system evaluation with state running[0m
-[32m2025-08-08 21:38:24.025 INFO (MainThread) [supervisor.resolution.evaluate] System evaluation complete[0m
-[32m2025-08-08 21:38:27.639 INFO (MainThread) [supervisor.homeassistant.core] Home Assistant Core state changed to APIState(core_state='NOT_RUNNING', offline_db_migration=False)[0m
-[32m2025-08-08 21:39:27.710 INFO (MainThread) [supervisor.homeassistant.core] Home Assistant Core state changed to APIState(core_state='RUNNING', offline_db_migration=False)[0m
-[32m2025-08-08 21:39:27.710 INFO (MainThread) [supervisor.homeassistant.core] Detect a running Home Assistant instance[0m
-[32m2025-08-08 21:40:18.406 INFO (MainThread) [supervisor.homeassistant.api] Updated Home Assistant API token[0m
-[32m2025-08-08 21:45:24.908 INFO (MainThread) [supervisor.updater] Fetching update data from https://version.home-assistant.io/stable.json[0m
-[32m2025-08-08 21:46:22.415 INFO (SyncWorker_2) [supervisor.docker.manager] Restarting homeassistant[0m
-[32m2025-08-08 21:46:29.431 INFO (MainThread) [supervisor.homeassistant.core] Wait until Home Assistant is ready[0m
-[32m2025-08-08 21:46:30.688 INFO (MainThread) [supervisor.resolution.evaluate] Starting system evaluation with state running[0m
-[32m2025-08-08 21:46:30.710 INFO (MainThread) [supervisor.resolution.evaluate] System evaluation complete[0m
-[32m2025-08-08 21:46:34.436 INFO (MainThread) [supervisor.homeassistant.core] Home Assistant Core state changed to APIState(core_state='NOT_RUNNING', offline_db_migration=False)[0m
-[32m2025-08-08 21:47:34.507 INFO (MainThread) [supervisor.homeassistant.core] Home Assistant Core state changed to APIState(core_state='RUNNING', offline_db_migration=False)[0m
-[32m2025-08-08 21:47:34.508 INFO (MainThread) [supervisor.homeassistant.core] Detect a running Home Assistant instance[0m
-[32m2025-08-08 22:06:31.857 INFO (MainThread) [supervisor.resolution.check] Starting system checks with state running[0m
-[32m2025-08-08 22:06:31.857 INFO (MainThread) [supervisor.resolution.checks.base] Run check for dns_server_failed/dns_server[0m
-[32m2025-08-08 22:06:31.919 INFO (MainThread) [supervisor.resolution.checks.base] Run check for dns_server_ipv6_error/dns_server[0m
-[32m2025-08-08 22:06:31.919 INFO (MainThread) [supervisor.resolution.checks.base] Run check for ipv4_connection_problem/system[0m
-[32m2025-08-08 22:06:31.920 INFO (MainThread) [supervisor.resolution.checks.base] Run check for security/core[0m
-[32m2025-08-08 22:06:31.920 INFO (MainThread) [supervisor.resolution.checks.base] Run check for multiple_data_disks/system[0m
-[32m2025-08-08 22:06:31.920 INFO (MainThread) [supervisor.resolution.checks.base] Run check for docker_config/system[0m
-[32m2025-08-08 22:06:31.920 INFO (MainThread) [supervisor.resolution.checks.base] Run check for disabled_data_disk/system[0m
-[32m2025-08-08 22:06:31.920 INFO (MainThread) [supervisor.resolution.checks.base] Run check for trust/supervisor[0m
-[32m2025-08-08 22:06:31.922 INFO (MainThread) [supervisor.resolution.checks.base] Run check for pwned/addon[0m
-[32m2025-08-08 22:06:31.922 INFO (MainThread) [supervisor.resolution.checks.base] Run check for free_space/system[0m
-[32m2025-08-08 22:06:31.922 INFO (MainThread) [supervisor.resolution.check] System checks complete[0m
-[32m2025-08-08 22:06:31.922 INFO (MainThread) [supervisor.resolution.evaluate] Starting system evaluation with state running[0m
-[32m2025-08-08 22:06:31.942 INFO (MainThread) [supervisor.resolution.evaluate] System evaluation complete[0m
-[32m2025-08-08 22:06:31.942 INFO (MainThread) [supervisor.resolution.fixup] Starting system autofix at state running[0m
-[32m2025-08-08 22:06:31.942 INFO (MainThread) [supervisor.resolution.fixup] System autofix complete[0m
-[32m2025-08-08 22:07:06.583 INFO (MainThread) [supervisor.host.info] Updating local host information[0m
-[32m2025-08-08 22:07:06.691 INFO (MainThread) [supervisor.host.services] Updating service information[0m
-[32m2025-08-08 22:07:06.692 INFO (MainThread) [supervisor.host.network] Updating local network information[0m
-[32m2025-08-08 22:07:06.713 INFO (MainThread) [supervisor.host.sound] Updating PulseAudio information[0m
 [32m2025-08-08 22:07:06.715 INFO (MainThread) [supervisor.host.manager] Host information reload completed[0m
 [32m2025-08-08 22:10:20.673 INFO (MainThread) [supervisor.homeassistant.api] Updated Home Assistant API token[0m
 [32m2025-08-08 22:36:28.921 INFO (SyncWorker_0) [supervisor.docker.manager] Restarting homeassistant[0m
@@ -535,44 +360,55 @@ https://github.com/hacs/integration/issues
 [32m2025-08-08 23:45:39.213 INFO (MainThread) [supervisor.homeassistant.core] Home Assistant Core state changed to APIState(core_state='NOT_RUNNING', offline_db_migration=False)[0m
 [32m2025-08-08 23:46:39.285 INFO (MainThread) [supervisor.homeassistant.core] Home Assistant Core state changed to APIState(core_state='RUNNING', offline_db_migration=False)[0m
 [32m2025-08-08 23:46:39.285 INFO (MainThread) [supervisor.homeassistant.core] Detect a running Home Assistant instance[0m
+[32m2025-08-08 23:52:35.038 INFO (SyncWorker_1) [supervisor.docker.manager] Restarting homeassistant[0m
+[32m2025-08-08 23:52:41.460 INFO (MainThread) [supervisor.homeassistant.core] Wait until Home Assistant is ready[0m
+[32m2025-08-08 23:52:43.181 INFO (MainThread) [supervisor.resolution.evaluate] Starting system evaluation with state running[0m
+[32m2025-08-08 23:52:43.202 INFO (MainThread) [supervisor.resolution.evaluate] System evaluation complete[0m
+[32m2025-08-08 23:52:46.465 INFO (MainThread) [supervisor.homeassistant.core] Home Assistant Core state changed to APIState(core_state='RUNNING', offline_db_migration=False)[0m
+[32m2025-08-08 23:52:46.465 INFO (MainThread) [supervisor.homeassistant.core] Detect a running Home Assistant instance[0m
+[32m2025-08-08 23:55:54.466 INFO (SyncWorker_4) [supervisor.docker.manager] Restarting homeassistant[0m
+[32m2025-08-08 23:56:01.222 INFO (MainThread) [supervisor.homeassistant.core] Wait until Home Assistant is ready[0m
+[32m2025-08-08 23:56:02.482 INFO (MainThread) [supervisor.resolution.evaluate] Starting system evaluation with state running[0m
+[32m2025-08-08 23:56:02.502 INFO (MainThread) [supervisor.resolution.evaluate] System evaluation complete[0m
+[32m2025-08-08 23:56:06.227 INFO (MainThread) [supervisor.homeassistant.core] Home Assistant Core state changed to APIState(core_state='RUNNING', offline_db_migration=False)[0m
+[32m2025-08-08 23:56:06.227 INFO (MainThread) [supervisor.homeassistant.core] Detect a running Home Assistant instance[0m
+[32m2025-08-08 23:56:46.936 INFO (SyncWorker_3) [supervisor.docker.manager] Restarting homeassistant[0m
+[32m2025-08-08 23:56:53.653 INFO (MainThread) [supervisor.homeassistant.core] Wait until Home Assistant is ready[0m
+[32m2025-08-08 23:56:54.924 INFO (MainThread) [supervisor.resolution.evaluate] Starting system evaluation with state running[0m
+[32m2025-08-08 23:56:54.947 INFO (MainThread) [supervisor.resolution.evaluate] System evaluation complete[0m
+[32m2025-08-08 23:56:58.656 INFO (MainThread) [supervisor.homeassistant.core] Home Assistant Core state changed to APIState(core_state='RUNNING', offline_db_migration=False)[0m
+[32m2025-08-08 23:56:58.656 INFO (MainThread) [supervisor.homeassistant.core] Detect a running Home Assistant instance[0m
+[32m2025-08-08 23:57:35.624 INFO (SyncWorker_0) [supervisor.docker.manager] Restarting homeassistant[0m
+[32m2025-08-08 23:57:42.333 INFO (MainThread) [supervisor.homeassistant.core] Wait until Home Assistant is ready[0m
+[32m2025-08-08 23:57:43.584 INFO (MainThread) [supervisor.resolution.evaluate] Starting system evaluation with state running[0m
+[32m2025-08-08 23:57:43.604 INFO (MainThread) [supervisor.resolution.evaluate] System evaluation complete[0m
+[32m2025-08-08 23:57:47.338 INFO (MainThread) [supervisor.homeassistant.core] Home Assistant Core state changed to APIState(core_state='NOT_RUNNING', offline_db_migration=False)[0m
+[32m2025-08-08 23:58:42.401 INFO (MainThread) [supervisor.homeassistant.core] Home Assistant Core state changed to APIState(core_state='RUNNING', offline_db_migration=False)[0m
+[32m2025-08-08 23:58:42.401 INFO (MainThread) [supervisor.homeassistant.core] Detect a running Home Assistant instance[0m
+[32m2025-08-09 00:03:54.731 INFO (SyncWorker_0) [supervisor.docker.manager] Restarting homeassistant[0m
+[32m2025-08-09 00:04:01.494 INFO (MainThread) [supervisor.homeassistant.core] Wait until Home Assistant is ready[0m
+[32m2025-08-09 00:04:02.761 INFO (MainThread) [supervisor.resolution.evaluate] Starting system evaluation with state running[0m
+[32m2025-08-09 00:04:02.784 INFO (MainThread) [supervisor.resolution.evaluate] System evaluation complete[0m
+[32m2025-08-09 00:04:06.500 INFO (MainThread) [supervisor.homeassistant.core] Home Assistant Core state changed to APIState(core_state='NOT_RUNNING', offline_db_migration=False)[0m
+[32m2025-08-09 00:06:32.043 INFO (MainThread) [supervisor.resolution.check] Starting system checks with state running[0m
+[32m2025-08-09 00:06:32.043 INFO (MainThread) [supervisor.resolution.checks.base] Run check for dns_server_failed/dns_server[0m
+[32m2025-08-09 00:06:32.101 INFO (MainThread) [supervisor.resolution.checks.base] Run check for dns_server_ipv6_error/dns_server[0m
+[32m2025-08-09 00:06:32.101 INFO (MainThread) [supervisor.resolution.checks.base] Run check for ipv4_connection_problem/system[0m
+[32m2025-08-09 00:06:32.101 INFO (MainThread) [supervisor.resolution.checks.base] Run check for security/core[0m
+[32m2025-08-09 00:06:32.101 INFO (MainThread) [supervisor.resolution.checks.base] Run check for multiple_data_disks/system[0m
+[32m2025-08-09 00:06:32.101 INFO (MainThread) [supervisor.resolution.checks.base] Run check for docker_config/system[0m
+[32m2025-08-09 00:06:32.101 INFO (MainThread) [supervisor.resolution.checks.base] Run check for disabled_data_disk/system[0m
+[32m2025-08-09 00:06:32.101 INFO (MainThread) [supervisor.resolution.checks.base] Run check for trust/supervisor[0m
+[32m2025-08-09 00:06:32.104 INFO (MainThread) [supervisor.resolution.checks.base] Run check for pwned/addon[0m
+[32m2025-08-09 00:06:32.104 INFO (MainThread) [supervisor.resolution.checks.base] Run check for free_space/system[0m
+[32m2025-08-09 00:06:32.104 INFO (MainThread) [supervisor.resolution.check] System checks complete[0m
+[32m2025-08-09 00:06:32.104 INFO (MainThread) [supervisor.resolution.evaluate] Starting system evaluation with state running[0m
+[32m2025-08-09 00:06:32.124 INFO (MainThread) [supervisor.resolution.evaluate] System evaluation complete[0m
+[32m2025-08-09 00:06:32.124 INFO (MainThread) [supervisor.resolution.fixup] Starting system autofix at state running[0m
+[32m2025-08-09 00:06:32.124 INFO (MainThread) [supervisor.resolution.fixup] System autofix complete[0m
 
 
 ===== HOST LOGS =====
-2025-08-08 17:43:26.842 homeassistant systemd[1]: docker-c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.scope: Deactivated successfully.
-2025-08-08 17:43:26.842 homeassistant systemd[1]: docker-c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.scope: Consumed 7.712s CPU time, 542.3M memory peak, 4K read from disk, 11.7M written to disk.
-2025-08-08 17:43:26.847 homeassistant dockerd[475]: time="2025-08-08T17:43:26.847334175Z" level=info msg="ignoring event" container=c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859 module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"
-2025-08-08 17:43:26.917 homeassistant systemd[1]: Started libcontainer container c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.
-2025-08-08 17:43:26.922 homeassistant systemd-resolved[365]: System hostname changed to 'homeassistant'.
-2025-08-08 17:43:26.983 homeassistant systemd-resolved[365]: Detected conflict on homeassistant.local IN A 192.168.0.151
-2025-08-08 17:43:26.983 homeassistant systemd-resolved[365]: Hostname conflict, changing published hostname from 'homeassistant' to 'homeassistant9'.
-2025-08-08 17:50:42.795 homeassistant systemd[1]: docker-c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.scope: Deactivated successfully.
-2025-08-08 17:50:42.795 homeassistant systemd[1]: docker-c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.scope: Consumed 6.950s CPU time, 484.6M memory peak, 10.8M written to disk.
-2025-08-08 17:50:42.801 homeassistant dockerd[475]: time="2025-08-08T17:50:42.801356225Z" level=info msg="ignoring event" container=c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859 module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"
-2025-08-08 17:50:42.886 homeassistant systemd[1]: Started libcontainer container c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.
-2025-08-08 17:50:42.891 homeassistant systemd-resolved[365]: System hostname changed to 'homeassistant'.
-2025-08-08 17:50:42.984 homeassistant systemd-resolved[365]: Detected conflict on homeassistant IN AAAA fdc4:ec57:ec5b:0:47:8a62:bee1:c568
-2025-08-08 17:50:42.984 homeassistant systemd-resolved[365]: Hostname conflict, changing published hostname from 'homeassistant' to 'homeassistant10'.
-2025-08-08 17:54:05.651 homeassistant systemd[1]: docker-c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.scope: Deactivated successfully.
-2025-08-08 17:54:05.651 homeassistant systemd[1]: docker-c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.scope: Consumed 6.015s CPU time, 438M memory peak, 2.9M written to disk.
-2025-08-08 17:54:05.656 homeassistant dockerd[475]: time="2025-08-08T17:54:05.656845366Z" level=info msg="ignoring event" container=c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859 module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"
-2025-08-08 17:54:05.722 homeassistant systemd[1]: Started libcontainer container c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.
-2025-08-08 17:54:05.727 homeassistant systemd-resolved[365]: System hostname changed to 'homeassistant'.
-2025-08-08 17:54:05.806 homeassistant systemd-resolved[365]: Detected conflict on homeassistant.local IN A 192.168.0.151
-2025-08-08 17:54:05.806 homeassistant systemd-resolved[365]: Hostname conflict, changing published hostname from 'homeassistant' to 'homeassistant11'.
-2025-08-08 18:00:26.457 homeassistant systemd[1]: Starting Hostname Service...
-2025-08-08 18:00:26.465 homeassistant systemd-timesyncd[1096]: Network configuration changed, trying to establish connection.
-2025-08-08 18:00:26.469 homeassistant systemd-timesyncd[1096]: Contacted time server 192.168.0.200:123 (192.168.0.200).
-2025-08-08 18:00:26.471 homeassistant systemd-timesyncd[1096]: Network configuration changed, trying to establish connection.
-2025-08-08 18:00:26.473 homeassistant systemd-timesyncd[1096]: Contacted time server 192.168.0.200:123 (192.168.0.200).
-2025-08-08 18:00:26.504 homeassistant systemd[1]: Started Hostname Service.
-2025-08-08 18:00:26.507 homeassistant systemd[1]: Starting Time & Date Service...
-2025-08-08 18:00:26.519 homeassistant systemd-timesyncd[1096]: Network configuration changed, trying to establish connection.
-2025-08-08 18:00:26.521 homeassistant systemd-timesyncd[1096]: Contacted time server 192.168.0.200:123 (192.168.0.200).
-2025-08-08 18:00:26.553 homeassistant systemd[1]: Started Time & Date Service.
-2025-08-08 18:00:56.536 homeassistant systemd[1]: systemd-hostnamed.service: Deactivated successfully.
-2025-08-08 18:00:56.581 homeassistant systemd[1]: systemd-timedated.service: Deactivated successfully.
-2025-08-08 18:13:02.845 homeassistant systemd[1]: docker-c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.scope: Deactivated successfully.
-2025-08-08 18:13:02.846 homeassistant systemd[1]: docker-c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.scope: Consumed 8.859s CPU time, 506.6M memory peak, 10.7M written to disk.
 2025-08-08 18:13:02.851 homeassistant dockerd[475]: time="2025-08-08T18:13:02.851172764Z" level=info msg="ignoring event" container=c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859 module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"
 2025-08-08 18:13:02.914 homeassistant systemd[1]: Started libcontainer container c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.
 2025-08-08 18:13:02.918 homeassistant systemd-resolved[365]: System hostname changed to 'homeassistant'.
@@ -638,4 +474,39 @@ https://github.com/hacs/integration/issues
 2025-08-08 21:45:34.176 homeassistant systemd-resolved[365]: System hostname changed to 'homeassistant'.
 2025-08-08 21:45:34.234 homeassistant systemd-resolved[365]: Detected conflict on homeassistant IN AAAA fe80::d169:f614:e3dc:41e3
 2025-08-08 21:45:34.234 homeassistant systemd-resolved[365]: Hostname conflict, changing published hostname from 'homeassistant' to 'homeassistant11'.
+2025-08-08 21:52:41.344 homeassistant systemd[1]: docker-c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.scope: Deactivated successfully.
+2025-08-08 21:52:41.345 homeassistant systemd[1]: docker-c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.scope: Consumed 6.956s CPU time, 495.3M memory peak, 44K read from disk, 6.3M written to disk.
+2025-08-08 21:52:41.350 homeassistant dockerd[475]: time="2025-08-08T21:52:41.350962934Z" level=info msg="ignoring event" container=c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859 module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"
+2025-08-08 21:52:41.420 homeassistant systemd[1]: Started libcontainer container c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.
+2025-08-08 21:52:41.424 homeassistant systemd-resolved[365]: System hostname changed to 'homeassistant'.
+2025-08-08 21:52:41.484 homeassistant systemd-resolved[365]: Detected conflict on homeassistant.local IN AAAA 2a00:6020:b286:4700:b421:c7fc:c5b2:3c83
+2025-08-08 21:52:41.484 homeassistant systemd-resolved[365]: Hostname conflict, changing published hostname from 'homeassistant' to 'homeassistant10'.
+2025-08-08 21:56:01.112 homeassistant systemd[1]: docker-c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.scope: Deactivated successfully.
+2025-08-08 21:56:01.112 homeassistant systemd[1]: docker-c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.scope: Consumed 6.107s CPU time, 466.1M memory peak, 4M written to disk.
+2025-08-08 21:56:01.117 homeassistant dockerd[475]: time="2025-08-08T21:56:01.117723093Z" level=info msg="ignoring event" container=c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859 module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"
+2025-08-08 21:56:01.183 homeassistant systemd[1]: Started libcontainer container c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.
+2025-08-08 21:56:01.187 homeassistant systemd-resolved[365]: System hostname changed to 'homeassistant'.
+2025-08-08 21:56:01.234 homeassistant systemd-resolved[365]: Detected conflict on homeassistant IN AAAA fe80::d169:f614:e3dc:41e3
+2025-08-08 21:56:01.234 homeassistant systemd-resolved[365]: Hostname conflict, changing published hostname from 'homeassistant' to 'homeassistant2'.
+2025-08-08 21:56:53.543 homeassistant systemd[1]: docker-c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.scope: Deactivated successfully.
+2025-08-08 21:56:53.543 homeassistant systemd[1]: docker-c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.scope: Consumed 5.270s CPU time, 443.3M memory peak, 3.7M written to disk.
+2025-08-08 21:56:53.548 homeassistant dockerd[475]: time="2025-08-08T21:56:53.548115949Z" level=info msg="ignoring event" container=c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859 module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"
+2025-08-08 21:56:53.614 homeassistant systemd[1]: Started libcontainer container c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.
+2025-08-08 21:56:53.618 homeassistant systemd-resolved[365]: System hostname changed to 'homeassistant'.
+2025-08-08 21:56:53.734 homeassistant systemd-resolved[365]: Detected conflict on homeassistant.local IN AAAA fdc4:ec57:ec5b:0:47:8a62:bee1:c568
+2025-08-08 21:56:53.734 homeassistant systemd-resolved[365]: Hostname conflict, changing published hostname from 'homeassistant' to 'homeassistant2'.
+2025-08-08 21:57:42.219 homeassistant systemd[1]: docker-c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.scope: Deactivated successfully.
+2025-08-08 21:57:42.219 homeassistant systemd[1]: docker-c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.scope: Consumed 5.610s CPU time, 447.3M memory peak, 3.6M written to disk.
+2025-08-08 21:57:42.225 homeassistant dockerd[475]: time="2025-08-08T21:57:42.224949249Z" level=info msg="ignoring event" container=c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859 module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"
+2025-08-08 21:57:42.293 homeassistant systemd[1]: Started libcontainer container c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.
+2025-08-08 21:57:42.297 homeassistant systemd-resolved[365]: System hostname changed to 'homeassistant'.
+2025-08-08 21:57:42.347 homeassistant systemd-resolved[365]: Detected conflict on homeassistant.local IN A 192.168.0.151
+2025-08-08 21:57:42.347 homeassistant systemd-resolved[365]: Hostname conflict, changing published hostname from 'homeassistant' to 'homeassistant7'.
+2025-08-08 22:04:01.389 homeassistant systemd[1]: docker-c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.scope: Deactivated successfully.
+2025-08-08 22:04:01.389 homeassistant systemd[1]: docker-c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.scope: Consumed 6.733s CPU time, 492.8M memory peak, 9.1M written to disk.
+2025-08-08 22:04:01.395 homeassistant dockerd[475]: time="2025-08-08T22:04:01.394953059Z" level=info msg="ignoring event" container=c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859 module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"
+2025-08-08 22:04:01.456 homeassistant systemd[1]: Started libcontainer container c5d2cbe405e59b9fba575496e9941f7bbb3e79e02352115ead74a34565a27859.
+2025-08-08 22:04:01.461 homeassistant systemd-resolved[365]: System hostname changed to 'homeassistant'.
+2025-08-08 22:04:01.734 homeassistant systemd-resolved[365]: Detected conflict on homeassistant.local IN AAAA 2a00:6020:b286:4700:b421:c7fc:c5b2:3c83
+2025-08-08 22:04:01.734 homeassistant systemd-resolved[365]: Hostname conflict, changing published hostname from 'homeassistant' to 'homeassistant9'.
 

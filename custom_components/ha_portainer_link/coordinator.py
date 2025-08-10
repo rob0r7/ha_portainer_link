@@ -31,6 +31,7 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
         self.container_stack_map: Dict[str, str] = {}  # container_id -> stack_name
         self.container_stack_info: Dict[str, Dict[str, Any]] = {}  # container_id -> detailed stack info
         self.update_availability: Dict[str, bool] = {}  # container_id -> has_updates
+        self.stable_container_map: Dict[str, str] = {}  # stable_id -> container_id
 
     async def _async_update_data(self) -> Dict[str, Any]:
         """Update container and stack data."""
@@ -66,6 +67,7 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
             self.containers = {}
             self.container_stack_map = {}
             self.container_stack_info = {}
+            self.stable_container_map = {}  # Reset stable container map
             
             stack_containers_count = 0
             standalone_containers_count = 0
@@ -122,6 +124,24 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
                 else:
                     # In lightweight mode, all containers are standalone
                     standalone_containers_count += 1
+                
+                # Build stable container map
+                stack_info = self.container_stack_info.get(container_id, {
+                    "stack_name": None,
+                    "service_name": None,
+                    "container_number": None,
+                    "is_stack_container": False
+                })
+                
+                # Generate stable ID
+                if stack_info.get("is_stack_container"):
+                    stack_name = stack_info.get("stack_name", "unknown")
+                    service_name = stack_info.get("service_name", container_name)
+                    stable_id = f"{stack_name}_{service_name}"
+                else:
+                    stable_id = container_name
+                
+                self.stable_container_map[stable_id] = container_id
             
             # Process stacks
             self.stacks = {}
@@ -188,6 +208,10 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
     def get_update_availability(self, container_id: str) -> bool:
         """Get update availability for a container."""
         return self.update_availability.get(container_id, False)
+
+    def get_container_by_stable_id(self, stable_id: str) -> Optional[str]:
+        """Get current container ID for a stable ID."""
+        return self.stable_container_map.get(stable_id)
 
     def get_stack_containers(self, stack_name: str) -> List[Dict[str, Any]]:
         """Get all containers belonging to a stack."""

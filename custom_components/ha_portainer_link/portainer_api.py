@@ -184,6 +184,14 @@ class PortainerAPI:
         """Get available version for an image."""
         return await self.images.get_available_version(endpoint_id, image_name)
 
+    async def get_current_digest(self, endpoint_id: int, container_id: str):
+        """Get current image digest for a container."""
+        return await self.images.get_current_digest(endpoint_id, container_id)
+
+    async def get_available_digest(self, endpoint_id: int, container_id: str):
+        """Get available image digest from registry for a container."""
+        return await self.images.get_available_digest(endpoint_id, container_id)
+
     # Legacy methods for backward compatibility
     async def get_container_info(self, endpoint_id: int, container_id: str):
         """Get container information (legacy method)."""

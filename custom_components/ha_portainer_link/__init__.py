@@ -9,7 +9,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.entity_registry import RegistryEntry
 
-from .const import DOMAIN
+from .const import DOMAIN, INTEGRATION_MODE_PRESETS
 from .portainer_api import PortainerAPI
 from .coordinator import PortainerDataUpdateCoordinator
 
@@ -114,17 +114,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Apply integration mode presets
     integration_mode = config.get("integration_mode", "lightweight")
     if integration_mode in INTEGRATION_MODE_PRESETS:
-        preset_features = INTEGRATION_MODE_PRESETS[integration_mode]
+        preset_features = INTEGRATION_MODE_PRESETS[integration_mode]["features"]
         config.update(preset_features)
         _LOGGER.info("📊 Applied %s mode features: %s", integration_mode, list(preset_features.keys()))
     
     # Create API instance
     api = PortainerAPI(
         host=config["host"],
-        username=config["username"],
-        password=config["password"],
-        endpoint_id=endpoint_id,
-        ssl_verify=config.get("ssl_verify", True)
+        username=config.get("username"),  # Optional
+        password=config.get("password"),  # Optional
+        api_key=config.get("api_key"),   # Optional
+        config=config
     )
     
     # Initialize API
@@ -134,6 +134,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     # Create coordinator
     coordinator = PortainerDataUpdateCoordinator(hass, api, endpoint_id, config)
+    
+    # Initialize DOMAIN in hass.data if it doesn't exist
+    if DOMAIN not in hass.data:
+        hass.data[DOMAIN] = {}
     
     # Store coordinator in hass data
     hass.data[DOMAIN][f"{entry_id}_coordinator"] = coordinator

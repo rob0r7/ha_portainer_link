@@ -153,6 +153,7 @@ class PortainerStackAPI:
             "update_put": None,
             "started": False,
             "wait_ready": False,
+            "compose_retrieved": False,
         }
 
         # Resolve stack + compose content/env
@@ -206,11 +207,19 @@ class PortainerStackAPI:
             _LOGGER.error("❌ Stack compose content invalid/empty for %s (length: %d)", stack_name, len(compose))
             _LOGGER.error("❌ Available stack data keys: %s", list(stack.keys()) if stack else "None")
             _LOGGER.error("❌ Available detail keys: %s", list(detail.keys()) if detail else "None")
+            result["compose_retrieved"] = False
             # Try to start the stack anyway as a fallback
             _LOGGER.info("🔄 Trying to start stack %s as fallback", stack_name)
             started = await self.start_stack(endpoint_id, stack_name)
             result["started"] = started
+            if started:
+                # Wait for containers to be running
+                ready = await self._wait_until_running(endpoint_id, stack_name, timeout=wait_timeout, interval=wait_interval)
+                result["wait_ready"] = ready
             return result
+        else:
+            result["compose_retrieved"] = True
+            _LOGGER.info("✅ Successfully retrieved compose content for %s (length: %d)", stack_name, len(compose))
 
         # Stop containers (best effort)
         await self.stop_stack(endpoint_id, stack_name)
@@ -219,14 +228,17 @@ class PortainerStackAPI:
         # Delete existing containers to force recreation
         deleted: List[str] = []
         ids = await self._list_stack_container_ids(endpoint_id, stack_name)
+        _LOGGER.info("🔄 Deleting %d containers for stack %s", len(ids), stack_name)
         for cid in ids:
             url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{cid}?force=1&v=1"
             async with await self._request("DELETE", url) as resp:
                 if resp.status in (204, 200, 404):  # 404 means already gone
                     deleted.append(cid)
+                    _LOGGER.debug("✅ Deleted container %s", cid)
                 else:
                     _LOGGER.warning("⚠️ Failed to delete %s: HTTP %s", cid, resp.status)
         result["deleted"] = deleted
+        _LOGGER.info("✅ Deleted %d/%d containers for stack %s", len(deleted), len(ids), stack_name)
 
         # PUT update (pull fresh images + redeploy)
         put_url = f"{self.base_url}/api/stacks/{stack_id}?endpointId={endpoint_id}"
@@ -237,7 +249,7 @@ class PortainerStackAPI:
             "stackFileContent": compose,
         }
         _LOGGER.debug("🔍 Updating stack %s with URL: %s", stack_name, put_url)
-        _LOGGER.debug("🔍 Update payload: %s", payload)
+        _LOGGER.debug("🔍 Update payload keys: %s", list(payload.keys()))
         async with await self._request("PUT", put_url, json=payload) as resp:
             ok = resp.status == 200
             body = None
@@ -254,13 +266,27 @@ class PortainerStackAPI:
                 result["started"] = started
                 if not started:
                     _LOGGER.error("❌ Fallback start also failed for stack %s", stack_name)
-                    return result
+                    # Try one more time with a delay
+                    _LOGGER.info("🔄 Trying one more time with delay for stack %s", stack_name)
+                    import asyncio
+                    await asyncio.sleep(5)
+                    started = await self.start_stack(endpoint_id, stack_name)
+                    result["started"] = started
+                    if not started:
+                        _LOGGER.error("❌ All attempts to start stack %s failed", stack_name)
+                        return result
             else:
                 _LOGGER.info("✅ Stack update PUT successful for %s", stack_name)
 
         # After successful PUT (or fallback start), wait for containers to be healthy/running
+        _LOGGER.info("🔄 Waiting for stack %s containers to be running...", stack_name)
         ready = await self._wait_until_running(endpoint_id, stack_name, timeout=wait_timeout, interval=wait_interval)
         result["wait_ready"] = ready
+        
+        if ready:
+            _LOGGER.info("✅ Stack %s update completed successfully", stack_name)
+        else:
+            _LOGGER.warning("⚠️ Stack %s update completed but containers may not be fully ready", stack_name)
         
         _LOGGER.info("✅ Stack %s update completed: %s", stack_name, result)
         return result
