@@ -266,7 +266,7 @@ class StackUpdateButton(BaseStackEntity, ButtonEntity):
             result = await self.coordinator.api.stacks.update_stack(self.coordinator.endpoint_id, self.stack_name)
             
             # Log the full result for debugging
-            _LOGGER.info("📊 Stack update result for %s: %s", self.stack_name, result)
+            _LOGGER.debug("📊 Stack update result for %s: %s", self.stack_name, result)
             
             # Check if compose content was retrieved
             if not result.get("compose_retrieved", False):

@@ -130,7 +130,8 @@ service: ha_portainer_link.refresh
 Enable debug logging in your `configuration.yaml`:
 ```yaml
 logger:
-  ha_portainer_link: debug
+  logs:
+    custom_components.ha_portainer_link: debug
 ```
 
 ## 🛠️ Services
