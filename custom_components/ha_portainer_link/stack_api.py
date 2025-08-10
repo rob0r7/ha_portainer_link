@@ -295,21 +295,33 @@ class PortainerStackAPI:
     # Wait helpers
     # ---------------------------
     async def _wait_until_running(self, endpoint_id: int, stack_name: str, *, timeout: float, interval: float) -> bool:
-        """Poll until at least one container of the stack is running; time bounded.
-        Why: Compose redeploy is async and we want predictable UI feedback.
+        """Wait until all containers for the stack are running, time bounded.
+        Uses two lists: expected containers (all=1) filtered by stack label, and running (all=0).
+        Success requires expected_count > 0 and running_count == expected_count.
         """
-        deadline = asyncio.get_event_loop().time() + timeout
-        while asyncio.get_event_loop().time() < deadline:
-            url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/json?all=0"
-            async with await self._request("GET", url) as resp:
+        loop = asyncio.get_event_loop()
+        deadline = loop.time() + timeout
+        while loop.time() < deadline:
+            # Determine expected containers for this stack
+            expected_ids = await self._list_stack_container_ids(endpoint_id, stack_name)
+            if not expected_ids:
+                await asyncio.sleep(interval)
+                continue
+
+            # Get currently running containers and count how many belong to the stack
+            running_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/json?all=0"
+            async with await self._request("GET", running_url) as resp:
                 if resp.status != 200:
                     await asyncio.sleep(interval)
                     continue
-                data: List[Dict[str, Any]] = await resp.json()
-                for c in data:
+                running_data: List[Dict[str, Any]] = await resp.json()
+                running_count = 0
+                for c in running_data:
                     labels = c.get("Labels", {}) or {}
                     if labels.get("com.docker.compose.project") == stack_name:
-                        # If it's in the running list, it's running
-                        return True
+                        running_count += 1
+                if running_count == len(expected_ids) and running_count > 0:
+                    return True
+
             await asyncio.sleep(interval)
         return False

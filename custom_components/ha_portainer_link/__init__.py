@@ -139,8 +139,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if DOMAIN not in hass.data:
         hass.data[DOMAIN] = {}
     
-    # Store coordinator in hass data
+    # Store coordinator and api in hass data
     hass.data[DOMAIN][f"{entry_id}_coordinator"] = coordinator
+    hass.data[DOMAIN][f"{entry_id}_api"] = api
     
     # Initialize coordinator data (only once)
     try:

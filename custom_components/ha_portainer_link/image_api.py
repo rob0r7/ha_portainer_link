@@ -61,11 +61,13 @@ class PortainerImageAPI:
                     _LOGGER.debug("Could not get current image info: %s", resp.status)
                     return False
                 current_image_data = await resp.json()
-                current_digest = current_image_data.get("Id", "")
+                # Prefer RepoDigests when available; fall back to Id
+                repo_digests = current_image_data.get("RepoDigests") or []
+                current_digest = (repo_digests[0] if repo_digests else current_image_data.get("Id", ""))
                 current_created = current_image_data.get("Created", "")
             
             _LOGGER.debug("Current image digest: %s, created: %s", 
-                         current_digest[:12] if current_digest else "unknown",
+                         (current_digest.split("@")[-1] if "@" in current_digest else current_digest)[:12] if current_digest else "unknown",
                          current_created[:19] if current_created else "unknown")
             
             # Check if we have a cached result for this image
@@ -121,7 +123,6 @@ class PortainerImageAPI:
                         registry_url = f"https://registry.hub.docker.com/v2/repositories/library/{clean_repo}/tags/{tag}"
                     elif "/" not in repo:
                         # Official image without library/ prefix: mariadb -> library/mariadb
-                        # Docker Hub automatically adds library/ to official images
                         registry_url = f"https://registry.hub.docker.com/v2/repositories/library/{repo}/tags/{tag}"
                     else:
                         # Third-party image: interaapps/pastefy -> interaapps/pastefy
@@ -133,17 +134,23 @@ class PortainerImageAPI:
                     async with session.get(registry_url, ssl=False) as registry_resp:
                         if registry_resp.status == 200:
                             registry_data = await registry_resp.json()
-                            registry_digest = registry_data.get("digest", "")
-                            
-                            if registry_digest and registry_digest != current_digest:
-                                _LOGGER.debug("✅ New image available for %s (registry: %s, local: %s)", 
-                                            image_name, registry_digest[:12], current_digest[:12])
-                                self._update_cache[cache_key] = (True, time.time())
-                                return True
-                            else:
-                                _LOGGER.debug("✅ Image %s is up to date", image_name)
-                                self._update_cache[cache_key] = (False, time.time())
-                                return False
+                            # Prefer images[0].digest if available, else top-level digest
+                            images_list = registry_data.get("images") or []
+                            image_digest = None
+                            if images_list and isinstance(images_list[0], dict):
+                                image_digest = images_list[0].get("digest")
+                            if not image_digest:
+                                image_digest = registry_data.get("digest", "")
+                            if image_digest:
+                                short_registry = (image_digest.split(":")[-1])[:12]
+                                short_local = (current_digest.split("@")[-1] if "@" in current_digest else current_digest)[:12]
+                                if short_registry and short_local and short_registry != short_local:
+                                    _LOGGER.debug("✅ New image available for %s (registry: %s, local: %s)", image_name, short_registry, short_local)
+                                    self._update_cache[cache_key] = (True, time.time())
+                                    return True
+                            _LOGGER.debug("✅ Image %s is up to date", image_name)
+                            self._update_cache[cache_key] = (False, time.time())
+                            return False
                         else:
                             _LOGGER.debug("Could not check Docker Hub for %s: HTTP %s", image_name, registry_resp.status)
                             # Handle specific HTTP status codes for update checks
@@ -511,11 +518,12 @@ class PortainerImageAPI:
                     _LOGGER.debug("Could not get current image info: %s", resp.status)
                     return "unknown"
                 current_image_data = await resp.json()
-                current_digest = current_image_data.get("Id", "")
-                
-                if current_digest:
-                    # Return first 12 characters (short digest)
-                    return current_digest[:12]
+                # Prefer RepoDigests when available; fall back to Id
+                repo_digests = current_image_data.get("RepoDigests") or []
+                digest = (repo_digests[0] if repo_digests else current_image_data.get("Id", ""))
+                if digest:
+                    short = (digest.split("@")[-1] if "@" in digest else digest).split(":")[-1][:12]
+                    return short
                 else:
                     return "unknown"
                     
@@ -566,7 +574,6 @@ class PortainerImageAPI:
                         registry_url = f"https://registry.hub.docker.com/v2/repositories/library/{clean_repo}/tags/{tag}"
                     elif "/" not in repo:
                         # Official image without library/ prefix: mariadb -> library/mariadb
-                        # Docker Hub automatically adds library/ to official images
                         registry_url = f"https://registry.hub.docker.com/v2/repositories/library/{repo}/tags/{tag}"
                     else:
                         # Third-party image: interaapps/pastefy -> interaapps/pastefy
@@ -577,14 +584,17 @@ class PortainerImageAPI:
                     async with session.get(registry_url, ssl=False) as registry_resp:
                         if registry_resp.status == 200:
                             registry_data = await registry_resp.json()
-                            
-                            # Get digest from registry
-                            if "digest" in registry_data and registry_data["digest"]:
-                                registry_digest = registry_data["digest"]
-                                # Return first 12 characters (short digest)
-                                short_digest = registry_digest[:12]
-                                _LOGGER.debug("✅ Got available digest %s for %s from Docker Hub", short_digest, image_name)
-                                return short_digest
+                            # Prefer images[0].digest if available, else top-level digest
+                            images_list = registry_data.get("images") or []
+                            image_digest = None
+                            if images_list and isinstance(images_list[0], dict):
+                                image_digest = images_list[0].get("digest")
+                            if not image_digest:
+                                image_digest = registry_data.get("digest", "")
+                            if image_digest:
+                                short = (image_digest.split(":")[-1])[:12]
+                                _LOGGER.debug("✅ Got available digest %s for %s from Docker Hub", short, image_name)
+                                return short
                             else:
                                 _LOGGER.debug("No digest found in registry data for %s", image_name)
                                 return "unknown (no digest)"

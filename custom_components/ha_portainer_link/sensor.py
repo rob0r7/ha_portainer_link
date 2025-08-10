@@ -27,13 +27,10 @@ async def async_setup_entry(hass, entry, async_add_entities):
     _LOGGER.info("📊 Sensor configuration: Resource sensors=%s, Version sensors=%s", 
                  resource_sensors_enabled, version_sensors_enabled)
     
-    # Always create status sensors (core functionality), but check if any other sensors are enabled
+    # Always create status sensors (core functionality). If other sensors are disabled, only status sensors will be created.
     any_sensors_enabled = resource_sensors_enabled or version_sensors_enabled or coordinator.is_stack_view_enabled()
-    
-    # If no sensors are enabled, don't create any entities
     if not any_sensors_enabled:
-        _LOGGER.info("✅ No sensors to create (all sensor types disabled)")
-        return
+        _LOGGER.info("ℹ️ Only status sensors will be created (other sensor types disabled)")
     
     # Coordinator data is already loaded in main setup
     entities = []
@@ -101,10 +98,21 @@ class ContainerStatusSensor(BaseContainerEntity, SensorEntity):
 
     @property
     def state(self):
-        """Return the state of the sensor."""
+        """Return a normalized container state string."""
         container_data = self._get_container_data()
-        if container_data:
-            return container_data.get("State", STATE_UNKNOWN)
+        if not container_data:
+            return STATE_UNKNOWN
+        raw_state = container_data.get("State")
+        if isinstance(raw_state, dict):
+            # Prefer explicit Running flag, then textual Status
+            if raw_state.get("Running") is True:
+                return "running"
+            status_text = raw_state.get("Status") or raw_state.get("State")
+            if isinstance(status_text, str) and status_text:
+                return status_text
+            return "exited"
+        if isinstance(raw_state, str):
+            return raw_state
         return STATE_UNKNOWN
 
     @property
@@ -492,13 +500,18 @@ class ContainerAvailableVersionSensor(BaseContainerEntity, SensorEntity):
                 self._state = STATE_UNKNOWN
                 return
 
-            # Get available version from image API
-            available_version = await self.coordinator.api.check_image_updates(
+            # Get available version via image API helper
+            image_name = None
+            container_info = await self.coordinator.api.inspect_container(
                 self.coordinator.endpoint_id, self.container_id
             )
-            
-            if available_version:
-                self._state = available_version
+            if container_info and "Config" in container_info:
+                image_name = container_info["Config"].get("Image")
+            if image_name:
+                version = await self.coordinator.api.get_available_version(
+                    self.coordinator.endpoint_id, image_name
+                )
+                self._state = version if version else STATE_UNKNOWN
             else:
                 self._state = STATE_UNKNOWN
                 

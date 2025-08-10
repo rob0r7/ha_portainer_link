@@ -163,7 +163,8 @@ class PortainerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 host=config[CONF_HOST],
                 username=config.get(CONF_USERNAME),
                 password=config.get(CONF_PASSWORD),
-                api_key=config.get(CONF_API_KEY)
+                api_key=config.get(CONF_API_KEY),
+                config={"endpoint_id": config[CONF_ENDPOINT_ID]}
             )
             
             # Test connection

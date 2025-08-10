@@ -62,6 +62,15 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
             else:
                 containers = await containers_task
                 stacks = []
+
+            # Defensive handling when API returns None (e.g., 403/404)
+            if containers is None:
+                _LOGGER.error("❌ Containers list is None; returning empty dataset to keep HA responsive")
+                return {
+                    "containers": {},
+                    "stacks": {},
+                    "container_stack_map": {}
+                }
             
             # Process containers
             self.containers = {}
