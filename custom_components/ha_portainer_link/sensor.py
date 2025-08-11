@@ -106,6 +106,52 @@ class BaseContainerSensor(Entity):
         self._stack_info = stack_info
         self._entry_id = entry_id
 
+    async def _find_current_container_id(self):
+        """Try to find the current container ID after recreation by matching stack labels or name."""
+        try:
+            containers = await self._api.get_containers(self._endpoint_id)
+            if not containers:
+                return None
+
+            # Prefer stack label match for stack containers
+            if self._stack_info.get("is_stack_container"):
+                expected_stack = self._stack_info.get("stack_name")
+                expected_service = self._stack_info.get("service_name")
+                for container in containers:
+                    labels = container.get("Labels", {}) or {}
+                    if (
+                        labels.get("com.docker.compose.project") == expected_stack
+                        and labels.get("com.docker.compose.service") == expected_service
+                    ):
+                        return container.get("Id")
+
+            # Fallback: match by container name
+            for container in containers:
+                names = container.get("Names", []) or []
+                if not names:
+                    continue
+                name = names[0].strip("/")
+                if name == self._container_name:
+                    return container.get("Id")
+        except Exception:
+            return None
+        return None
+
+    async def _ensure_container_bound(self) -> None:
+        """Ensure self._container_id points to an existing container; rebind if necessary."""
+        try:
+            info = await self._api.get_container_info(self._endpoint_id, self._container_id)
+            # If info is empty or missing expected fields, try to rebind
+            if not info or not isinstance(info, dict) or not info.get("Id"):
+                new_id = await self._find_current_container_id()
+                if new_id and new_id != self._container_id:
+                    self._container_id = new_id
+        except Exception:
+            # On any error, try to rebind once
+            new_id = await self._find_current_container_id()
+            if new_id and new_id != self._container_id:
+                self._container_id = new_id
+
     @property
     def device_info(self):
         host_name = _get_host_display_name(self._api.base_url)
@@ -162,6 +208,7 @@ class ContainerStatusSensor(BaseContainerSensor):
     async def async_update(self):
         """Update the container status."""
         try:
+            await self._ensure_container_bound()
             container_info = await self._api.get_container_info(self._endpoint_id, self._container_id)
             if container_info:
                 self._state = container_info.get("State", {}).get("Status", STATE_UNKNOWN)
@@ -193,6 +240,7 @@ class ContainerCPUSensor(BaseContainerSensor):
         return "mdi:cpu-64-bit"
 
     async def async_update(self):
+        await self._ensure_container_bound()
         stats = await self._api.get_container_stats(self._endpoint_id, self._container_id)
         try:
             cpu_usage = stats["cpu_stats"]["cpu_usage"]["total_usage"]
@@ -232,6 +280,7 @@ class ContainerMemorySensor(BaseContainerSensor):
         return "mdi:memory"
 
     async def async_update(self):
+        await self._ensure_container_bound()
         stats = await self._api.get_container_stats(self._endpoint_id, self._container_id)
         try:
             mem_bytes = stats["memory_stats"]["usage"]
@@ -258,6 +307,7 @@ class ContainerUptimeSensor(BaseContainerSensor):
         return "mdi:clock-outline"
 
     async def async_update(self):
+        await self._ensure_container_bound()
         container_info = await self._api.get_container_info(self._endpoint_id, self._container_id)
         try:
             started_at = container_info["State"]["StartedAt"]
@@ -310,6 +360,7 @@ class ContainerImageSensor(BaseContainerSensor):
     async def async_update(self):
         """Update the container image information."""
         try:
+            await self._ensure_container_bound()
             container_info = await self._api.get_container_info(self._endpoint_id, self._container_id)
             if container_info:
                 self._state = container_info.get("Config", {}).get("Image", STATE_UNKNOWN)
@@ -339,6 +390,7 @@ class ContainerCurrentVersionSensor(BaseContainerSensor):
 
     async def async_update(self):
         try:
+            await self._ensure_container_bound()
             container_info = await self._api.get_container_info(self._endpoint_id, self._container_id)
             if container_info:
                 image_id = container_info.get("Image")
@@ -378,6 +430,7 @@ class ContainerAvailableVersionSensor(BaseContainerSensor):
 
     async def async_update(self):
         try:
+            await self._ensure_container_bound()
             container_info = await self._api.get_container_info(self._endpoint_id, self._container_id)
             if container_info:
                 image_name = container_info.get("Config", {}).get("Image")

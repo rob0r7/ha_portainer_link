@@ -92,6 +92,44 @@ class RestartContainerButton(ButtonEntity):
         self._attr_unique_id = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_restart"
         self._attr_available = True
 
+    async def _find_current_container_id(self):
+        try:
+            containers = await self._api.get_containers(self._endpoint_id)
+            if not containers:
+                return None
+            if self._stack_info.get("is_stack_container"):
+                expected_stack = self._stack_info.get("stack_name")
+                expected_service = self._stack_info.get("service_name")
+                for container in containers:
+                    labels = container.get("Labels", {}) or {}
+                    if (
+                        labels.get("com.docker.compose.project") == expected_stack
+                        and labels.get("com.docker.compose.service") == expected_service
+                    ):
+                        return container.get("Id")
+            for container in containers:
+                names = container.get("Names", []) or []
+                if not names:
+                    continue
+                name = names[0].strip("/")
+                if name == self._container_name:
+                    return container.get("Id")
+        except Exception:
+            return None
+        return None
+
+    async def _ensure_container_bound(self) -> None:
+        try:
+            info = await self._api.get_container_info(self._endpoint_id, self._container_id)
+            if not info or not isinstance(info, dict) or not info.get("Id"):
+                new_id = await self._find_current_container_id()
+                if new_id and new_id != self._container_id:
+                    self._container_id = new_id
+        except Exception:
+            new_id = await self._find_current_container_id()
+            if new_id and new_id != self._container_id:
+                self._container_id = new_id
+
     @property
     def icon(self):
         return "mdi:restart"
@@ -131,6 +169,7 @@ class RestartContainerButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Restart the Docker container."""
+        await self._ensure_container_bound()
         await self._api.restart_container(self._endpoint_id, self._container_id)
 
     async def async_update(self):
@@ -203,6 +242,7 @@ class PullUpdateButton(ButtonEntity):
     async def async_press(self) -> None:
         """Pull the latest image update for the Docker container."""
         try:
+            await self._ensure_container_bound()
             _LOGGER.info("🚀 Starting pull update process for %s", self._container_name)
             
             # Get container status for debugging
@@ -234,6 +274,9 @@ class PullUpdateButton(ButtonEntity):
                 if recreate_success:
                     _LOGGER.info("✅ Container recreated successfully to use new image")
                     await self._send_notification("✅ Update Complete", f"Successfully updated and recreated {self._container_name}")
+                    
+                    # After recreation, rebind to the new ID if it changed
+                    await self._ensure_container_bound()
                     
                     # Wait longer for the container to fully start and Docker to update image info
                     _LOGGER.info("⏳ Waiting for container to fully start and image info to update...")

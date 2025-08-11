@@ -79,6 +79,44 @@ class ContainerSwitch(SwitchEntity):
         self._attr_unique_id = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_switch"
         self._available = True
 
+    async def _find_current_container_id(self):
+        try:
+            containers = await self._api.get_containers(self._endpoint_id)
+            if not containers:
+                return None
+            if self._stack_info.get("is_stack_container"):
+                expected_stack = self._stack_info.get("stack_name")
+                expected_service = self._stack_info.get("service_name")
+                for container in containers:
+                    labels = container.get("Labels", {}) or {}
+                    if (
+                        labels.get("com.docker.compose.project") == expected_stack
+                        and labels.get("com.docker.compose.service") == expected_service
+                    ):
+                        return container.get("Id")
+            for container in containers:
+                names = container.get("Names", []) or []
+                if not names:
+                    continue
+                name = names[0].strip("/")
+                if name == self._container_name:
+                    return container.get("Id")
+        except Exception:
+            return None
+        return None
+
+    async def _ensure_container_bound(self) -> None:
+        try:
+            info = await self._api.get_container_info(self._endpoint_id, self._container_id)
+            if not info or not isinstance(info, dict) or not info.get("Id"):
+                new_id = await self._find_current_container_id()
+                if new_id and new_id != self._container_id:
+                    self._container_id = new_id
+        except Exception:
+            new_id = await self._find_current_container_id()
+            if new_id and new_id != self._container_id:
+                self._container_id = new_id
+
     @property
     def is_on(self):
         return self._state is True
@@ -121,6 +159,7 @@ class ContainerSwitch(SwitchEntity):
 
     async def async_turn_on(self, **kwargs):
         """Start the Docker container."""
+        await self._ensure_container_bound()
         success = await self._api.start_container(self._endpoint_id, self._container_id)
         if success:
             self._state = True
@@ -131,6 +170,7 @@ class ContainerSwitch(SwitchEntity):
 
     async def async_turn_off(self, **kwargs):
         """Stop the Docker container."""
+        await self._ensure_container_bound()
         success = await self._api.stop_container(self._endpoint_id, self._container_id)
         if success:
             self._state = False
@@ -142,10 +182,16 @@ class ContainerSwitch(SwitchEntity):
     async def async_update(self):
         """Update the current status of the container."""
         try:
+            await self._ensure_container_bound()
             containers = await self._api.get_containers(self._endpoint_id)
             for container in containers:
                 if container["Id"] == self._container_id:
-                    self._state = container.get("State") == "running"
+                    # Some APIs return State as dict or string; support both
+                    state_val = container.get("State")
+                    if isinstance(state_val, dict):
+                        self._state = state_val.get("Running") is True
+                    else:
+                        self._state = state_val == "running"
                     self._available = True
                     return
             self._state = False
