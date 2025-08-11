@@ -8,6 +8,14 @@ from .portainer_api import PortainerAPI
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.info("Loaded Portainer binary sensor integration.")
 
+
+def _merge_options(data, options):
+    merged = dict(data)
+    if options:
+        merged.update(options)
+    return merged
+
+
 def _get_host_display_name(base_url):
     """Extract a clean host name from the base URL for display purposes."""
     # Remove protocol and common ports
@@ -18,7 +26,7 @@ def _get_host_display_name(base_url):
     for port in [":9000", ":9443", ":80", ":443"]:
         if host.endswith(port):
             host = host[:-len(port)]
-    
+
     # If the host is an IP address, keep it as is
     # If it's a domain, try to extract a meaningful name
     if host.replace('.', '').replace('-', '').replace('_', '').isdigit():
@@ -33,9 +41,11 @@ def _get_host_display_name(base_url):
         else:
             return host
 
+
 def _get_host_hash(base_url):
     """Generate a short hash of the host URL for unique identification."""
     return hashlib.md5(base_url.encode()).hexdigest()[:8]
+
 
 def _build_stable_unique_id(entry_id, endpoint_id, container_name, stack_info, suffix):
     if stack_info.get("is_stack_container"):
@@ -47,14 +57,21 @@ def _build_stable_unique_id(entry_id, endpoint_id, container_name, stack_info, s
     sanitized = base.replace('-', '_').replace(' ', '_').replace('/', '_')
     return f"entry_{entry_id}_endpoint_{endpoint_id}_{sanitized}_{suffix}"
 
+
 async def async_setup_entry(hass, entry, async_add_entities):
-    config = entry.data
+    config = _merge_options(entry.data, entry.options)
     host = config["host"]
     username = config.get("username")
     password = config.get("password")
     api_key = config.get("api_key")
     endpoint_id = config["endpoint_id"]
     entry_id = entry.entry_id
+
+    enable_update_sensors = config.get("enable_update_sensors", False)
+    if not enable_update_sensors:
+        _LOGGER.info("Update sensors disabled by options; skipping binary_sensor setup for entry %s", entry_id)
+        async_add_entities([])
+        return
 
     api = PortainerAPI(host, username, password, api_key)
     await api.initialize()
@@ -85,11 +102,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
     for container in containers:
         name = container.get("Names", ["unknown"])[0].strip("/")
         container_id = container["Id"]
-        
+
         # Get container inspection data to determine if it's part of a stack
         container_info = await api.inspect_container(endpoint_id, container_id)
         stack_info = api.get_container_stack_info(container_info) if container_info else {"is_stack_container": False}
-        
+
         # Create binary sensors for all containers - they will all belong to the same stack device if they're in a stack
         entities.append(ContainerUpdateAvailableSensor(name, api, endpoint_id, container_id, stack_info, entry_id))
 
@@ -156,7 +173,7 @@ class ContainerUpdateAvailableSensor(BinarySensorEntity):
     def device_info(self):
         host_name = _get_host_display_name(self._api.base_url)
         host_hash = _get_host_hash(self._api.base_url)
-        
+
         if self._stack_info.get("is_stack_container"):
             # For stack containers, use the stack as the device
             stack_name = self._stack_info.get("stack_name", "unknown_stack")

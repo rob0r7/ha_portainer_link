@@ -9,14 +9,27 @@ from .portainer_api import PortainerAPI
 
 _LOGGER = logging.getLogger(__name__)
 
+
 class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
     """Coordinator for Portainer data updates."""
 
     def __init__(self, hass: HomeAssistant, api: PortainerAPI, endpoint_id: int, config: Dict[str, Any]):
         """Initialize the coordinator."""
+        # Ensure config has safe defaults for feature toggles
+        config = {
+            "enable_stack_view": config.get("enable_stack_view", False),
+            "enable_resource_sensors": config.get("enable_resource_sensors", False),
+            "enable_version_sensors": config.get("enable_version_sensors", False),
+            "enable_update_sensors": config.get("enable_update_sensors", False),
+            "enable_stack_buttons": config.get("enable_stack_buttons", False),
+            "enable_container_buttons": config.get("enable_container_buttons", True),
+            "update_interval": config.get("update_interval", 5),
+            **config,
+        }
+
         # Get update interval from config
         update_interval = config.get("update_interval", 5)
-        
+
         super().__init__(
             hass,
             _LOGGER,
@@ -174,7 +187,7 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
                     # Check updates for each container (this could be optimized further)
                     for container_id in self.containers:
                         try:
-                            has_updates = await self.api.images.check_image_updates(self.endpoint_id, container_id)
+                            has_updates = await self.api.check_image_updates(self.endpoint_id, container_id)
                             self.update_availability[container_id] = has_updates
                         except Exception as e:
                             _LOGGER.debug("⚠️ Could not check updates for container %s: %s", container_id, e)

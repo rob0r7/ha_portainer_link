@@ -168,300 +168,15 @@ class PortainerAPI:
                                 repo_tags = image.get("RepoTags", [])
                                 if image_name in repo_tags:
                                     new_digest = image.get("Id", "")
-                                    _LOGGER.debug("New image digest: %s", new_digest[:12] if new_digest else "unknown")
-                                    
-                                    # Compare digests to see if there's an update
-                                    has_update = new_digest != current_digest
-                                    _LOGGER.info("Update check for %s: %s (current: %s, new: %s)", 
-                                               image_name, has_update, 
-                                               current_digest[:12] if current_digest else "unknown",
-                                               new_digest[:12] if new_digest else "unknown")
-                                    
-                                    # If we found a different digest, there's an update
-                                    if has_update:
-                                        _LOGGER.info("✅ Update available for %s: digest changed from %s to %s", 
-                                                   image_name, 
-                                                   current_digest[:12] if current_digest else "unknown",
-                                                   new_digest[:12] if new_digest else "unknown")
-                                    else:
-                                        _LOGGER.info("ℹ️ No update available for %s: same digest %s", 
-                                                   image_name, 
-                                                   current_digest[:12] if current_digest else "unknown")
-                                    
-                                    return has_update
-                    
-                    _LOGGER.warning("⚠️ Could not find image %s after pull", image_name)
-                    return False
-                elif resp.status == 401:
-                    _LOGGER.warning("⚠️ Authentication required for registry %s", image_name.split('/')[0])
-                    return False
-                elif resp.status == 403:
-                    _LOGGER.warning("⚠️ Access forbidden for registry %s", image_name.split('/')[0])
-                    return False
-                elif resp.status == 404:
-                    _LOGGER.warning("⚠️ Image %s not found in registry", image_name)
-                    return False
-                elif resp.status == 429:
-                    _LOGGER.warning("⚠️ Rate limit exceeded for registry %s", image_name.split('/')[0])
-                    return False
-                elif resp.status == 500:
-                    _LOGGER.warning("⚠️ Registry server error for %s", image_name)
-                    return False
+                                    _LOGGER.debug("Pulled image digest: %s", new_digest[:12] if new_digest else "unknown")
+                                    return new_digest != current_digest
+                        return False
                 else:
-                    _LOGGER.warning("⚠️ Failed to pull image %s: HTTP %s", image_name, resp.status)
-                    return False
-        except aiohttp.ClientConnectorError as e:
-            _LOGGER.warning("⚠️ Network error connecting to registry for %s: %s", container_id, e)
-            return False
-        except aiohttp.ClientTimeout as e:
-            _LOGGER.warning("⚠️ Timeout connecting to registry for %s: %s", container_id, e)
-            return False
-        except Exception as e:
-            _LOGGER.exception("❌ Error checking image updates for container %s: %s", container_id, e)
-            return False
-
-
-
-    async def pull_image_update(self, endpoint_id, container_id):
-        """Pull the latest image for a container."""
-        try:
-            # Get container inspection data to find the image
-            container_info = await self.inspect_container(endpoint_id, container_id)
-            if not container_info:
-                _LOGGER.error("No container info found for %s", container_id)
-                return False
-            
-            # Extract image information
-            image_name = container_info.get("Config", {}).get("Image")
-            if not image_name:
-                _LOGGER.error("No image name found for container %s", container_id)
-                return False
-            
-            _LOGGER.info("Pulling latest image for container %s: %s", container_id, image_name)
-            
-            # Pull the latest image
-            url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/create"
-            params = {"fromImage": image_name}
-            
-            async with self.session.post(url, headers=self.headers, params=params, ssl=False) as resp:
-                if resp.status == 200:
-                    _LOGGER.info("✅ Successfully pulled image update for container %s (%s)", container_id, image_name)
-                    return True
-                else:
-                    _LOGGER.error("❌ Failed to pull image update for container %s: %s", container_id, resp.status)
+                    _LOGGER.debug("Could not pull image %s: HTTP %s", image_name, resp.status)
                     return False
         except Exception as e:
-            _LOGGER.exception("❌ Error pulling image update for container %s: %s", container_id, e)
+            _LOGGER.exception("❌ Error checking updates for container %s: %s", container_id, e)
             return False
-
-    async def recreate_container_with_new_image(self, endpoint_id, container_id):
-        """Recreate a container with the latest image."""
-        try:
-            _LOGGER.info("🔄 Starting container recreation for %s", container_id)
-            
-            # Get current container configuration
-            container_info = await self.inspect_container(endpoint_id, container_id)
-            if not container_info:
-                _LOGGER.error("No container info found for %s", container_id)
-                return False
-            
-            # Check if container is part of a stack
-            labels = container_info.get("Config", {}).get("Labels", {})
-            stack_name = labels.get("com.docker.compose.project")
-            
-            if stack_name:
-                _LOGGER.info("📦 Container %s is part of stack %s - using stack update", container_id, stack_name)
-                return await self._update_stack_container(endpoint_id, container_id, stack_name)
-            else:
-                _LOGGER.info("🏠 Container %s is standalone - using direct recreation", container_id)
-                return await self._recreate_standalone_container(endpoint_id, container_id, container_info)
-                    
-        except Exception as e:
-            _LOGGER.exception("❌ Error recreating container %s: %s", container_id, e)
-            return False
-
-    async def _update_stack_container(self, endpoint_id, container_id, stack_name):
-        """Update a container that's part of a stack by updating the entire stack.
-        Uses the comprehensive stack update flow (repull + apply compose).
-        """
-        try:
-            _LOGGER.info("🔄 Updating stack %s to refresh container %s", stack_name, container_id)
-            result = await self.update_stack(endpoint_id, stack_name, pull_image=True, prune=False)
-            ok = bool(result) and (result.get("update_put", {}).get("ok") or result.get("started") or result.get("wait_ready"))
-            if ok:
-                _LOGGER.info("✅ Successfully updated stack %s via comprehensive flow", stack_name)
-                return True
-            _LOGGER.error("❌ Stack %s update reported failure: %s", stack_name, result)
-            return False
-        except Exception as e:
-            _LOGGER.exception("❌ Error updating stack %s: %s", stack_name, e)
-            return False
-
-    async def _recreate_standalone_container(self, endpoint_id, container_id, container_info):
-        """Recreate a standalone container with the latest image."""
-        try:
-            # Extract container configuration
-            config = container_info.get("Config", {})
-            host_config = container_info.get("HostConfig", {})
-            
-            # Get the image name
-            image_name = config.get("Image")
-            if not image_name:
-                _LOGGER.error("No image name found for container %s", container_id)
-                return False
-            
-            # Get container name
-            container_name = container_info.get("Name", "").lstrip("/")
-            if not container_name:
-                _LOGGER.error("No container name found for %s", container_id)
-                return False
-            
-            _LOGGER.info("📋 Recreating standalone container %s with image %s", container_name, image_name)
-            
-            # Stop the current container
-            _LOGGER.info("⏹️ Stopping container %s", container_name)
-            stop_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/stop"
-            async with self.session.post(stop_url, headers=self.headers, ssl=False) as resp:
-                if resp.status not in [204, 304]:  # 304 means already stopped
-                    _LOGGER.warning("Could not stop container %s: %s", container_name, resp.status)
-            
-            # Wait a moment for the container to stop
-            await asyncio.sleep(2)
-            
-            # Remove the old container
-            _LOGGER.info("🗑️ Removing old container %s", container_name)
-            remove_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}?force=1"
-            async with self.session.delete(remove_url, headers=self.headers, ssl=False) as resp:
-                if resp.status not in [204, 404]:  # 404 means already removed
-                    _LOGGER.warning("Could not remove container %s: %s", container_name, resp.status)
-            
-            # Wait a moment for removal to complete
-            await asyncio.sleep(2)
-            
-            # Create new container with the same configuration
-            _LOGGER.info("🏗️ Creating new container %s", container_name)
-            create_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/create"
-            
-            # Prepare container creation payload with ALL original configuration
-            create_payload = {
-                "Image": image_name,
-                "name": container_name,
-                "Cmd": config.get("Cmd", []),
-                "Entrypoint": config.get("Entrypoint", []),
-                "Env": config.get("Env", []),
-                "WorkingDir": config.get("WorkingDir", ""),
-                "Labels": config.get("Labels", {}),
-                "ExposedPorts": config.get("ExposedPorts", {}),
-                "Hostname": config.get("Hostname", ""),
-                "Domainname": config.get("Domainname", ""),
-                "User": config.get("User", ""),
-                "AttachStdin": config.get("AttachStdin", False),
-                "AttachStdout": config.get("AttachStdout", False),
-                "AttachStderr": config.get("AttachStderr", False),
-                "Tty": config.get("Tty", False),
-                "OpenStdin": config.get("OpenStdin", False),
-                "StdinOnce": config.get("StdinOnce", False),
-                "HostConfig": {
-                    "Binds": host_config.get("Binds", []),
-                    "NetworkMode": host_config.get("NetworkMode", "default"),
-                    "RestartPolicy": host_config.get("RestartPolicy", {}),
-                    "PortBindings": host_config.get("PortBindings", {}),
-                    "VolumesFrom": host_config.get("VolumesFrom", []),
-                    "CapAdd": host_config.get("CapAdd", []),
-                    "CapDrop": host_config.get("CapDrop", []),
-                    "Dns": host_config.get("Dns", []),
-                    "DnsOptions": host_config.get("DnsOptions", []),
-                    "DnsSearch": host_config.get("DnsSearch", []),
-                    "ExtraHosts": host_config.get("ExtraHosts", []),
-                    "GroupAdd": host_config.get("GroupAdd", []),
-                    "IpcMode": host_config.get("IpcMode", ""),
-                    "Cgroup": host_config.get("Cgroup", ""),
-                    "Links": host_config.get("Links", []),
-                    "OomScoreAdj": host_config.get("OomScoreAdj", 0),
-                    "PidMode": host_config.get("PidMode", ""),
-                    "Privileged": host_config.get("Privileged", False),
-                    "PublishAllPorts": host_config.get("PublishAllPorts", False),
-                    "ReadonlyRootfs": host_config.get("ReadonlyRootfs", False),
-                    "SecurityOpt": host_config.get("SecurityOpt", []),
-                    "StorageOpt": host_config.get("StorageOpt", {}),
-                    "Tmpfs": host_config.get("Tmpfs", {}),
-                    "UTSMode": host_config.get("UTSMode", ""),
-                    "UsernsMode": host_config.get("UsernsMode", ""),
-                    "ShmSize": host_config.get("ShmSize", 0),
-                    "Sysctls": host_config.get("Sysctls", {}),
-                    "Runtime": host_config.get("Runtime", ""),
-                    "ConsoleSize": host_config.get("ConsoleSize", [0, 0]),
-                    "Isolation": host_config.get("Isolation", ""),
-                    "CpuShares": host_config.get("CpuShares", 0),
-                    "Memory": host_config.get("Memory", 0),
-                    "NanoCpus": host_config.get("NanoCpus", 0),
-                    "CgroupParent": host_config.get("CgroupParent", ""),
-                    "BlkioWeight": host_config.get("BlkioWeight", 0),
-                    "BlkioWeightDevice": host_config.get("BlkioWeightDevice", []),
-                    "BlkioDeviceReadBps": host_config.get("BlkioDeviceReadBps", []),
-                    "BlkioDeviceWriteBps": host_config.get("BlkioDeviceWriteBps", []),
-                    "BlkioDeviceReadIOps": host_config.get("BlkioDeviceReadIOps", []),
-                    "BlkioDeviceWriteIOps": host_config.get("BlkioDeviceWriteIOps", []),
-                    "CpuPeriod": host_config.get("CpuPeriod", 0),
-                    "CpuQuota": host_config.get("CpuQuota", 0),
-                    "CpuRealtimePeriod": host_config.get("CpuRealtimePeriod", 0),
-                    "CpuRealtimeRuntime": host_config.get("CpuRealtimeRuntime", 0),
-                    "CpusetCpus": host_config.get("CpusetCpus", ""),
-                    "CpusetMems": host_config.get("CpusetMems", ""),
-                    "Devices": host_config.get("Devices", []),
-                    "DeviceCgroupRules": host_config.get("DeviceCgroupRules", []),
-                    "DeviceRequests": host_config.get("DeviceRequests", []),
-                    "KernelMemory": host_config.get("KernelMemory", 0),
-                    "KernelMemoryTCP": host_config.get("KernelMemoryTCP", 0),
-                    "MemoryReservation": host_config.get("MemoryReservation", 0),
-                    "MemorySwap": host_config.get("MemorySwap", 0),
-                    "MemorySwappiness": host_config.get("MemorySwappiness", None),
-                    "OomKillDisable": host_config.get("OomKillDisable", False),
-                    "PidsLimit": host_config.get("PidsLimit", 0),
-                    "Ulimits": host_config.get("Ulimits", []),
-                    "CpuCount": host_config.get("CpuCount", 0),
-                    "CpuPercent": host_config.get("CpuPercent", 0),
-                    "IOMaximumIOps": host_config.get("IOMaximumIOps", 0),
-                    "IOMaximumBandwidth": host_config.get("IOMaximumBandwidth", 0),
-                    "MaskedPaths": host_config.get("MaskedPaths", []),
-                    "ReadonlyPaths": host_config.get("ReadonlyPaths", [])
-                }
-            }
-            
-            async with self.session.post(create_url, headers=self.headers, json=create_payload, ssl=False) as resp:
-                if resp.status == 201:
-                    new_container_data = await resp.json()
-                    new_container_id = new_container_data.get("Id")
-                    _LOGGER.info("✅ Successfully created new container %s with ID %s", container_name, new_container_id)
-                    
-                    # Start the new container
-                    _LOGGER.info("▶️ Starting new container %s", container_name)
-                    start_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{new_container_id}/start"
-                    async with self.session.post(start_url, headers=self.headers, ssl=False) as resp:
-                        if resp.status == 204:
-                            _LOGGER.info("✅ Successfully started new container %s", container_name)
-                            return True
-                        else:
-                            _LOGGER.error("❌ Failed to start new container %s: %s", container_name, resp.status)
-                            return False
-                else:
-                    _LOGGER.error("❌ Failed to create new container %s: %s", container_name, resp.status)
-                    return False
-                    
-        except Exception as e:
-            _LOGGER.exception("❌ Error recreating standalone container %s: %s", container_id, e)
-            return False
-
-    async def get_container_image_name(self, endpoint_id, container_id):
-        """Get the image name for a container."""
-        try:
-            container_info = await self.inspect_container(endpoint_id, container_id)
-            if container_info:
-                return container_info.get("Config", {}).get("Image")
-            return None
-        except Exception as e:
-            _LOGGER.exception("Error getting image name for container %s: %s", container_id, e)
-            return None
 
     async def get_image_info(self, endpoint_id, image_id):
         """Get detailed information about a Docker image."""
@@ -558,191 +273,13 @@ class PortainerAPI:
                 elif resp.status == 401:
                     _LOGGER.warning("⚠️ Authentication required for registry %s", image_name.split('/')[0])
                     return "unknown (auth required)"
-                elif resp.status == 403:
-                    _LOGGER.warning("⚠️ Access forbidden for registry %s", image_name.split('/')[0])
-                    return "unknown (access forbidden)"
-                elif resp.status == 404:
-                    _LOGGER.warning("⚠️ Image %s not found in registry", image_name)
-                    return "unknown (not in registry)"
-                elif resp.status == 429:
-                    _LOGGER.warning("⚠️ Rate limit exceeded for registry %s", image_name.split('/')[0])
-                    return "unknown (rate limited)"
-                elif resp.status == 500:
-                    _LOGGER.warning("⚠️ Registry server error for %s", image_name)
-                    return "unknown (registry error)"
                 else:
                     _LOGGER.warning("⚠️ Failed to pull image %s: HTTP %s", image_name, resp.status)
                     return f"unknown (HTTP {resp.status})"
-        except aiohttp.ClientConnectorError as e:
-            _LOGGER.warning("⚠️ Network error connecting to registry for %s: %s", image_name, e)
-            return "unknown (network error)"
-        except aiohttp.ClientTimeout as e:
-            _LOGGER.warning("⚠️ Timeout connecting to registry for %s: %s", image_name, e)
-            return "unknown (timeout)"
         except Exception as e:
-            _LOGGER.warning("⚠️ Error getting available version for %s: %s", image_name, e)
-            return "unknown (error)"
+            _LOGGER.exception("❌ Error getting available version for image %s: %s", image_name, e)
+            return "unknown"
 
-    async def get_stacks(self):
-        """Get all stacks from Portainer."""
-        try:
-            stacks_url = f"{self.base_url}/api/stacks"
-            async with self.session.get(stacks_url, headers=self.headers, ssl=False) as resp:
-                if resp.status == 200:
-                    return await resp.json()
-                else:
-                    _LOGGER.error("Could not get stacks list: %s", resp.status)
-                    return []
-        except Exception as e:
-            _LOGGER.exception("Error getting stacks: %s", e)
-            return []
-
-    def get_container_stack_info(self, container_info):
-        """Extract stack information from container info."""
-        try:
-            if not container_info:
-                _LOGGER.warning("⚠️ Container info is empty, cannot determine stack info")
-                return {
-                    "stack_name": None,
-                    "service_name": None,
-                    "container_number": None,
-                    "is_stack_container": False
-                }
-            
-            labels = container_info.get("Config", {}).get("Labels", {})
-            stack_name = labels.get("com.docker.compose.project")
-            stack_service = labels.get("com.docker.compose.service")
-            stack_container_number = labels.get("com.docker.compose.container-number")
-            
-            _LOGGER.debug("🔍 Stack detection for container: stack_name=%s, service=%s, number=%s", 
-                         stack_name, stack_service, stack_container_number)
-            
-            if stack_name:
-                _LOGGER.info("✅ Container is part of stack: %s (service: %s)", stack_name, stack_service)
-                return {
-                    "stack_name": stack_name,
-                    "service_name": stack_service,
-                    "container_number": stack_container_number,
-                    "is_stack_container": True
-                }
-            else:
-                _LOGGER.debug("ℹ️ Container is standalone (no stack labels found)")
-                return {
-                    "stack_name": None,
-                    "service_name": None,
-                    "container_number": None,
-                    "is_stack_container": False
-                }
-        except Exception as e:
-            _LOGGER.exception("❌ Error extracting stack info from container: %s", e)
-            return {
-                "stack_name": None,
-                "service_name": None,
-                "container_number": None,
-                "is_stack_container": False
-            }
-
-    async def stop_stack(self, endpoint_id, stack_name):
-        """Stop all containers in a stack."""
-        try:
-            _LOGGER.info("🛑 Stopping stack %s", stack_name)
-            
-            # Get all containers in the stack
-            containers_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/json?all=1"
-            async with self.session.get(containers_url, headers=self.headers, ssl=False) as resp:
-                if resp.status != 200:
-                    _LOGGER.error("Could not get containers list: %s", resp.status)
-                    return False
-                
-                containers_data = await resp.json()
-                stack_containers = []
-                
-                # Find all containers belonging to this stack
-                for container in containers_data:
-                    labels = container.get("Labels", {})
-                    if labels.get("com.docker.compose.project") == stack_name:
-                        stack_containers.append(container["Id"])
-                
-                if not stack_containers:
-                    _LOGGER.warning("No containers found for stack %s", stack_name)
-                    return False
-                
-                _LOGGER.info("Found %d containers in stack %s", len(stack_containers), stack_name)
-                
-                # Stop each container in the stack
-                success_count = 0
-                for container_id in stack_containers:
-                    try:
-                        stop_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/stop"
-                        async with self.session.post(stop_url, headers=self.headers, ssl=False) as stop_resp:
-                            if stop_resp.status == 204:
-                                success_count += 1
-                                _LOGGER.debug("✅ Stopped container %s", container_id)
-                            else:
-                                _LOGGER.warning("⚠️ Failed to stop container %s: %s", container_id, stop_resp.status)
-                    except Exception as e:
-                        _LOGGER.warning("⚠️ Error stopping container %s: %s", container_id, e)
-                
-                _LOGGER.info("✅ Successfully stopped %d/%d containers in stack %s", 
-                           success_count, len(stack_containers), stack_name)
-                return success_count > 0
-                
-        except Exception as e:
-            _LOGGER.exception("❌ Error stopping stack %s: %s", stack_name, e)
-            return False
-
-    async def start_stack(self, endpoint_id, stack_name):
-        """Start all containers in a stack."""
-        try:
-            _LOGGER.info("▶️ Starting stack %s", stack_name)
-            
-            # Get all containers in the stack
-            containers_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/json?all=1"
-            async with self.session.get(containers_url, headers=self.headers, ssl=False) as resp:
-                if resp.status != 200:
-                    _LOGGER.error("Could not get containers list: %s", resp.status)
-                    return False
-                
-                containers_data = await resp.json()
-                stack_containers = []
-                
-                # Find all containers belonging to this stack
-                for container in containers_data:
-                    labels = container.get("Labels", {})
-                    if labels.get("com.docker.compose.project") == stack_name:
-                        stack_containers.append(container["Id"])
-                
-                if not stack_containers:
-                    _LOGGER.warning("No containers found for stack %s", stack_name)
-                    return False
-                
-                _LOGGER.info("Found %d containers in stack %s", len(stack_containers), stack_name)
-                
-                # Start each container in the stack
-                success_count = 0
-                for container_id in stack_containers:
-                    try:
-                        start_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/start"
-                        async with self.session.post(start_url, headers=self.headers, ssl=False) as start_resp:
-                            if start_resp.status == 204:
-                                success_count += 1
-                                _LOGGER.debug("✅ Started container %s", container_id)
-                            else:
-                                _LOGGER.warning("⚠️ Failed to start container %s: %s", container_id, start_resp.status)
-                    except Exception as e:
-                        _LOGGER.warning("⚠️ Error starting container %s: %s", container_id, e)
-                
-                _LOGGER.info("✅ Successfully started %d/%d containers in stack %s", 
-                           success_count, len(stack_containers), stack_name)
-                return success_count > 0
-                
-        except Exception as e:
-            _LOGGER.exception("❌ Error starting stack %s: %s", stack_name, e)
-            return False
-
-    # ---------------------------
-    # Added helpers for stack update integration
-    # ---------------------------
     def get_headers(self):
         """Return current headers for API requests (used by sub-APIs)."""
         return self.headers
@@ -771,3 +308,23 @@ class PortainerAPI:
         except Exception as e:
             _LOGGER.exception("❌ Error during stack update for %s: %s", stack_name, e)
             return {"ok": False, "error": str(e)}
+
+    async def get_current_digest(self, endpoint_id, container_id):
+        """Wrapper delegating to image API for current digest."""
+        try:
+            from .image_api import PortainerImageAPI
+            image_api = PortainerImageAPI(self.base_url, self, ssl_verify=False, session=self.session)
+            return await image_api.get_current_digest(endpoint_id, container_id)
+        except Exception as e:
+            _LOGGER.exception("❌ Error in get_current_digest: %s", e)
+            return "unknown"
+
+    async def get_available_digest(self, endpoint_id, container_id):
+        """Wrapper delegating to image API for available digest."""
+        try:
+            from .image_api import PortainerImageAPI
+            image_api = PortainerImageAPI(self.base_url, self, ssl_verify=False, session=self.session)
+            return await image_api.get_available_digest(endpoint_id, container_id)
+        except Exception as e:
+            _LOGGER.exception("❌ Error in get_available_digest: %s", e)
+            return "unknown"

@@ -12,8 +12,9 @@ A comprehensive Home Assistant integration for managing Docker containers and st
 - **SSL Support**: Automatic SSL certificate handling with fallback
 
 ### Integration Modes
-- **Lightweight View**: Essential features only (switches, restart buttons, basic sensors)
-- **Full View**: Complete functionality including update checks and version sensors
+- **Lightweight (Preset)**: Essential features only; maps to toggles below (resource/version/update sensors off; stack view off; container buttons on; stack buttons off)
+- **Full (Preset)**: Complete functionality; maps to toggles below (all features on)
+- **Custom**: You pick exactly which feature toggles are enabled
 
 ### Device Organization
 - **Hierarchical Structure**: Organized by stacks and containers
@@ -48,30 +49,48 @@ A comprehensive Home Assistant integration for managing Docker containers and st
 4. Enter your Portainer details:
    - **Portainer URL**: Full URL (e.g., `https://192.168.1.100:9443`)
    - **Username/Password** or **API Key**: Your Portainer credentials
-   - **Endpoint ID**: **Important!** Check your Portainer URL - if you see `https://192.168.1.100:9443/#!/1/docker/containers` then your endpoint ID is `1`. If you see `#!/2/docker/containers` then it's `2`, etc.
-   - **Integration Mode**: Choose Lightweight or Full View
+   - **Endpoint ID**: Check your Portainer URL - if you see `https://192.168.1.100:9443/#!/1/docker/containers` then your endpoint ID is `1`. If you see `#!/2/docker/containers` then it's `2`, etc.
+   - **Integration Mode**: Choose Lightweight, Full, or Custom
+
+If you choose **Custom**, the flow continues with a second step where you can toggle features:
+- Stack view
+- Resource sensors (CPU, memory, uptime)
+- Version sensors (current/available)
+- Update sensors (binary sensor per container)
+- Container buttons (restart, pull update)
+- Stack buttons (start, stop, update)
+- Update interval (minutes)
+
+You can later change any of these from the integration’s **Options**.
 
 **💡 Pro Tip**: Look at your Portainer URL when you're viewing containers. The number after `#!/` is your endpoint ID!
 
-### Configuration Options
+### Configuration Options (Options Flow)
+- **enable_stack_view**: Cluster by stacks and expose stack metadata and controls
+- **enable_resource_sensors**: CPU, memory, uptime per container
+- **enable_version_sensors**: Current and available version and digests
+- **enable_update_sensors**: Binary sensor indicating updates available
+- **enable_container_buttons**: Restart and Pull Update buttons for containers
+- **enable_stack_buttons**: Start, Stop, Update buttons for stacks
+- **update_interval**: Coordinator refresh interval in minutes
 
-#### Lightweight View
-- Container switches (start/stop)
-- Restart buttons
-- Status sensors
-
-#### Full View
-- All Lightweight features
-- CPU and memory monitoring
-- Uptime tracking
-- Stack controls
-
-#### Full View
-- All Lightweight features
-- Update availability sensors
-- Version tracking
-- Bulk operations
-- Advanced monitoring
+### Mode Presets → Feature Toggles
+- **Lightweight**
+  - enable_stack_view: false
+  - enable_resource_sensors: false
+  - enable_version_sensors: false
+  - enable_update_sensors: false
+  - enable_stack_buttons: false
+  - enable_container_buttons: true
+  - update_interval: 10
+- **Full**
+  - enable_stack_view: true
+  - enable_resource_sensors: true
+  - enable_version_sensors: true
+  - enable_update_sensors: true
+  - enable_stack_buttons: true
+  - enable_container_buttons: true
+  - update_interval: 5
 
 ## 🏗️ Architecture
 
@@ -150,16 +169,16 @@ Force refresh container data for all integrations.
 ## 📊 Sensors
 
 ### Container Sensors
-- **Status**: Running, stopped, paused
-- **CPU Usage**: Current CPU utilization
-- **Memory Usage**: Current memory consumption
-- **Uptime**: Container running time
-- **Image**: Current image name and tag
-- **Current Version**: Extracted version from image
-- **Available Version**: Latest available version (Full View only)
-- **Update Available**: Whether updates are available (Full View only)
-- **Current Digest**: Current image digest (first 12 characters of SHA256)
-- **Available Digest**: Available image digest from registry (Full View only)
+- **Status**: Running, stopped, paused (always available)
+- **CPU Usage**: Optional (enable_resource_sensors)
+- **Memory Usage**: Optional (enable_resource_sensors)
+- **Uptime**: Optional (enable_resource_sensors)
+- **Image**: Current image name (always available)
+- **Current Version**: Optional (enable_version_sensors)
+- **Available Version**: Optional (enable_version_sensors)
+- **Update Available**: Optional binary sensor (enable_update_sensors)
+- **Current Digest**: Optional (enable_version_sensors)
+- **Available Digest**: Optional (enable_version_sensors)
 
 ### Stack Sensors
 - **Status**: Overall stack status
@@ -169,15 +188,15 @@ Force refresh container data for all integrations.
 
 ### Container Controls
 - **Container Switch**: Start/stop individual containers
-- **Restart Button**: Restart container
-- **Pull Update Button**: Pull latest image (Full View only)
+- **Restart Button**: Restart container (optional via enable_container_buttons)
+- **Pull Update Button**: Pull latest image (optional via enable_container_buttons)
 
 ### Stack Controls
-- **Stack Start**: Start entire stack
-- **Stack Stop**: Stop entire stack
-- **Stack Update**: Comprehensive update with image pulling, container recreation, and robust error handling
+- **Stack Start**: Start entire stack (optional via enable_stack_buttons)
+- **Stack Stop**: Stop entire stack (optional via enable_stack_buttons)
+- **Stack Update**: Update stack (optional via enable_stack_buttons)
 
-### Bulk Operations (Full View only)
+### Bulk Operations (Full view may include via toggles)
 - **Start All**: Start all stopped containers
 - **Stop All**: Stop all running containers
 
@@ -266,12 +285,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Issues**: [GitHub Issues](https://github.com/rob0r7/ha_portainer_link/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/rob0r7/ha_portainer_link/discussions)
-
-## 🙏 Acknowledgments
-
-- Portainer team for the excellent API
-- Home Assistant community for the amazing platform
-- All contributors and testers
 
 ---
 
