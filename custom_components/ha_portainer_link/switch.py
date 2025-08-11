@@ -1,6 +1,7 @@
 import logging
 import hashlib
 from homeassistant.components.switch import SwitchEntity
+from homeassistant.helpers import entity_registry as er
 from .const import DOMAIN
 from .portainer_api import PortainerAPI
 
@@ -36,6 +37,16 @@ def _get_host_hash(base_url):
     """Generate a short hash of the host URL for unique identification."""
     return hashlib.md5(base_url.encode()).hexdigest()[:8]
 
+def _build_stable_unique_id(entry_id, endpoint_id, container_name, stack_info, suffix):
+    if stack_info.get("is_stack_container"):
+        stack_name = stack_info.get("stack_name", "unknown")
+        service_name = stack_info.get("service_name", container_name)
+        base = f"{stack_name}_{service_name}"
+    else:
+        base = container_name
+    sanitized = base.replace('-', '_').replace(' ', '_').replace('/', '_')
+    return f"entry_{entry_id}_endpoint_{endpoint_id}_{sanitized}_{suffix}"
+
 async def async_setup_entry(hass, entry, async_add_entities):
     conf = entry.data
     host = conf["host"]
@@ -48,6 +59,27 @@ async def async_setup_entry(hass, entry, async_add_entities):
     api = PortainerAPI(host, username, password, api_key)
     await api.initialize()
     containers = await api.get_containers(endpoint_id)
+
+    # Migrate existing switch entities to stable unique_ids
+    try:
+        er_registry = er.async_get(hass)
+        for container in containers:
+            name = container.get("Names", ["unknown"])[0].strip("/")
+            container_id = container["Id"]
+            container_info = await api.inspect_container(endpoint_id, container_id)
+            stack_info = api.get_container_stack_info(container_info) if container_info else {"is_stack_container": False}
+            old_uid = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_switch"
+            new_uid = _build_stable_unique_id(entry_id, endpoint_id, name, stack_info, "switch")
+            if old_uid != new_uid:
+                ent_id = er_registry.async_get_entity_id("switch", DOMAIN, old_uid)
+                if ent_id:
+                    try:
+                        er_registry.async_update_entity(ent_id, new_unique_id=new_uid)
+                        _LOGGER.debug("Migrated %s unique_id: %s -> %s", ent_id, old_uid, new_uid)
+                    except Exception as e:
+                        _LOGGER.debug("Could not migrate %s: %s", ent_id, e)
+    except Exception as e:
+        _LOGGER.debug("Switch registry migration skipped/failed: %s", e)
 
     switches = []
     for container in containers:
@@ -76,8 +108,46 @@ class ContainerSwitch(SwitchEntity):
         self._container_id = container_id
         self._stack_info = stack_info
         self._entry_id = entry_id
-        self._attr_unique_id = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_switch"
+        self._attr_unique_id = _build_stable_unique_id(entry_id, endpoint_id, name, stack_info, "switch")
         self._available = True
+
+    async def _find_current_container_id(self):
+        try:
+            containers = await self._api.get_containers(self._endpoint_id)
+            if not containers:
+                return None
+            if self._stack_info.get("is_stack_container"):
+                expected_stack = self._stack_info.get("stack_name")
+                expected_service = self._stack_info.get("service_name")
+                for container in containers:
+                    labels = container.get("Labels", {}) or {}
+                    if (
+                        labels.get("com.docker.compose.project") == expected_stack
+                        and labels.get("com.docker.compose.service") == expected_service
+                    ):
+                        return container.get("Id")
+            for container in containers:
+                names = container.get("Names", []) or []
+                if not names:
+                    continue
+                name = names[0].strip("/")
+                if name == self._container_name:
+                    return container.get("Id")
+        except Exception:
+            return None
+        return None
+
+    async def _ensure_container_bound(self) -> None:
+        try:
+            info = await self._api.get_container_info(self._endpoint_id, self._container_id)
+            if not info or not isinstance(info, dict) or not info.get("Id"):
+                new_id = await self._find_current_container_id()
+                if new_id and new_id != self._container_id:
+                    self._container_id = new_id
+        except Exception:
+            new_id = await self._find_current_container_id()
+            if new_id and new_id != self._container_id:
+                self._container_id = new_id
 
     @property
     def is_on(self):
@@ -121,6 +191,7 @@ class ContainerSwitch(SwitchEntity):
 
     async def async_turn_on(self, **kwargs):
         """Start the Docker container."""
+        await self._ensure_container_bound()
         success = await self._api.start_container(self._endpoint_id, self._container_id)
         if success:
             self._state = True
@@ -131,6 +202,7 @@ class ContainerSwitch(SwitchEntity):
 
     async def async_turn_off(self, **kwargs):
         """Stop the Docker container."""
+        await self._ensure_container_bound()
         success = await self._api.stop_container(self._endpoint_id, self._container_id)
         if success:
             self._state = False
@@ -142,10 +214,16 @@ class ContainerSwitch(SwitchEntity):
     async def async_update(self):
         """Update the current status of the container."""
         try:
+            await self._ensure_container_bound()
             containers = await self._api.get_containers(self._endpoint_id)
             for container in containers:
                 if container["Id"] == self._container_id:
-                    self._state = container.get("State") == "running"
+                    # Some APIs return State as dict or string; support both
+                    state_val = container.get("State")
+                    if isinstance(state_val, dict):
+                        self._state = state_val.get("Running") is True
+                    else:
+                        self._state = state_val == "running"
                     self._available = True
                     return
             self._state = False

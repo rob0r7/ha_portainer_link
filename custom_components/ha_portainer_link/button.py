@@ -3,6 +3,7 @@ import hashlib
 import asyncio
 from datetime import timedelta
 from homeassistant.components.button import ButtonEntity
+from homeassistant.helpers import entity_registry as er
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_time_interval
 from .const import DOMAIN
@@ -10,6 +11,16 @@ from .portainer_api import PortainerAPI
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.info("Loaded Portainer button integration.")
+
+def _build_stable_unique_id(entry_id, endpoint_id, container_or_stack_name, stack_info, suffix):
+    if stack_info.get("is_stack_container") and suffix in {"restart", "pull_update"}:
+        stack_name = stack_info.get("stack_name", "unknown")
+        service_name = stack_info.get("service_name", container_or_stack_name)
+        base = f"{stack_name}_{service_name}"
+    else:
+        base = container_or_stack_name
+    sanitized = base.replace('-', '_').replace(' ', '_').replace('/', '_')
+    return f"entry_{entry_id}_endpoint_{endpoint_id}_{sanitized}_{suffix}"
 
 def _get_host_display_name(base_url):
     """Extract a clean host name from the base URL for display purposes."""
@@ -56,6 +67,28 @@ async def async_setup_entry(hass, entry, async_add_entities):
     buttons = []
     added_stacks = set() # To prevent duplicate stack buttons
     
+    # Migrate existing button entities to stable unique_ids
+    try:
+        er_registry = er.async_get(hass)
+        for container in containers:
+            name = container.get("Names", ["unknown"])[0].strip("/")
+            container_id = container["Id"]
+            container_info = await api.inspect_container(endpoint_id, container_id)
+            stack_info = api.get_container_stack_info(container_info) if container_info else {"is_stack_container": False}
+            for suffix, domain_name in [("restart", "button"), ("pull_update", "button")]:
+                old_uid = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_{suffix}"
+                new_uid = _build_stable_unique_id(entry_id, endpoint_id, name, stack_info, suffix)
+                if old_uid != new_uid:
+                    ent_id = er_registry.async_get_entity_id(domain_name, DOMAIN, old_uid)
+                    if ent_id:
+                        try:
+                            er_registry.async_update_entity(ent_id, new_unique_id=new_uid)
+                            _LOGGER.debug("Migrated %s unique_id: %s -> %s", ent_id, old_uid, new_uid)
+                        except Exception as e:
+                            _LOGGER.debug("Could not migrate %s: %s", ent_id, e)
+    except Exception as e:
+        _LOGGER.debug("Button registry migration skipped/failed: %s", e)
+    
     for container in containers:
         name = container.get("Names", ["unknown"])[0].strip("/")
         container_id = container["Id"]
@@ -89,8 +122,46 @@ class RestartContainerButton(ButtonEntity):
         self._container_id = container_id
         self._stack_info = stack_info
         self._entry_id = entry_id
-        self._attr_unique_id = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_restart"
+        self._attr_unique_id = _build_stable_unique_id(entry_id, endpoint_id, name, stack_info, "restart")
         self._attr_available = True
+
+    async def _find_current_container_id(self):
+        try:
+            containers = await self._api.get_containers(self._endpoint_id)
+            if not containers:
+                return None
+            if self._stack_info.get("is_stack_container"):
+                expected_stack = self._stack_info.get("stack_name")
+                expected_service = self._stack_info.get("service_name")
+                for container in containers:
+                    labels = container.get("Labels", {}) or {}
+                    if (
+                        labels.get("com.docker.compose.project") == expected_stack
+                        and labels.get("com.docker.compose.service") == expected_service
+                    ):
+                        return container.get("Id")
+            for container in containers:
+                names = container.get("Names", []) or []
+                if not names:
+                    continue
+                name = names[0].strip("/")
+                if name == self._container_name:
+                    return container.get("Id")
+        except Exception:
+            return None
+        return None
+
+    async def _ensure_container_bound(self) -> None:
+        try:
+            info = await self._api.get_container_info(self._endpoint_id, self._container_id)
+            if not info or not isinstance(info, dict) or not info.get("Id"):
+                new_id = await self._find_current_container_id()
+                if new_id and new_id != self._container_id:
+                    self._container_id = new_id
+        except Exception:
+            new_id = await self._find_current_container_id()
+            if new_id and new_id != self._container_id:
+                self._container_id = new_id
 
     @property
     def icon(self):
@@ -131,6 +202,7 @@ class RestartContainerButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Restart the Docker container."""
+        await self._ensure_container_bound()
         await self._api.restart_container(self._endpoint_id, self._container_id)
 
     async def async_update(self):
@@ -149,7 +221,7 @@ class PullUpdateButton(ButtonEntity):
         self._container_id = container_id
         self._stack_info = stack_info
         self._entry_id = entry_id
-        self._attr_unique_id = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_pull_update"
+        self._attr_unique_id = _build_stable_unique_id(entry_id, endpoint_id, name, stack_info, "pull_update")
         self._attr_available = True
         self._has_update = False  # Will be updated in async_update
 
@@ -203,6 +275,7 @@ class PullUpdateButton(ButtonEntity):
     async def async_press(self) -> None:
         """Pull the latest image update for the Docker container."""
         try:
+            await self._ensure_container_bound()
             _LOGGER.info("🚀 Starting pull update process for %s", self._container_name)
             
             # Get container status for debugging
@@ -234,6 +307,9 @@ class PullUpdateButton(ButtonEntity):
                 if recreate_success:
                     _LOGGER.info("✅ Container recreated successfully to use new image")
                     await self._send_notification("✅ Update Complete", f"Successfully updated and recreated {self._container_name}")
+                    
+                    # After recreation, rebind to the new ID if it changed
+                    await self._ensure_container_bound()
                     
                     # Wait longer for the container to fully start and Docker to update image info
                     _LOGGER.info("⏳ Waiting for container to fully start and image info to update...")
@@ -402,7 +478,8 @@ class StackStopButton(ButtonEntity):
         self._endpoint_id = endpoint_id
         self._stack_info = stack_info
         self._entry_id = entry_id
-        self._attr_unique_id = f"entry_{entry_id}_endpoint_{endpoint_id}_stack_{stack_name}_stop"
+        # Stack buttons already stable by stack name, keep format but consistent
+        self._attr_unique_id = _build_stable_unique_id(entry_id, endpoint_id, stack_name, {"is_stack_container": True, "stack_name": stack_name, "service_name": stack_name}, "stop")
         self._attr_available = True
 
     @property
@@ -510,7 +587,7 @@ class StackStartButton(ButtonEntity):
         self._endpoint_id = endpoint_id
         self._stack_info = stack_info
         self._entry_id = entry_id
-        self._attr_unique_id = f"entry_{entry_id}_endpoint_{endpoint_id}_stack_{stack_name}_start"
+        self._attr_unique_id = _build_stable_unique_id(entry_id, endpoint_id, stack_name, {"is_stack_container": True, "stack_name": stack_name, "service_name": stack_name}, "start")
         self._attr_available = True
 
     @property
