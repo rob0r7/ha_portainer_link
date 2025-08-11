@@ -107,6 +107,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
             if stack_name and stack_name not in added_stacks:
                 buttons.append(StackStopButton(stack_name, api, endpoint_id, stack_info, entry_id))
                 buttons.append(StackStartButton(stack_name, api, endpoint_id, stack_info, entry_id))
+                buttons.append(StackUpdateButton(stack_name, api, endpoint_id, stack_info, entry_id))
                 added_stacks.add(stack_name)
 
     async_add_entities(buttons, update_before_add=True)
@@ -680,6 +681,87 @@ class StackStartButton(ButtonEntity):
                         "message": message
                     },
                     blocking=False
+                )
+                _LOGGER.info("Persistent notification sent: %s - %s", title, message)
+            except Exception as e2:
+                _LOGGER.debug("Could not send notification: %s, %s", e, e2)
+
+
+class StackUpdateButton(ButtonEntity):
+    """Button to update a Docker stack by pulling latest images and applying the stack config."""
+
+    def __init__(self, stack_name, api, endpoint_id, stack_info, entry_id):
+        self._stack_name = stack_name
+        self._api = api
+        self._endpoint_id = endpoint_id
+        self._stack_info = stack_info
+        self._entry_id = entry_id
+        self._attr_unique_id = _build_stable_unique_id(entry_id, endpoint_id, stack_name, {"is_stack_container": True, "stack_name": stack_name, "service_name": stack_name}, "update")
+        self._attr_available = True
+
+    @property
+    def name(self):
+        return f"Stack: {self._stack_name} Update"
+
+    @property
+    def icon(self):
+        return "mdi:update"
+
+    @property
+    def device_info(self):
+        host_name = _get_host_display_name(self._api.base_url)
+        host_hash = _get_host_hash(self._api.base_url)
+        stack_name = self._stack_info.get("stack_name", self._stack_name)
+        device_id = f"entry_{self._entry_id}_endpoint_{self._endpoint_id}_stack_{stack_name}_{host_hash}_{host_name.replace('.', '_').replace(':', '_')}"
+        return {
+            "identifiers": {(DOMAIN, device_id)},
+            "name": f"Stack: {stack_name} ({host_name})",
+            "manufacturer": "Docker via Portainer",
+            "model": "Docker Stack",
+            "configuration_url": f"{self._api.base_url}/#!/stacks/{stack_name}",
+        }
+
+    @property
+    def available(self):
+        return self._attr_available
+
+    async def async_update(self):
+        pass
+
+    async def async_press(self) -> None:
+        try:
+            _LOGGER.info("🔄 Starting stack update for %s", self._stack_name)
+            self._attr_available = False
+            result = await self._api.update_stack(self._endpoint_id, self._stack_name, pull_image=True, prune=False)
+            ok = bool(result) and (result.get("update_put", {}).get("ok") or result.get("started") or result.get("wait_ready"))
+            if ok:
+                _LOGGER.info("✅ SUCCESS: Stack %s updated: %s", self._stack_name, result)
+                await self._send_notification("✅ Stack Updated", f"Successfully updated stack {self._stack_name}")
+            else:
+                _LOGGER.error("❌ FAILED: Stack %s update failed: %s", self._stack_name, result)
+                await self._send_notification("❌ Stack Update Failed", f"Failed to update stack {self._stack_name}")
+        except Exception as e:
+            _LOGGER.exception("❌ ERROR: Error updating stack %s: %s", self._stack_name, e)
+            await self._send_notification("❌ Stack Update Error", f"Error updating stack {self._stack_name}: {str(e)}")
+        finally:
+            self._attr_available = True
+
+    async def _send_notification(self, title, message):
+        try:
+            await self.hass.services.async_call(
+                "notify",
+                "mobile_app",
+                {"title": title, "message": message},
+                blocking=False,
+            )
+            _LOGGER.info("Notification sent: %s - %s", title, message)
+        except Exception as e:
+            try:
+                await self.hass.services.async_call(
+                    "persistent_notification",
+                    "create",
+                    {"title": title, "message": message},
+                    blocking=False,
                 )
                 _LOGGER.info("Persistent notification sent: %s - %s", title, message)
             except Exception as e2:

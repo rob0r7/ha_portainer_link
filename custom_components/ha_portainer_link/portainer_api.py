@@ -281,43 +281,18 @@ class PortainerAPI:
             return False
 
     async def _update_stack_container(self, endpoint_id, container_id, stack_name):
-        """Update a container that's part of a stack by updating the entire stack."""
+        """Update a container that's part of a stack by updating the entire stack.
+        Uses the comprehensive stack update flow (repull + apply compose).
+        """
         try:
             _LOGGER.info("🔄 Updating stack %s to refresh container %s", stack_name, container_id)
-            
-            # Get stack information
-            stacks_url = f"{self.base_url}/api/stacks"
-            async with self.session.get(stacks_url, headers=self.headers, ssl=False) as resp:
-                if resp.status != 200:
-                    _LOGGER.error("Could not get stacks list: %s", resp.status)
-                    return False
-                
-                stacks_data = await resp.json()
-                stack_id = None
-                for stack in stacks_data:
-                    if stack.get("Name") == stack_name:
-                        stack_id = stack.get("Id")
-                        break
-                
-                if not stack_id:
-                    _LOGGER.error("Could not find stack %s", stack_name)
-                    return False
-            
-            # Update the stack (this will pull new images and recreate containers)
-            update_url = f"{self.base_url}/api/stacks/{stack_id}/update"
-            update_payload = {
-                "prune": False,  # Don't remove unused images
-                "pullImage": True  # Pull latest images
-            }
-            
-            async with self.session.put(update_url, headers=self.headers, json=update_payload, ssl=False) as resp:
-                if resp.status == 200:
-                    _LOGGER.info("✅ Successfully updated stack %s", stack_name)
-                    return True
-                else:
-                    _LOGGER.error("❌ Failed to update stack %s: %s", stack_name, resp.status)
-                    return False
-                    
+            result = await self.update_stack(endpoint_id, stack_name, pull_image=True, prune=False)
+            ok = bool(result) and (result.get("update_put", {}).get("ok") or result.get("started") or result.get("wait_ready"))
+            if ok:
+                _LOGGER.info("✅ Successfully updated stack %s via comprehensive flow", stack_name)
+                return True
+            _LOGGER.error("❌ Stack %s update reported failure: %s", stack_name, result)
+            return False
         except Exception as e:
             _LOGGER.exception("❌ Error updating stack %s: %s", stack_name, e)
             return False
@@ -764,3 +739,35 @@ class PortainerAPI:
         except Exception as e:
             _LOGGER.exception("❌ Error starting stack %s: %s", stack_name, e)
             return False
+
+    # ---------------------------
+    # Added helpers for stack update integration
+    # ---------------------------
+    def get_headers(self):
+        """Return current headers for API requests (used by sub-APIs)."""
+        return self.headers
+
+    async def update_stack(self, endpoint_id, stack_name, *, pull_image: bool = True, prune: bool = False, wait_timeout: float = 90.0, wait_interval: float = 2.0):
+        """Update a stack by pulling latest images and redeploying the stack compose.
+        Returns a result dict from the underlying stack API.
+        """
+        try:
+            from .stack_api import PortainerStackAPI
+        except Exception as e:
+            _LOGGER.exception("❌ Failed to import PortainerStackAPI: %s", e)
+            return {"ok": False, "error": str(e)}
+
+        stack_api = PortainerStackAPI(self.base_url, self, ssl_verify=False, session=self.session)
+        try:
+            result = await stack_api.update_stack(
+                endpoint_id,
+                stack_name,
+                pull_image=pull_image,
+                prune=prune,
+                wait_timeout=wait_timeout,
+                wait_interval=wait_interval,
+            )
+            return result
+        except Exception as e:
+            _LOGGER.exception("❌ Error during stack update for %s: %s", stack_name, e)
+            return {"ok": False, "error": str(e)}
