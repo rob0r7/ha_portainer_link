@@ -2,16 +2,27 @@ import logging
 import hashlib
 from homeassistant.helpers.entity import Entity
 from homeassistant.const import STATE_UNKNOWN
+from homeassistant.helpers import entity_registry as er
 from .const import DOMAIN
 from .portainer_api import PortainerAPI
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.info("Loaded Portainer sensor integration.")
 
+def _build_stable_unique_id(entry_id, endpoint_id, container_name, stack_info, suffix):
+    if stack_info.get("is_stack_container"):
+        stack_name = stack_info.get("stack_name", "unknown")
+        service_name = stack_info.get("service_name", container_name)
+        base = f"{stack_name}_{service_name}"
+    else:
+        base = container_name
+    sanitized = base.replace('-', '_').replace(' ', '_').replace('/', '_')
+    return f"entry_{entry_id}_endpoint_{endpoint_id}_{sanitized}_{suffix}"
+
 def _get_host_display_name(base_url):
     """Extract a clean host name from the base URL for display purposes."""
     # Remove protocol and common ports
-    host = base_url.replace("https://", "").replace("http://", "")
+    host = base_url.replace("https://", "http://").replace("http://", "")
     # Remove trailing slash if present
     host = host.rstrip("/")
     # Remove common ports
@@ -62,6 +73,39 @@ async def async_setup_entry(hass, entry, async_add_entities):
     entities = []
     stack_containers_count = 0
     standalone_containers_count = 0
+
+    # Migrate existing entities to stable unique_ids to avoid breaking automations
+    try:
+        er_registry = er.async_get(hass)
+        for container in containers:
+            name = container.get("Names", ["unknown"])[0].strip("/")
+            container_id = container["Id"]
+            container_info = await api.inspect_container(endpoint_id, container_id)
+            stack_info = api.get_container_stack_info(container_info) if container_info else {"is_stack_container": False}
+            # Old unique_id suffixes and new stable mapping
+            suffixes = [
+                ("status", "sensor"),
+                ("cpu_usage", "sensor"),
+                ("memory_usage", "sensor"),
+                ("uptime", "sensor"),
+                ("image", "sensor"),
+                ("current_version", "sensor"),
+                ("available_version", "sensor"),
+            ]
+            for suffix, domain_name in suffixes:
+                old_uid = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_{suffix}"
+                new_uid = _build_stable_unique_id(entry_id, endpoint_id, name, stack_info, suffix)
+                if old_uid == new_uid:
+                    continue
+                ent_id = er_registry.async_get_entity_id(domain_name, DOMAIN, old_uid)
+                if ent_id:
+                    try:
+                        er_registry.async_update_entity(ent_id, new_unique_id=new_uid)
+                        _LOGGER.debug("Migrated %s unique_id: %s -> %s", ent_id, old_uid, new_uid)
+                    except Exception as e:
+                        _LOGGER.debug("Could not migrate %s: %s", ent_id, e)
+    except Exception as e:
+        _LOGGER.debug("Entity registry migration skipped/failed: %s", e)
     
     for container in containers:
         name = container.get("Names", ["unknown"])[0].strip("/")
@@ -190,7 +234,7 @@ class ContainerStatusSensor(BaseContainerSensor):
     def __init__(self, name, state, api, endpoint_id, container_id, stack_info, entry_id):
         super().__init__(name, container_id, api, endpoint_id, stack_info, entry_id)
         self._attr_name = f"{name} Status"
-        self._attr_unique_id = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_status"
+        self._attr_unique_id = _build_stable_unique_id(entry_id, endpoint_id, name, stack_info, "status")
         self._state = state
 
     @property
@@ -224,7 +268,7 @@ class ContainerCPUSensor(BaseContainerSensor):
     def __init__(self, name, api, endpoint_id, container_id, stack_info, entry_id):
         super().__init__(name, container_id, api, endpoint_id, stack_info, entry_id)
         self._attr_name = f"{name} CPU Usage"
-        self._attr_unique_id = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_cpu_usage"
+        self._attr_unique_id = _build_stable_unique_id(entry_id, endpoint_id, name, stack_info, "cpu_usage")
         self._state = STATE_UNKNOWN
 
     @property
@@ -264,7 +308,7 @@ class ContainerMemorySensor(BaseContainerSensor):
     def __init__(self, name, api, endpoint_id, container_id, stack_info, entry_id):
         super().__init__(name, container_id, api, endpoint_id, stack_info, entry_id)
         self._attr_name = f"{name} Memory Usage"
-        self._attr_unique_id = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_memory_usage"
+        self._attr_unique_id = _build_stable_unique_id(entry_id, endpoint_id, name, stack_info, "memory_usage")
         self._state = STATE_UNKNOWN
 
     @property
@@ -295,7 +339,7 @@ class ContainerUptimeSensor(BaseContainerSensor):
     def __init__(self, name, api, endpoint_id, container_id, stack_info, entry_id):
         super().__init__(name, container_id, api, endpoint_id, stack_info, entry_id)
         self._attr_name = f"{name} Uptime"
-        self._attr_unique_id = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_uptime"
+        self._attr_unique_id = _build_stable_unique_id(entry_id, endpoint_id, name, stack_info, "uptime")
         self._state = STATE_UNKNOWN
 
     @property
@@ -346,7 +390,7 @@ class ContainerImageSensor(BaseContainerSensor):
     def __init__(self, name, container_data, api, endpoint_id, container_id, stack_info, entry_id):
         super().__init__(name, container_id, api, endpoint_id, stack_info, entry_id)
         self._attr_name = f"{name} Image"
-        self._attr_unique_id = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_image"
+        self._attr_unique_id = _build_stable_unique_id(entry_id, endpoint_id, name, stack_info, "image")
         self._state = container_data.get("Image", STATE_UNKNOWN)
 
     @property
@@ -377,7 +421,7 @@ class ContainerCurrentVersionSensor(BaseContainerSensor):
     def __init__(self, name, api, endpoint_id, container_id, stack_info, entry_id):
         super().__init__(name, container_id, api, endpoint_id, stack_info, entry_id)
         self._attr_name = f"{name} Current Version"
-        self._attr_unique_id = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_current_version"
+        self._attr_unique_id = _build_stable_unique_id(entry_id, endpoint_id, name, stack_info, "current_version")
         self._state = STATE_UNKNOWN
 
     @property
@@ -417,7 +461,7 @@ class ContainerAvailableVersionSensor(BaseContainerSensor):
     def __init__(self, name, api, endpoint_id, container_id, stack_info, entry_id):
         super().__init__(name, container_id, api, endpoint_id, stack_info, entry_id)
         self._attr_name = f"{name} Available Version"
-        self._attr_unique_id = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_available_version"
+        self._attr_unique_id = _build_stable_unique_id(entry_id, endpoint_id, name, stack_info, "available_version")
         self._state = STATE_UNKNOWN
 
     @property

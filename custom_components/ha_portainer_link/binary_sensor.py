@@ -1,6 +1,7 @@
 import logging
 import hashlib
 from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.helpers import entity_registry as er
 from .const import DOMAIN
 from .portainer_api import PortainerAPI
 
@@ -36,6 +37,16 @@ def _get_host_hash(base_url):
     """Generate a short hash of the host URL for unique identification."""
     return hashlib.md5(base_url.encode()).hexdigest()[:8]
 
+def _build_stable_unique_id(entry_id, endpoint_id, container_name, stack_info, suffix):
+    if stack_info.get("is_stack_container"):
+        stack_name = stack_info.get("stack_name", "unknown")
+        service_name = stack_info.get("service_name", container_name)
+        base = f"{stack_name}_{service_name}"
+    else:
+        base = container_name
+    sanitized = base.replace('-', '_').replace(' ', '_').replace('/', '_')
+    return f"entry_{entry_id}_endpoint_{endpoint_id}_{sanitized}_{suffix}"
+
 async def async_setup_entry(hass, entry, async_add_entities):
     config = entry.data
     host = config["host"]
@@ -48,6 +59,27 @@ async def async_setup_entry(hass, entry, async_add_entities):
     api = PortainerAPI(host, username, password, api_key)
     await api.initialize()
     containers = await api.get_containers(endpoint_id)
+
+    # Migrate old unique_ids to stable unique_ids
+    try:
+        er_registry = er.async_get(hass)
+        for container in containers:
+            name = container.get("Names", ["unknown"])[0].strip("/")
+            container_id = container["Id"]
+            container_info = await api.inspect_container(endpoint_id, container_id)
+            stack_info = api.get_container_stack_info(container_info) if container_info else {"is_stack_container": False}
+            old_uid = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_update_available"
+            new_uid = _build_stable_unique_id(entry_id, endpoint_id, name, stack_info, "update_available")
+            if old_uid != new_uid:
+                ent_id = er_registry.async_get_entity_id("binary_sensor", DOMAIN, old_uid)
+                if ent_id:
+                    try:
+                        er_registry.async_update_entity(ent_id, new_unique_id=new_uid)
+                        _LOGGER.debug("Migrated %s unique_id: %s -> %s", ent_id, old_uid, new_uid)
+                    except Exception as e:
+                        _LOGGER.debug("Could not migrate %s: %s", ent_id, e)
+    except Exception as e:
+        _LOGGER.debug("Binary sensor registry migration skipped/failed: %s", e)
 
     entities = []
     for container in containers:
@@ -75,7 +107,7 @@ class ContainerUpdateAvailableSensor(BinarySensorEntity):
         self._container_id = container_id
         self._stack_info = stack_info
         self._entry_id = entry_id
-        self._attr_unique_id = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_update_available"
+        self._attr_unique_id = _build_stable_unique_id(entry_id, endpoint_id, name, stack_info, "update_available")
         self._attr_is_on = False
 
     async def _find_current_container_id(self):
