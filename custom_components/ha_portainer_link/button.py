@@ -37,41 +37,72 @@ async def async_setup_entry(hass, entry, async_add_entities):
     
     # Coordinator data is already loaded in main setup
     entities = []
-    
-    # Create container buttons
+
+    # Track created containers/stacks to avoid duplicates
+    created_for: set[str] = set()
+    created_stacks: set[str] = set()
+
+    # Bulk buttons are created once if container buttons are enabled
     if container_buttons_enabled:
-        # Bulk buttons (once)
         entities.append(BulkStartAllButton(coordinator, entry_id))
         entities.append(BulkStopAllButton(coordinator, entry_id))
-        for container_id, container_data in coordinator.containers.items():
-            container_name = container_data.get("Names", ["unknown"])[0].strip("/")
-            
-            # Get detailed stack information from coordinator's processed data
-            stack_info = coordinator.get_container_stack_info(container_id) or {
-                "stack_name": None,
-                "service_name": None,
-                "container_number": None,
-                "is_stack_container": False
-            }
-            
-            _LOGGER.debug("🔍 Processing container: %s (ID: %s, Stack: %s)", container_name, container_id, stack_info.get("stack_name"))
-            
-            # Create container buttons
-            entities.append(RestartContainerButton(coordinator, entry_id, container_id, container_name, stack_info))
-            entities.append(PullUpdateButton(coordinator, entry_id, container_id, container_name, stack_info))
 
-    # Create stack buttons
+    # Helpers to create entities
+    def _create_container_buttons(container_id: str, container_data: dict) -> list:
+        container_name = container_data.get("Names", ["unknown"])[0].strip("/")
+        stack_info = coordinator.get_container_stack_info(container_id) or {
+            "stack_name": None,
+            "service_name": None,
+            "container_number": None,
+            "is_stack_container": False
+        }
+        _LOGGER.debug("🔍 Processing container for buttons: %s (ID: %s, Stack: %s)", container_name, container_id, stack_info.get("stack_name"))
+        new_entities = []
+        if container_buttons_enabled:
+            new_entities.append(RestartContainerButton(coordinator, entry_id, container_id, container_name, stack_info))
+            new_entities.append(PullUpdateButton(coordinator, entry_id, container_id, container_name, stack_info))
+        return new_entities
+
+    def _create_stack_buttons(stack_name: str) -> list:
+        new_entities = []
+        if stack_buttons_enabled and coordinator.is_stack_view_enabled():
+            new_entities.append(StackStopButton(coordinator, entry_id, stack_name))
+            new_entities.append(StackStartButton(coordinator, entry_id, stack_name))
+            new_entities.append(StackUpdateButton(coordinator, entry_id, stack_name))
+        return new_entities
+
+    # Initial creation
+    if container_buttons_enabled:
+        for container_id, container_data in coordinator.containers.items():
+            entities.extend(_create_container_buttons(container_id, container_data))
+            created_for.add(container_id)
     if stack_buttons_enabled and coordinator.is_stack_view_enabled():
-        for stack_name, stack_data in coordinator.stacks.items():
-            _LOGGER.debug("🔍 Processing stack: %s", stack_name)
-            
-            # Create stack buttons
-            entities.append(StackStopButton(coordinator, entry_id, stack_name))
-            entities.append(StackStartButton(coordinator, entry_id, stack_name))
-            entities.append(StackUpdateButton(coordinator, entry_id, stack_name))
+        for stack_name in coordinator.stacks.keys():
+            entities.extend(_create_stack_buttons(stack_name))
+            created_stacks.add(stack_name)
 
     _LOGGER.info("✅ Created %d button entities", len(entities))
-    async_add_entities(entities, update_before_add=True)
+    async_add_entities(entities, update_before_add=False)
+
+    # Dynamic add on coordinator updates
+    def _add_new_buttons() -> None:
+        new_entities: list = []
+        if container_buttons_enabled:
+            for container_id, container_data in coordinator.containers.items():
+                if container_id not in created_for:
+                    _LOGGER.info("➕ Discovered new container %s, creating buttons", container_id)
+                    new_entities.extend(_create_container_buttons(container_id, container_data))
+                    created_for.add(container_id)
+        if stack_buttons_enabled and coordinator.is_stack_view_enabled():
+            for stack_name in coordinator.stacks.keys():
+                if stack_name not in created_stacks:
+                    _LOGGER.info("➕ Discovered new stack %s, creating buttons", stack_name)
+                    new_entities.extend(_create_stack_buttons(stack_name))
+                    created_stacks.add(stack_name)
+        if new_entities:
+            async_add_entities(new_entities, update_before_add=False)
+
+    coordinator.async_add_listener(_add_new_buttons)
 
 class RestartContainerButton(BaseContainerEntity, ButtonEntity):
     """Button for restarting a container."""
