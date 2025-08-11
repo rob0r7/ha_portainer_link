@@ -309,6 +309,47 @@ class PortainerAPI:
             _LOGGER.exception("❌ Error during stack update for %s: %s", stack_name, e)
             return {"ok": False, "error": str(e)}
 
+    def get_container_stack_info(self, container_info):
+        """Extract stack information from container inspection data.
+
+        Returns a dict with keys: stack_name, service_name, container_number, is_stack_container
+        """
+        try:
+            if not container_info or not isinstance(container_info, dict):
+                return {
+                    "stack_name": None,
+                    "service_name": None,
+                    "container_number": None,
+                    "is_stack_container": False,
+                }
+
+            labels = (container_info.get("Config", {}) or {}).get("Labels", {}) or {}
+            stack_name = labels.get("com.docker.compose.project")
+            service_name = labels.get("com.docker.compose.service")
+            container_number = labels.get("com.docker.compose.container-number")
+
+            if stack_name:
+                return {
+                    "stack_name": stack_name,
+                    "service_name": service_name,
+                    "container_number": container_number,
+                    "is_stack_container": True,
+                }
+            return {
+                "stack_name": None,
+                "service_name": None,
+                "container_number": None,
+                "is_stack_container": False,
+            }
+        except Exception as e:
+            _LOGGER.debug("Error extracting stack info: %s", e)
+            return {
+                "stack_name": None,
+                "service_name": None,
+                "container_number": None,
+                "is_stack_container": False,
+            }
+
     async def get_current_digest(self, endpoint_id, container_id):
         """Wrapper delegating to image API for current digest."""
         try:
