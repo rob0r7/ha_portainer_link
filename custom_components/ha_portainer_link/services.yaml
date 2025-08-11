@@ -1,10 +1,9 @@
-ha_portainer_link:
-  reload:
-    name: "Reload HA Portainer Link"
-    description: "Reload all Portainer integrations"
-    fields: {}
-  
-  refresh:
-    name: "Refresh Container Data"
-    description: "Force refresh container data for all Portainer integrations"
-    fields: {}
+reload:
+  name: "Reload HA Portainer Link"
+  description: "Reload all Portainer integrations"
+  fields: {}
+
+refresh:
+  name: "Refresh Container Data"
+  description: "Force refresh container data for all Portainer integrations"
+  fields: {}

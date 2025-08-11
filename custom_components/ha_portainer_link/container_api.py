@@ -25,7 +25,7 @@ class PortainerContainerAPI:
             self.ssl_verify = False
             return await session.request(method, url, headers=headers, ssl=False, **kwargs)
 
-    async def check_endpoint_exists(self, endpoint_id: int) -> bool:
+    async def _check_endpoint_exists_simple(self, endpoint_id: int) -> bool:
         url = f"{self.base_url}/api/endpoints/{endpoint_id}"
         async with await self._request("GET", url) as resp:
             if resp.status == 200:

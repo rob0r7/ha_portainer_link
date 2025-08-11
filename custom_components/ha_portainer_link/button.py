@@ -40,6 +40,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
     
     # Create container buttons
     if container_buttons_enabled:
+        # Bulk buttons (once)
+        entities.append(BulkStartAllButton(coordinator, entry_id))
+        entities.append(BulkStopAllButton(coordinator, entry_id))
         for container_id, container_data in coordinator.containers.items():
             container_name = container_data.get("Names", ["unknown"])[0].strip("/")
             

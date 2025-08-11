@@ -151,7 +151,8 @@ class ContainerSwitch(BaseContainerEntity, SwitchEntity):
     @property
     def device_class(self):
         """Return the device class of the switch."""
-        return "switch"
+        from homeassistant.components.switch import SwitchDeviceClass
+        return SwitchDeviceClass.SWITCH
 
     @property
     def entity_category(self):
@@ -163,7 +164,7 @@ class ContainerSwitch(BaseContainerEntity, SwitchEntity):
         try:
             _LOGGER.info("▶️ Starting container %s", self.container_id)
             
-            success = await self.coordinator.api.containers.start_container(
+            success = await self.coordinator.api.start_container(
                 self.coordinator.endpoint_id, 
                 self.container_id
             )
@@ -185,7 +186,7 @@ class ContainerSwitch(BaseContainerEntity, SwitchEntity):
         try:
             _LOGGER.info("🛑 Stopping container %s", self.container_id)
             
-            success = await self.coordinator.api.containers.stop_container(
+            success = await self.coordinator.api.stop_container(
                 self.coordinator.endpoint_id, 
                 self.container_id
             )
