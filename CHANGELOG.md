@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.0] - 2025-08-08
+## [0.4.0] - 2024-08-11
 
 ### Added
 - Comprehensive stack update functionality with multi-step process
@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Integration mode handling and feature toggling
 - Configuration flow and migration handling
 
-## [0.3.8] - 2025-08-08
+## [0.3.8] - 2024-08-11
 
 ### Changed
 - Disabled stack update buttons due to reliability issues

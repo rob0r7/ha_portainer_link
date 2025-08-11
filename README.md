@@ -6,14 +6,20 @@ A comprehensive Home Assistant integration for managing Docker containers and st
 
 ### Core Functionality
 - **Container Management**: Start, stop, and restart individual containers
-- **Stack Management**: Control entire Docker stacks (start, stop, update)
-- **Real-time Monitoring**: Live status, CPU, memory, and uptime tracking
+- **Stack Management**: Control entire Docker stacks (start, stop, update) - enabled by default
+- **Real-time Monitoring**: Live status, CPU, memory, and uptime tracking - enabled by default
 - **Automatic Discovery**: Automatically detects containers and stacks
-- **SSL Support**: Automatic SSL certificate handling with fallback
+- **SSL Support**: SSL disabled by default (ssl=False) for self-signed certificates
 
-### Integration Modes
-- **Lightweight View**: Essential features only (switches, restart buttons, basic sensors)
-- **Full View**: Complete functionality including update checks and version sensors
+### Feature Toggles
+**Note**: Feature toggles are currently hardcoded in the configuration and cannot be changed without modifying the code.
+
+- **Stack View**: Stack clustering and management (enabled by default)
+- **Resource Sensors**: CPU, memory, and uptime monitoring (enabled by default)
+- **Version Sensors**: Current and available version tracking (enabled by default)
+- **Update Sensors**: Update availability detection (enabled by default)
+- **Stack Buttons**: Stack control buttons (start, stop, update) (enabled by default for stack containers)
+- **Container Buttons**: Container control buttons (restart, pull update) - Always enabled by default
 
 ### Device Organization
 - **Hierarchical Structure**: Organized by stacks and containers
@@ -49,35 +55,33 @@ A comprehensive Home Assistant integration for managing Docker containers and st
    - **Portainer URL**: Full URL (e.g., `https://192.168.1.100:9443`)
    - **Username/Password** or **API Key**: Your Portainer credentials
    - **Endpoint ID**: **Important!** Check your Portainer URL - if you see `https://192.168.1.100:9443/#!/1/docker/containers` then your endpoint ID is `1`. If you see `#!/2/docker/containers` then it's `2`, etc.
-   - **Integration Mode**: Choose Lightweight or Full View
+   
+   **Note**: Feature toggles and update intervals are not configurable during initial setup in the current version.
 
 **💡 Pro Tip**: Look at your Portainer URL when you're viewing containers. The number after `#!/` is your endpoint ID!
 
 ### Configuration Options
 
-#### Lightweight View
+#### Basic Features (Always Available)
 - Container switches (start/stop)
-- Restart buttons
 - Status sensors
+- Basic container information
+- Container buttons (restart, pull update)
 
-#### Full View
-- All Lightweight features
-- CPU and memory monitoring
-- Uptime tracking
-- Stack controls
+#### Optional Features (Currently Hardcoded)
+- **Stack View**: Stack clustering and management (enabled by default)
+- **Resource Sensors**: CPU, memory, and uptime monitoring (enabled by default)
+- **Version Sensors**: Current and available version tracking (enabled by default)
+- **Update Sensors**: Update availability detection (enabled by default)
+- **Stack Buttons**: Stack control buttons (enabled by default for stack containers)
 
-#### Full View
-- All Lightweight features
-- Update availability sensors
-- Version tracking
-- Bulk operations
-- Advanced monitoring
+**Note**: Most features are enabled by default. Only Stack View clustering is disabled by default. To change these defaults, you need to modify the configuration in the coordinator.py file or wait for a future version with proper configuration options.
 
 ## 🏗️ Architecture
 
 ### Components
-- **PortainerAPI**: Main API facade with automatic SSL handling
-- **DataUpdateCoordinator**: Centralized data management and caching
+- **PortainerAPI**: Main API facade with SSL handling (hardcoded to ssl=False)
+- **DataUpdateCoordinator**: Centralized data management with configurable update intervals
 - **Modular API Classes**: Specialized classes for containers, stacks, and images
 - **Base Entities**: Reusable entity classes with common functionality
 
@@ -105,7 +109,7 @@ Portainer Endpoint
 ```
 ssl.SSLCertVerificationError: certificate verify failed
 ```
-**Solution**: The integration automatically handles SSL issues. If problems persist, check your Portainer SSL configuration.
+**Solution**: The integration uses `ssl=False` by default to handle self-signed certificates. If you need SSL verification, you'll need to modify the code.
 
 #### Logger Configuration Error
 ```
@@ -156,10 +160,10 @@ Force refresh container data for all integrations.
 - **Uptime**: Container running time
 - **Image**: Current image name and tag
 - **Current Version**: Extracted version from image
-- **Available Version**: Latest available version (Full View only)
-- **Update Available**: Whether updates are available (Full View only)
+- **Available Version**: Latest available version (if enabled)
+- **Update Available**: Whether updates are available (if enabled)
 - **Current Digest**: Current image digest (first 12 characters of SHA256)
-- **Available Digest**: Available image digest from registry (Full View only)
+- **Available Digest**: Available image digest from registry (if enabled)
 
 ### Stack Sensors
 - **Status**: Overall stack status
@@ -169,23 +173,19 @@ Force refresh container data for all integrations.
 
 ### Container Controls
 - **Container Switch**: Start/stop individual containers
-- **Restart Button**: Restart container
-- **Pull Update Button**: Pull latest image (Full View only)
+- **Restart Button**: Restart container (always enabled)
+- **Pull Update Button**: Pull latest image (always enabled)
 
 ### Stack Controls
-- **Stack Start**: Start entire stack
-- **Stack Stop**: Stop entire stack
-- **Stack Update**: Comprehensive update with image pulling, container recreation, and robust error handling
-
-### Bulk Operations (Full View only)
-- **Start All**: Start all stopped containers
-- **Stop All**: Stop all running containers
+- **Stack Start**: Start entire stack (enabled by default for stack containers)
+- **Stack Stop**: Stop entire stack (enabled by default for stack containers)
+- **Stack Update**: Comprehensive update with image pulling, container recreation, and robust error handling (enabled by default for stack containers)
 
 ## 🔄 Recent Updates
 
-### v0.4.0 (Current)
+### v0.4.0 (Current - August 11, 2024)
 - 🚀 Completely reworked stack update functionality with improved architecture
-- 🔧 Enhanced stack update with centralized request handling and SSL auto-fallback
+- 🔧 Enhanced stack update with centralized request handling and SSL handling
 - 🔧 Added comprehensive error handling with detailed result reporting
 - 🔧 Improved user feedback with button state management and configurable timeouts
 - 🔧 Enhanced logging and progress tracking with detailed step-by-step reporting
@@ -202,6 +202,9 @@ Force refresh container data for all integrations.
 - 🔧 Removed device registry warnings by eliminating via_device references
 - 🔍 Added Current Digest and Available Digest sensors for better image version tracking
 - 🔧 Fixed Docker Hub API detection to properly handle third-party images (like interaapps/pastefy)
+- ⚙️ Added comprehensive feature toggle configuration system
+- ⚙️ Added configurable update intervals (1-60 minutes)
+- ⚙️ **Note**: Options flow for runtime configuration is not yet fully implemented
 
 ### v0.3.7
 - 🔧 Fixed indentation error in stack update fallback logic
@@ -245,7 +248,7 @@ Force refresh container data for all integrations.
 - Added DataUpdateCoordinator for better performance
 - Implemented automatic container discovery
 
-### v0.3.0
+### v0.3.1
 - Complete rewrite with modern Home Assistant patterns
 - Added stack clustering and organization
 - Implemented comprehensive error handling
@@ -274,6 +277,21 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - All contributors and testers
 
 ---
+
+## ⚠️ Current Limitations
+
+### What's Not Yet Implemented
+- **Runtime Configuration**: Feature toggles and update intervals cannot be changed after installation
+- **SSL Configuration**: SSL verification is hardcoded to `ssl=False`
+- **Bulk Operations**: Start/stop all containers functionality is not implemented
+- **Container Logs**: Log viewing functionality is not implemented
+- **Health Monitoring**: Container health status tracking is not implemented
+- **Backup Management**: Container/stack backup functionality is not implemented
+
+### Workarounds
+- To change feature toggles: Remove and re-add the integration with new settings
+- To enable SSL verification: Modify the code in the respective API files
+- To enable disabled features: Modify the configuration in `coordinator.py`
 
 **Note**: This is a custom integration and not officially supported by Home Assistant. Use at your own risk.
 

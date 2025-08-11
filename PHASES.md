@@ -23,7 +23,7 @@
 
 ---
 
-## Phase 1.5: Configuration Flexibility ✅ COMPLETED
+## Phase 1.5: Configuration Flexibility 🔄 PARTIALLY COMPLETED
 
 ### Goals
 - Add flexible hostname/port configuration
@@ -34,36 +34,32 @@
 
 ### Completed Features
 - ✅ **Flexible Host Configuration**: Support for hostname, port, and full URL input
-- ✅ **SSL/TLS Configuration**: Configurable SSL verification for different environments
-- ✅ **Configurable Rate Limiting**: User-adjustable cache duration, rate limits, and periods
-- ✅ **Options Flow**: Runtime configuration changes without re-installation
-- ✅ **Advanced Settings**: Update intervals, monitoring toggles, and performance tuning
+- ❌ **SSL/TLS Configuration**: SSL verification is hardcoded to `ssl=False`
+- ❌ **Configurable Rate Limiting**: Rate limiting is hardcoded in the code
+- ❌ **Options Flow**: Runtime configuration changes not yet implemented
+- ❌ **Advanced Settings**: Update intervals and monitoring toggles not configurable
 - ✅ **Multi-Instance Support**: Different configurations per Portainer instance
-- ✅ **Validation**: Comprehensive input validation with helpful error messages
+- ✅ **Validation**: Basic input validation for required fields
 
 ---
 
-## Phase 1.6: Integration Modes ✅ COMPLETED
+## Phase 1.6: Feature Toggle System 🔄 PARTIALLY COMPLETED
 
 ### Goals
-- Implement different integration modes for different use cases
-- Add feature toggles for selective functionality
+- Implement granular feature toggles for different use cases
+- Add individual control over functionality
 - Create lightweight mode for performance-sensitive environments
-- Support custom mode for advanced users
-- Optimize resource usage based on selected mode
+- Support custom configurations for advanced users
+- Optimize resource usage based on selected features
 
 ### Completed Features
-- ✅ **Integration Modes**: Lightweight, Standard, Full, and Custom modes
-- ✅ **Feature Toggles**: Granular control over sensors, buttons, and functionality
-- ✅ **Lightweight Mode**: Minimal functionality for performance-sensitive environments
-- ✅ **Standard Mode**: Balanced functionality for most common use cases
-- ✅ **Full Mode**: Complete functionality with all features enabled
-- ✅ **Custom Mode**: User-defined feature selection
-- ✅ **Resource Optimization**: Reduced API calls and entity count in lightweight mode
-- ✅ **Stack View Toggle**: Optional stack clustering and management
-- ✅ **Sensor Toggles**: Optional resource, version, and update sensors
-- ✅ **Button Toggles**: Optional container and stack control buttons
-- ✅ **Bulk Operations**: Optional bulk start/stop functionality
+- ✅ **Feature Toggles**: Individual control over stack view, sensors, buttons, and functionality
+- ❌ **Granular Control**: Feature toggles exist in coordinator but don't control entity creation
+- ❌ **Performance Optimization**: All features are created regardless of toggle settings
+- ❌ **Stack View Toggle**: Stack clustering is disabled by default but not user-configurable
+- ✅ **Sensor Toggles**: Resource, version, and update sensors exist but are always created
+- ✅ **Button Toggles**: Container and stack control buttons exist but are always created
+- ❌ **Bulk Operations**: Start/stop all containers functionality is not implemented
 
 ---
 
@@ -150,10 +146,10 @@
 
 ## Current Status
 
-- **Phase 1**: ✅ **COMPLETED** (Version 0.3.0)
-- **Phase 1.5**: ✅ **COMPLETED** (Configuration Flexibility)
-- **Phase 1.6**: ✅ **COMPLETED** (Integration Modes)
-- **Phase 2**: 🔄 **IN PROGRESS** (Next priority)
+- **Phase 1**: ✅ **COMPLETED** (Core Architecture & Stability)
+- **Phase 1.5**: 🔄 **PARTIALLY COMPLETED** (Configuration Flexibility - SSL and options flow not implemented)
+- **Phase 1.6**: 🔄 **PARTIALLY COMPLETED** (Feature Toggle System - toggles exist but don't control entity creation)
+- **Phase 2**: ⏳ **PLANNED** (Next priority - Advanced Features & User Experience)
 - **Phase 3**: ⏳ **PLANNED**
 - **Phase 4**: ⏳ **PLANNED**
 - **Phase 5**: ⏳ **PLANNED**
@@ -189,16 +185,21 @@
 ### **Core Features** (Always Available)
 - Container status sensors
 - Basic container control switches
+- Basic container information
+- Container buttons (restart, pull update)
 
-### **Optional Features**
-- **Stack View**: Stack clustering and management
-- **Resource Sensors**: CPU, memory, uptime monitoring
-- **Version Sensors**: Current and available version tracking
-- **Update Sensors**: Update availability detection
-- **Container Buttons**: Restart and pull update buttons
-- **Stack Buttons**: Stack control buttons
-- **Bulk Operations**: Start/stop all containers
+### **Optional Features** (Currently Hardcoded)
+- **Stack View**: Stack clustering and management (disabled by default)
+- **Resource Sensors**: CPU, memory, uptime monitoring (enabled by default)
+- **Version Sensors**: Current and available version tracking (enabled by default)
+- **Update Sensors**: Update availability detection (enabled by default)
+- **Stack Buttons**: Stack control buttons (enabled by default for stack containers)
+
+### **Not Yet Implemented**
+- **Bulk Operations**: Start/stop all containers functionality
 - **Container Logs**: Log viewing functionality
+- **Health Monitoring**: Container health status tracking
+- **Backup Management**: Container/stack backup functionality
 
 ## Configuration Improvements Summary
 
@@ -209,23 +210,27 @@
 
 ### **SSL/TLS Configuration**
 - **Before**: Hardcoded SSL verification
-- **Now**: Configurable SSL verification per instance
+- **Now**: Still hardcoded to `ssl=False` (not yet configurable)
 - **Use Cases**: Self-signed certificates, internal networks, reverse proxies
+- **Status**: Requires code modification to enable SSL verification
 
 ### **Configurable Rate Limiting**
 - **Before**: Hardcoded 6-hour cache, 50 checks per 6 hours
-- **Now**: User-adjustable cache duration (1-24 hours), rate limits (10-100 checks), and periods (1-24 hours)
-- **Benefits**: Optimize for different environments and usage patterns
+- **Now**: Still hardcoded in the code (not yet configurable)
+- **Benefits**: Framework exists but requires code modification
+- **Status**: Not user-configurable
 
 ### **Runtime Configuration**
 - **Before**: No options flow
-- **Now**: Full options flow for changing settings without re-installation
-- **Features**: Update intervals, monitoring toggles, performance tuning
+- **Now**: Options flow framework exists but not implemented
+- **Features**: Feature toggles, update intervals, monitoring options
+- **Status**: Requires removing and re-adding integration to change settings
 
 ### **Multi-Instance Support**
 - **Before**: Single configuration approach
 - **Now**: Per-instance configuration with different settings
 - **Use Cases**: Multiple Portainer instances, different environments
+- **Status**: ✅ Fully functional
 
 ## Notes
 
@@ -233,5 +238,7 @@
 - Phases may be adjusted based on user feedback and priorities
 - Some features may be moved between phases as needed
 - Rate limiting and performance considerations are ongoing concerns
-- Configuration flexibility enables better deployment in diverse environments
-- Integration modes provide optimal performance for different use cases
+- Configuration flexibility framework exists but is not yet user-accessible
+- Feature toggle system exists but doesn't control entity creation
+- The current implementation focuses on stability with all features enabled by default
+- SSL configuration and runtime options require code modification in current version
