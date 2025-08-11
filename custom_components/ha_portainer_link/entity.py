@@ -2,6 +2,7 @@ import logging
 import hashlib
 from typing import Optional, Dict, Any
 from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
@@ -67,11 +68,12 @@ def _get_container_stable_id(container_name: str, stack_info: Dict[str, Any]) ->
     else:
         return container_name
 
-class BasePortainerEntity(Entity):
-    """Base class for all Portainer entities."""
+class BasePortainerEntity(CoordinatorEntity):
+    """Base class for all Portainer entities bound to the data update coordinator."""
 
     def __init__(self, coordinator: PortainerDataUpdateCoordinator, entry_id: str):
         """Initialize the base entity."""
+        super().__init__(coordinator)
         self.coordinator = coordinator
         self.entry_id = entry_id
         self._attr_should_poll = False
@@ -80,13 +82,6 @@ class BasePortainerEntity(Entity):
     def available(self) -> bool:
         """Return True if entity is available."""
         return self.coordinator.last_update_success
-
-    async def async_added_to_hass(self) -> None:
-        """When entity is added to hass."""
-        await super().async_added_to_hass()
-        self.async_on_remove(
-            self.coordinator.async_add_listener(self.async_write_ha_state)
-        )
 
 class BaseContainerEntity(BasePortainerEntity):
     """Base class for container-specific entities."""

@@ -59,36 +59,18 @@ class ContainerUpdateAvailableSensor(BaseContainerEntity, BinarySensorEntity):
 
     @property
     def name(self) -> str:
-        """Return the name of the sensor."""
         display_name = self._get_container_name_display()
         return f"Update Available {display_name}"
 
     @property
     def is_on(self):
-        """Return true if the binary sensor is on."""
-        # This will be updated by the coordinator
-        return getattr(self, '_state', False)
+        """Return true if updates are available for this container."""
+        return bool(self.coordinator.get_update_availability(self.container_id))
 
     @property
     def icon(self):
-        """Return the icon of the sensor."""
         return "mdi:update" if self.is_on else "mdi:update-disabled"
 
     @property
     def entity_category(self) -> EntityCategory | None:
         return EntityCategory.DIAGNOSTIC
-
-    async def async_update(self):
-        """Update the sensor."""
-        try:
-            container_data = self._get_container_data()
-            if not container_data:
-                self._state = False
-                return
-
-            # Use coordinator's cached update availability
-            self._state = self.coordinator.get_update_availability(self.container_id)
-            
-        except Exception as e:
-            _LOGGER.error("❌ Error updating update sensor for container %s: %s", self.container_id, e)
-            self._state = False

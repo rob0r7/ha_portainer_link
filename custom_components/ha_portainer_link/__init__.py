@@ -8,6 +8,8 @@ from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.entity_registry import RegistryEntry
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+import voluptuous as vol
 
 from .const import DOMAIN, INTEGRATION_MODE_PRESETS
 from .portainer_api import PortainerAPI
@@ -16,7 +18,7 @@ from .coordinator import PortainerDataUpdateCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 # Define platforms here since it's used in this file
-PLATFORMS = ["sensor", "binary_sensor", "switch", "button"]
+PLATFORMS = ["sensor", "binary_sensor", "switch", "button", "update"]
 
 def create_portainer_device_info(entry_id: str, host: str, name: str = None) -> DeviceInfo:
     """Create device info for Portainer endpoint."""
@@ -96,10 +98,10 @@ async def async_setup(hass: HomeAssistant, config: dict):
                 _LOGGER.error("❌ Failed to refresh entry %s: %s", entry.title, e)
     
     # Register the reload service
-    hass.services.async_register(DOMAIN, "reload", reload_portainer_integration)
+    hass.services.async_register(DOMAIN, "reload", reload_portainer_integration, schema=vol.Schema({}))
     
     # Register the refresh service
-    hass.services.async_register(DOMAIN, "refresh", refresh_container_data)
+    hass.services.async_register(DOMAIN, "refresh", refresh_container_data, schema=vol.Schema({}))
     
     return True
 
@@ -126,6 +128,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         api_key=config.get("api_key"),   # Optional
         config=config
     )
+
+    # Inject HA-managed aiohttp session
+    session = async_get_clientsession(hass)
+    api.set_session(session, managed_by_ha=True)
     
     # Initialize API
     if not await api.initialize():
@@ -174,14 +180,14 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     
     if unload_ok:
-        # Clean up API resources
+        # Clean up API resources (no session close since HA manages it)
         if f"{entry_id}_api" in hass.data.get(DOMAIN, {}):
             api = hass.data[DOMAIN][f"{entry_id}_api"]
             try:
                 await api.close()
-                _LOGGER.debug("🔌 Closed API session for entry %s", entry_id)
+                _LOGGER.debug("🔌 API closed for entry %s", entry_id)
             except Exception as e:
-                _LOGGER.warning("⚠️ Error closing API session: %s", e)
+                _LOGGER.warning("⚠️ Error closing API: %s", e)
         
         # Remove all data for this entry
         if DOMAIN in hass.data:
@@ -191,7 +197,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
                     _LOGGER.debug("🧹 Removing data key: %s", key)
                     hass.data[DOMAIN].pop(key, None)
             
-            # If no more entries, clean up the entire domain
             if not any(key for key in hass.data[DOMAIN].keys() if not key.endswith('_coordinator') and not key.endswith('_api') and not key.endswith('_endpoint_id')):
                 _LOGGER.debug("🧹 Cleaning up entire domain data")
                 hass.data.pop(DOMAIN, None)

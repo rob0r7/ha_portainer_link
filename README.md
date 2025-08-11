@@ -59,6 +59,9 @@ A comprehensive Home Assistant integration for managing Docker containers and st
 - Container switches (start/stop)
 - Restart buttons
 - Status sensors
+
+#### Full View
+- All Lightweight features
 - CPU and memory monitoring
 - Uptime tracking
 - Stack controls
