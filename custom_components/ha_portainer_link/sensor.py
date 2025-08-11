@@ -35,76 +35,50 @@ async def async_setup_entry(hass, entry, async_add_entities):
     # Coordinator data is already loaded in main setup
     entities = []
     
-    # Track which containers we've already created sensor entities for (by container_id)
-    created_for: set[str] = set()
-    
-    # Helper to create all sensors for a single container
-    def _create_container_sensors(container_id: str, container_data: dict) -> list:
+    # Create sensors for all containers
+    for container_id, container_data in coordinator.containers.items():
         container_name = container_data.get("Names", ["unknown"])[0].strip("/")
+        
+        # Get detailed stack information from coordinator's processed data
         stack_info = coordinator.get_container_stack_info(container_id) or {
             "stack_name": None,
             "service_name": None,
             "container_number": None,
             "is_stack_container": False
         }
+        
         _LOGGER.debug("🔍 Processing container: %s (ID: %s, Stack: %s)", container_name, container_id, stack_info.get("stack_name"))
-        new_entities = []
+        
         # Always create status sensor (core functionality)
-        new_entities.append(ContainerStatusSensor(coordinator, entry_id, container_id, container_name, stack_info))
-        # Resource sensors
+        entities.append(ContainerStatusSensor(coordinator, entry_id, container_id, container_name, stack_info))
+        
+        # Create resource sensors only if enabled
         if resource_sensors_enabled:
-            new_entities.append(ContainerCPUSensor(coordinator, entry_id, container_id, container_name, stack_info))
-            new_entities.append(ContainerMemorySensor(coordinator, entry_id, container_id, container_name, stack_info))
-            new_entities.append(ContainerUptimeSensor(coordinator, entry_id, container_id, container_name, stack_info))
-        # Version/image sensors
+            entities.append(ContainerCPUSensor(coordinator, entry_id, container_id, container_name, stack_info))
+            entities.append(ContainerMemorySensor(coordinator, entry_id, container_id, container_name, stack_info))
+            entities.append(ContainerUptimeSensor(coordinator, entry_id, container_id, container_name, stack_info))
+        
+        # Create image and version sensors only if enabled
         if version_sensors_enabled:
-            new_entities.append(ContainerImageSensor(coordinator, entry_id, container_id, container_name, stack_info))
-            new_entities.append(ContainerCurrentVersionSensor(coordinator, entry_id, container_id, container_name, stack_info))
-            new_entities.append(ContainerAvailableVersionSensor(coordinator, entry_id, container_id, container_name, stack_info))
-            new_entities.append(ContainerCurrentDigestSensor(coordinator, entry_id, container_id, container_name, stack_info))
-            new_entities.append(ContainerAvailableDigestSensor(coordinator, entry_id, container_id, container_name, stack_info))
-        return new_entities
-    
-    # Initial creation for all known containers
-    for container_id, container_data in coordinator.containers.items():
-        entities.extend(_create_container_sensors(container_id, container_data))
-        created_for.add(container_id)
+            entities.append(ContainerImageSensor(coordinator, entry_id, container_id, container_name, stack_info))
+            entities.append(ContainerCurrentVersionSensor(coordinator, entry_id, container_id, container_name, stack_info))
+            entities.append(ContainerAvailableVersionSensor(coordinator, entry_id, container_id, container_name, stack_info))
+            entities.append(ContainerCurrentDigestSensor(coordinator, entry_id, container_id, container_name, stack_info))
+            entities.append(ContainerAvailableDigestSensor(coordinator, entry_id, container_id, container_name, stack_info))
 
     # Create stack-level sensors if stack view is enabled
-    created_stacks: set[str] = set()
     if coordinator.is_stack_view_enabled():
         for stack_name, stack_data in coordinator.stacks.items():
             _LOGGER.debug("🔍 Creating stack sensors for: %s", stack_name)
+            
+            # Create stack status sensor
             entities.append(StackStatusSensor(coordinator, entry_id, stack_name))
+            
+            # Create stack container count sensor
             entities.append(StackContainerCountSensor(coordinator, entry_id, stack_name))
-            created_stacks.add(stack_name)
     
     _LOGGER.info("✅ Created %d sensor entities", len(entities))
-    # Register immediately; values will populate on next coordinator refresh
-    async_add_entities(entities, update_before_add=False)
-
-    # Dynamically add sensors for newly discovered containers and stacks on future updates
-    def _add_new_entities() -> None:
-        new_entities: list = []
-        # Containers
-        for container_id, container_data in coordinator.containers.items():
-            if container_id not in created_for:
-                _LOGGER.info("➕ Discovered new container %s, creating sensors", container_id)
-                new_entities.extend(_create_container_sensors(container_id, container_data))
-                created_for.add(container_id)
-        # Stacks
-        if coordinator.is_stack_view_enabled():
-            for stack_name in coordinator.stacks.keys():
-                if stack_name not in created_stacks:
-                    _LOGGER.info("➕ Discovered new stack %s, creating sensors", stack_name)
-                    new_entities.append(StackStatusSensor(coordinator, entry_id, stack_name))
-                    new_entities.append(StackContainerCountSensor(coordinator, entry_id, stack_name))
-                    created_stacks.add(stack_name)
-        if new_entities:
-            async_add_entities(new_entities, update_before_add=False)
-
-    # Listen for coordinator updates to discover new containers and stacks
-    coordinator.async_add_listener(_add_new_entities)
+    async_add_entities(entities, update_before_add=True)
 
 class ContainerStatusSensor(BaseContainerEntity, SensorEntity):
     """Sensor for container status."""

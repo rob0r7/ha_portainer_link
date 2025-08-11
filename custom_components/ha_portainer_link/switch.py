@@ -32,12 +32,27 @@ async def async_setup_entry(hass, entry, async_add_entities):
     
     # Coordinator data is already loaded in main setup
     entities = []
-
-    # Keep track of created switches to avoid duplicates
-    created_for: set[str] = set()
-
-    def _create_switch(container_id: str, container_data: dict) -> list:
+    
+    # Debug: Check if we have containers
+    container_count = len(coordinator.containers)
+    _LOGGER.info("🔍 Found %d containers in coordinator", container_count)
+    
+    # Create switches for all containers
+    for container_id, container_data in coordinator.containers.items():
         container_name = container_data.get("Names", ["unknown"])[0].strip("/")
+        
+        # Fix: Ensure container_state is a dictionary, not a string
+        container_state = container_data.get("State", {})
+        if isinstance(container_state, dict):
+            is_running = container_state.get("Running", False)
+        elif isinstance(container_state, str):
+            # Handle string state format (e.g., "running", "stopped")
+            is_running = container_state.lower() == "running"
+            _LOGGER.debug("🔍 Container %s has string state: %s (running: %s)", container_name, container_state, is_running)
+        else:
+            _LOGGER.warning("⚠️ Container state is not a dictionary for %s: %s", container_name, type(container_state))
+            is_running = False
+        
         # Get detailed stack information from coordinator's processed data
         stack_info = coordinator.get_container_stack_info(container_id) or {
             "stack_name": None,
@@ -45,14 +60,15 @@ async def async_setup_entry(hass, entry, async_add_entities):
             "container_number": None,
             "is_stack_container": False
         }
-        _LOGGER.debug("🔍 Processing container: %s (ID: %s, Stack: %s)", 
-                     container_name, container_id, stack_info.get("stack_name"))
-        return [ContainerSwitch(coordinator, entry_id, container_id, container_name, stack_info)]
-    
-    # Initial creation for all containers
-    for container_id, container_data in coordinator.containers.items():
-        entities.extend(_create_switch(container_id, container_data))
-        created_for.add(container_id)
+        
+        _LOGGER.debug("🔍 Processing container: %s (ID: %s, Stack: %s, Running: %s, State: %s)", 
+                     container_name, container_id, stack_info.get("stack_name"), is_running, container_state)
+        
+        # Always create container switches (core functionality)
+        switch_entity = ContainerSwitch(coordinator, entry_id, container_id, container_name, stack_info)
+        entities.append(switch_entity)
+        
+        _LOGGER.debug("✅ Created switch for container: %s (ID: %s)", container_name, container_id)
 
     _LOGGER.info("✅ Created %d switch entities", len(entities))
     
@@ -60,20 +76,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     for entity in entities:
         _LOGGER.debug("📋 Switch entity: %s (unique_id: %s)", entity.name, entity.unique_id)
     
-    async_add_entities(entities, update_before_add=False)
-
-    # Dynamic addition when new containers are discovered
-    def _add_new_switches() -> None:
-        new_entities: list = []
-        for container_id, container_data in coordinator.containers.items():
-            if container_id not in created_for:
-                _LOGGER.info("➕ Discovered new container %s, creating switch", container_id)
-                new_entities.extend(_create_switch(container_id, container_data))
-                created_for.add(container_id)
-        if new_entities:
-            async_add_entities(new_entities, update_before_add=False)
-
-    coordinator.async_add_listener(_add_new_switches)
+    async_add_entities(entities, update_before_add=True)
 
 
 class ContainerSwitch(BaseContainerEntity, SwitchEntity):
