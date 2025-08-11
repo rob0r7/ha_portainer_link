@@ -59,6 +59,9 @@ A comprehensive Home Assistant integration for managing Docker containers and st
 - Container switches (start/stop)
 - Restart buttons
 - Status sensors
+
+#### Full View
+- All Lightweight features
 - CPU and memory monitoring
 - Uptime tracking
 - Stack controls
@@ -130,7 +133,8 @@ service: ha_portainer_link.refresh
 Enable debug logging in your `configuration.yaml`:
 ```yaml
 logger:
-  ha_portainer_link: debug
+  logs:
+    custom_components.ha_portainer_link: debug
 ```
 
 ## 🛠️ Services

@@ -28,27 +28,39 @@ async def async_setup_entry(hass, entry, async_add_entities):
         _LOGGER.info("✅ No binary sensors to create (update sensors disabled)")
         return
     
-    # Coordinator data is already loaded in main setup
     entities = []
-    
-    # Create binary sensors for all containers
-    for container_id, container_data in coordinator.containers.items():
+    created_for: set[str] = set()
+
+    def _create_update_binary_sensor(container_id: str, container_data: dict) -> list:
         container_name = container_data.get("Names", ["unknown"])[0].strip("/")
-        
-        # Get detailed stack information from coordinator's processed data
         stack_info = coordinator.get_container_stack_info(container_id) or {
             "stack_name": None,
             "service_name": None,
             "container_number": None,
             "is_stack_container": False
         }
-        
-        _LOGGER.debug("🔍 Processing container: %s (ID: %s, Stack: %s)", container_name, container_id, stack_info.get("stack_name"))
-        
-        entities.append(ContainerUpdateAvailableSensor(coordinator, entry_id, container_id, container_name, stack_info))
+        _LOGGER.debug("🔍 Processing container for binary sensor: %s (ID: %s, Stack: %s)", container_name, container_id, stack_info.get("stack_name"))
+        return [ContainerUpdateAvailableSensor(coordinator, entry_id, container_id, container_name, stack_info)]
+
+    # Initial
+    for container_id, container_data in coordinator.containers.items():
+        entities.extend(_create_update_binary_sensor(container_id, container_data))
+        created_for.add(container_id)
 
     _LOGGER.info("✅ Created %d binary sensor entities", len(entities))
-    async_add_entities(entities, update_before_add=True)
+    async_add_entities(entities, update_before_add=False)
+
+    def _add_new_binary_sensors() -> None:
+        new_entities: list = []
+        for container_id, container_data in coordinator.containers.items():
+            if container_id not in created_for:
+                _LOGGER.info("➕ Discovered new container %s, creating update-available binary sensor", container_id)
+                new_entities.extend(_create_update_binary_sensor(container_id, container_data))
+                created_for.add(container_id)
+        if new_entities:
+            async_add_entities(new_entities, update_before_add=False)
+
+    coordinator.async_add_listener(_add_new_binary_sensors)
 
 class ContainerUpdateAvailableSensor(BaseContainerEntity, BinarySensorEntity):
     """Binary sensor for container update availability."""
@@ -59,36 +71,18 @@ class ContainerUpdateAvailableSensor(BaseContainerEntity, BinarySensorEntity):
 
     @property
     def name(self) -> str:
-        """Return the name of the sensor."""
         display_name = self._get_container_name_display()
         return f"Update Available {display_name}"
 
     @property
     def is_on(self):
-        """Return true if the binary sensor is on."""
-        # This will be updated by the coordinator
-        return getattr(self, '_state', False)
+        """Return true if updates are available for this container."""
+        return bool(self.coordinator.get_update_availability(self.container_id))
 
     @property
     def icon(self):
-        """Return the icon of the sensor."""
         return "mdi:update" if self.is_on else "mdi:update-disabled"
 
     @property
     def entity_category(self) -> EntityCategory | None:
         return EntityCategory.DIAGNOSTIC
-
-    async def async_update(self):
-        """Update the sensor."""
-        try:
-            container_data = self._get_container_data()
-            if not container_data:
-                self._state = False
-                return
-
-            # Use coordinator's cached update availability
-            self._state = self.coordinator.get_update_availability(self.container_id)
-            
-        except Exception as e:
-            _LOGGER.error("❌ Error updating update sensor for container %s: %s", self.container_id, e)
-            self._state = False

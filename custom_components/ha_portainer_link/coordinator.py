@@ -32,6 +32,8 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
         self.container_stack_info: Dict[str, Dict[str, Any]] = {}  # container_id -> detailed stack info
         self.update_availability: Dict[str, bool] = {}  # container_id -> has_updates
         self.stable_container_map: Dict[str, str] = {}  # stable_id -> container_id
+        self.metrics: Dict[str, Dict[str, Any]] = {}  # container_id -> {cpu_percent, memory_mb, uptime_s}
+        self.image_data: Dict[str, Dict[str, Any]] = {}  # container_id -> image metadata
 
     async def _async_update_data(self) -> Dict[str, Any]:
         """Update container and stack data."""
@@ -62,6 +64,15 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
             else:
                 containers = await containers_task
                 stacks = []
+
+            # Defensive handling when API returns None (e.g., 403/404)
+            if containers is None:
+                _LOGGER.error("❌ Containers list is None; returning empty dataset to keep HA responsive")
+                return {
+                    "containers": {},
+                    "stacks": {},
+                    "container_stack_map": {}
+                }
             
             # Process containers
             self.containers = {}
@@ -175,6 +186,102 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
                         self.update_availability = {}
             else:
                 self.update_availability = {}
+            
+            # Resource metrics aggregation
+            self.metrics = {}
+            if self.is_resource_sensors_enabled():
+                sem = asyncio.Semaphore(4)
+
+                async def compute_metrics(container_id: str, container: Dict[str, Any]) -> None:
+                    async with sem:
+                        metrics: Dict[str, Any] = {}
+                        try:
+                            stats = await self.api.get_container_stats(self.endpoint_id, container_id)
+                            if stats and "cpu_stats" in stats:
+                                cpu_stats = stats.get("cpu_stats", {})
+                                precpu_stats = stats.get("precpu_stats", {})
+                                cpu_delta = (
+                                    (cpu_stats.get("cpu_usage", {}) or {}).get("total", 0)
+                                    - (precpu_stats.get("cpu_usage", {}) or {}).get("total", 0)
+                                )
+                                system_delta = cpu_stats.get("system_cpu_usage", 0) - precpu_stats.get("system_cpu_usage", 0)
+                                if system_delta > 0:
+                                    metrics["cpu_percent"] = round((cpu_delta / system_delta) * 100, 2)
+                            if stats and "memory_stats" in stats:
+                                memory_stats = stats.get("memory_stats", {})
+                                usage = memory_stats.get("usage", 0)
+                                metrics["memory_mb"] = round(usage / (1024 * 1024), 2)
+                        except Exception as e:
+                            _LOGGER.debug("⚠️ Failed to compute stats for %s: %s", container_id, e)
+                        
+                        # Uptime: only if running
+                        try:
+                            state = container.get("State", {})
+                            is_running = (state.get("Running") if isinstance(state, dict) else str(state).lower() == "running")
+                            if is_running:
+                                info = await self.api.inspect_container(self.endpoint_id, container_id)
+                                started_at = (info or {}).get("State", {}).get("StartedAt")
+                                if started_at:
+                                    import datetime
+                                    start_time = datetime.datetime.fromisoformat(started_at.replace('Z', '+00:00'))
+                                    current_time = datetime.datetime.now(datetime.timezone.utc)
+                                    metrics["uptime_s"] = int((current_time - start_time).total_seconds())
+                        except Exception as e:
+                            _LOGGER.debug("⚠️ Failed to compute uptime for %s: %s", container_id, e)
+                        
+                        if metrics:
+                            self.metrics[container_id] = metrics
+                
+                await asyncio.gather(*(compute_metrics(cid, cdata) for cid, cdata in self.containers.items()))
+
+            # Image/version metadata aggregation
+            self.image_data = {}
+            if self.is_version_sensors_enabled():
+                sem_img = asyncio.Semaphore(4)
+
+                async def compute_image_data(container_id: str) -> None:
+                    async with sem_img:
+                        data: Dict[str, Any] = {}
+                        try:
+                            info = await self.api.inspect_container(self.endpoint_id, container_id)
+                            if not info:
+                                return
+                            image_name = (info.get("Config", {}) or {}).get("Image")
+                            image_id = info.get("Image")
+                            if image_name:
+                                data["image_name"] = image_name
+                            if image_id:
+                                image_info = await self.api.get_image_info(self.endpoint_id, image_id)
+                                if image_info:
+                                    try:
+                                        data["current_version"] = self.api.extract_version_from_image(image_info)
+                                    except Exception:
+                                        pass
+                            try:
+                                current_digest = await self.api.get_current_digest(self.endpoint_id, container_id)
+                                if current_digest and current_digest != "unknown":
+                                    data["current_digest"] = current_digest
+                            except Exception:
+                                pass
+                            if self.is_update_sensors_enabled() and image_name:
+                                try:
+                                    available_version = await self.api.get_available_version(self.endpoint_id, image_name)
+                                    if available_version:
+                                        data["available_version"] = available_version
+                                except Exception:
+                                    pass
+                                try:
+                                    available_digest = await self.api.get_available_digest(self.endpoint_id, container_id)
+                                    if available_digest and available_digest != "unknown":
+                                        data["available_digest"] = available_digest
+                                except Exception:
+                                    pass
+                        except Exception as e:
+                            _LOGGER.debug("⚠️ Failed to compute image data for %s: %s", container_id, e)
+                        if data:
+                            self.image_data[container_id] = data
+
+                await asyncio.gather(*(compute_image_data(cid) for cid in self.containers.keys()))
             
             _LOGGER.info("✅ Updated Portainer data: %d containers (%d stack, %d standalone), %d stacks", 
                         len(self.containers), stack_containers_count, standalone_containers_count, len(self.stacks))

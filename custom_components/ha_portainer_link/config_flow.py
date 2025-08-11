@@ -4,7 +4,6 @@ from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
-from urllib.parse import urlparse
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
@@ -43,6 +42,13 @@ class PortainerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             try:
                 processed_config = await self._process_basic_config(user_input)
                 await self._validate_connection(processed_config)
+
+                # Set a stable unique_id to avoid duplicates (host + endpoint_id)
+                unique_host = processed_config[CONF_HOST].rstrip("/")
+                unique_endpoint = processed_config[CONF_ENDPOINT_ID]
+                unique_id = f"{unique_host}_{unique_endpoint}"
+                await self.async_set_unique_id(unique_id)
+                self._abort_if_unique_id_configured()
                 
                 # Move to integration mode selection
                 return await self.async_step_integration_mode()
@@ -163,7 +169,8 @@ class PortainerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 host=config[CONF_HOST],
                 username=config.get(CONF_USERNAME),
                 password=config.get(CONF_PASSWORD),
-                api_key=config.get(CONF_API_KEY)
+                api_key=config.get(CONF_API_KEY),
+                config={"endpoint_id": config[CONF_ENDPOINT_ID]}
             )
             
             # Test connection

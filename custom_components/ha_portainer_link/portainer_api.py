@@ -24,6 +24,7 @@ class PortainerAPI:
         
         self.base_url = host.rstrip("/")
         self.session: Optional[aiohttp.ClientSession] = None
+        self._session_managed_by_ha = False
         self.ssl_verify = True  # Will be determined automatically
         self.config = config or {}
         
@@ -40,10 +41,23 @@ class PortainerAPI:
         self.stacks = PortainerStackAPI(self.base_url, self.auth, self.ssl_verify, None)  # Session will be set later
         self.images = PortainerImageAPI(self.base_url, self.auth, self.config, self.ssl_verify, None)  # Session will be set later
 
+    def set_session(self, session: aiohttp.ClientSession, *, managed_by_ha: bool = True) -> None:
+        """Inject an aiohttp session (ideally from Home Assistant)."""
+        self.session = session
+        self._session_managed_by_ha = managed_by_ha
+        # Share session with sub-clients
+        self.containers.session = session
+        self.stacks.session = session
+        self.images.session = session
+
     async def initialize(self) -> bool:
-        """Initialize the API connection."""
+        """Initialize the API connection using the provided session."""
         try:
-            # Try different SSL verification approaches automatically
+            if self.session is None:
+                _LOGGER.error("❌ Session not set. Call set_session() with HA session before initialize().")
+                return False
+
+            # Try different SSL verification approaches automatically using per-request ssl flag
             ssl_options = [
                 (True, "SSL verification enabled"),
                 (False, "SSL verification disabled"),
@@ -54,22 +68,11 @@ class PortainerAPI:
                 try:
                     _LOGGER.info("🔧 Trying connection with %s", description)
                     
-                    # Close any existing session
-                    if self.session:
-                        await self.session.close()
-                    
-                    # Create new session with current SSL setting
-                    connector = aiohttp.TCPConnector(ssl=ssl_verify)
-                    self.session = aiohttp.ClientSession(connector=connector)
-                    
                     # Update SSL verification setting for all components
                     self.ssl_verify = ssl_verify
                     self.containers.ssl_verify = ssl_verify
-                    self.containers.session = self.session  # Set shared session
                     self.stacks.ssl_verify = ssl_verify
-                    self.stacks.session = self.session  # Set shared session
                     self.images.ssl_verify = ssl_verify
-                    self.images.session = self.session  # Set shared session
                     self.auth.ssl_verify = ssl_verify
                     
                     # Initialize authentication
@@ -83,23 +86,16 @@ class PortainerAPI:
                                 return True
                             else:
                                 _LOGGER.warning("⚠️ Connection test failed with %s", description)
-                                await self.session.close()
                         else:
                             _LOGGER.warning("⚠️ Endpoint %s does not exist with %s", self.endpoint_id, description)
-                            await self.session.close()
                     else:
                         _LOGGER.warning("⚠️ Authentication failed with %s", description)
-                        await self.session.close()
                         
                 except ClientConnectorCertificateError as e:
                     _LOGGER.info("🔧 SSL certificate error with %s, trying next option: %s", description, e)
-                    if self.session:
-                        await self.session.close()
                     continue
                 except Exception as e:
                     _LOGGER.debug("❌ Connection failed with %s: %s", description, e)
-                    if self.session:
-                        await self.session.close()
                     continue
             
             _LOGGER.error("❌ All SSL verification approaches failed")
@@ -110,10 +106,11 @@ class PortainerAPI:
             return False
 
     async def close(self) -> None:
-        """Close the API connection."""
-        if self.session:
+        """No-op when using HA-managed session to avoid closing shared session."""
+        # Do not close HA-managed sessions
+        if self.session and not self._session_managed_by_ha:
             await self.session.close()
-            self.session = None
+        self.session = None
 
     # Container operations - delegate to container API
     async def get_containers(self, endpoint_id: int):
