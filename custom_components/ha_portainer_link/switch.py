@@ -1,201 +1,233 @@
 import logging
+import hashlib
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.helpers.entity import EntityCategory
-from typing import Optional, Dict, Any
-
+from homeassistant.helpers import entity_registry as er
 from .const import DOMAIN
-from .entity import BaseContainerEntity
-from .coordinator import PortainerDataUpdateCoordinator
+from .portainer_api import PortainerAPI
 
 _LOGGER = logging.getLogger(__name__)
+_LOGGER.info("Loaded Portainer switch integration.")
+
+def _get_host_display_name(base_url):
+    """Extract a clean host name from the base URL for display purposes."""
+    # Remove protocol and common ports
+    host = base_url.replace("https://", "").replace("http://", "")
+    # Remove trailing slash if present
+    host = host.rstrip("/")
+    # Remove common ports
+    for port in [":9000", ":9443", ":80", ":443"]:
+        if host.endswith(port):
+            host = host[:-len(port)]
+    
+    # If the host is an IP address, keep it as is
+    # If it's a domain, try to extract a meaningful name
+    if host.replace('.', '').replace('-', '').replace('_', '').isdigit():
+        # It's an IP address, keep as is
+        return host
+    else:
+        # It's a domain, extract the main part
+        parts = host.split('.')
+        if len(parts) >= 2:
+            # Use the main domain part (e.g., "portainer" from "portainer.example.com")
+            return parts[0]
+        else:
+            return host
+
+def _get_host_hash(base_url):
+    """Generate a short hash of the host URL for unique identification."""
+    return hashlib.md5(base_url.encode()).hexdigest()[:8]
+
+def _build_stable_unique_id(entry_id, endpoint_id, container_name, stack_info, suffix):
+    if stack_info.get("is_stack_container"):
+        stack_name = stack_info.get("stack_name", "unknown")
+        service_name = stack_info.get("service_name", container_name)
+        base = f"{stack_name}_{service_name}"
+    else:
+        base = container_name
+    sanitized = base.replace('-', '_').replace(' ', '_').replace('/', '_')
+    return f"entry_{entry_id}_endpoint_{endpoint_id}_{sanitized}_{suffix}"
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    """Set up Portainer switches from a config entry."""
-    config = dict(entry.data)  # Create mutable copy
-    endpoint_id = config["endpoint_id"]
+    conf = entry.data
+    host = conf["host"]
+    username = conf.get("username")
+    password = conf.get("password")
+    api_key = conf.get("api_key")
+    endpoint_id = conf["endpoint_id"]
     entry_id = entry.entry_id
 
-    _LOGGER.info("🚀 Setting up HA Portainer Link switches for entry %s (endpoint %s)", entry_id, endpoint_id)
-    
-    # Get coordinator
-    coordinator = hass.data[DOMAIN][f"{entry_id}_coordinator"]
-    
-    # Debug configuration
-    _LOGGER.info("🔧 Configuration debug:")
-    _LOGGER.info("  - Integration mode: %s", config.get("integration_mode", "not set"))
-    _LOGGER.info("  - Container buttons enabled: %s", coordinator.is_container_buttons_enabled())
-    _LOGGER.info("  - Stack view enabled: %s", coordinator.is_stack_view_enabled())
-    _LOGGER.info("  - Update interval: %s minutes", config.get("update_interval", "not set"))
-    
-    # Container switches are always available as core functionality
-    _LOGGER.info("📊 Switch configuration: Container switches are always enabled (core functionality)")
-    
-    # Coordinator data is already loaded in main setup
-    entities = []
+    api = PortainerAPI(host, username, password, api_key)
+    await api.initialize()
+    containers = await api.get_containers(endpoint_id)
 
-    # Keep track of created switches to avoid duplicates
-    created_for: set[str] = set()
+    # Migrate existing switch entities to stable unique_ids
+    try:
+        er_registry = er.async_get(hass)
+        for container in containers:
+            name = container.get("Names", ["unknown"])[0].strip("/")
+            container_id = container["Id"]
+            container_info = await api.inspect_container(endpoint_id, container_id)
+            stack_info = api.get_container_stack_info(container_info) if container_info else {"is_stack_container": False}
+            old_uid = f"entry_{entry_id}_endpoint_{endpoint_id}_{container_id}_switch"
+            new_uid = _build_stable_unique_id(entry_id, endpoint_id, name, stack_info, "switch")
+            if old_uid != new_uid:
+                ent_id = er_registry.async_get_entity_id("switch", DOMAIN, old_uid)
+                if ent_id:
+                    try:
+                        er_registry.async_update_entity(ent_id, new_unique_id=new_uid)
+                        _LOGGER.debug("Migrated %s unique_id: %s -> %s", ent_id, old_uid, new_uid)
+                    except Exception as e:
+                        _LOGGER.debug("Could not migrate %s: %s", ent_id, e)
+    except Exception as e:
+        _LOGGER.debug("Switch registry migration skipped/failed: %s", e)
 
-    def _create_switch(container_id: str, container_data: dict) -> list:
-        container_name = container_data.get("Names", ["unknown"])[0].strip("/")
-        # Get detailed stack information from coordinator's processed data
-        stack_info = coordinator.get_container_stack_info(container_id) or {
-            "stack_name": None,
-            "service_name": None,
-            "container_number": None,
-            "is_stack_container": False
-        }
-        _LOGGER.debug("🔍 Processing container: %s (ID: %s, Stack: %s)", 
-                     container_name, container_id, stack_info.get("stack_name"))
-        return [ContainerSwitch(coordinator, entry_id, container_id, container_name, stack_info)]
-    
-    # Initial creation for all containers
-    for container_id, container_data in coordinator.containers.items():
-        entities.extend(_create_switch(container_id, container_data))
-        created_for.add(container_id)
+    switches = []
+    for container in containers:
+        name = container.get("Names", ["unknown"])[0].strip("/")
+        container_id = container["Id"]
+        state = container.get("State", "unknown")
+        
+        # Get container inspection data to determine if it's part of a stack
+        container_info = await api.inspect_container(endpoint_id, container_id)
+        stack_info = api.get_container_stack_info(container_info) if container_info else {"is_stack_container": False}
+        
+        # Create switches for all containers - they will all belong to the same stack device if they're in a stack
+        switches.append(ContainerSwitch(name, state, api, endpoint_id, container_id, stack_info, entry_id))
 
-    _LOGGER.info("✅ Created %d switch entities", len(entities))
-    
-    # Debug: Log all created entities
-    for entity in entities:
-        _LOGGER.debug("📋 Switch entity: %s (unique_id: %s)", entity.name, entity.unique_id)
-    
-    async_add_entities(entities, update_before_add=False)
+    async_add_entities(switches, update_before_add=True)
 
-    # Dynamic addition when new containers are discovered
-    def _add_new_switches() -> None:
-        new_entities: list = []
-        for container_id, container_data in coordinator.containers.items():
-            if container_id not in created_for:
-                _LOGGER.info("➕ Discovered new container %s, creating switch", container_id)
-                new_entities.extend(_create_switch(container_id, container_data))
-                created_for.add(container_id)
-        if new_entities:
-            async_add_entities(new_entities, update_before_add=False)
+class ContainerSwitch(SwitchEntity):
+    """Switch to start/stop a Docker container."""
 
-    coordinator.async_add_listener(_add_new_switches)
+    def __init__(self, name, state, api, endpoint_id, container_id, stack_info, entry_id):
+        self._attr_name = f"{name} Switch"
+        self._container_name = name
+        self._state = state == "running"
+        self._api = api
+        self._endpoint_id = endpoint_id
+        self._container_id = container_id
+        self._stack_info = stack_info
+        self._entry_id = entry_id
+        self._attr_unique_id = _build_stable_unique_id(entry_id, endpoint_id, name, stack_info, "switch")
+        self._available = True
 
-
-class ContainerSwitch(BaseContainerEntity, SwitchEntity):
-    """Representation of a Portainer container switch."""
-
-    @property
-    def entity_type(self) -> str:
-        """Return the entity type."""
-        return "switch"
-
-    @property
-    def name(self) -> str:
-        """Return the name of the switch."""
-        container_name = self._get_container_name_display()
-        return f"Container Switch {container_name}"
-
-    def _get_container_data(self) -> Optional[Dict[str, Any]]:
-        """Get container data from coordinator."""
+    async def _find_current_container_id(self):
         try:
-            container_data = self.coordinator.get_container(self.container_id)
-            if not container_data:
-                _LOGGER.warning("⚠️ Container data not found for ID: %s", self.container_id)
+            containers = await self._api.get_containers(self._endpoint_id)
+            if not containers:
                 return None
-            
-            # Debug: Log container state
-            container_state = container_data.get("State", {})
-            _LOGGER.debug("🔍 Container %s state: %s (type: %s)", 
-                         self.container_id, container_state, type(container_state))
-            
-            return container_data
-        except Exception as e:
-            _LOGGER.error("❌ Error getting container data for %s: %s", self.container_id, e)
+            if self._stack_info.get("is_stack_container"):
+                expected_stack = self._stack_info.get("stack_name")
+                expected_service = self._stack_info.get("service_name")
+                for container in containers:
+                    labels = container.get("Labels", {}) or {}
+                    if (
+                        labels.get("com.docker.compose.project") == expected_stack
+                        and labels.get("com.docker.compose.service") == expected_service
+                    ):
+                        return container.get("Id")
+            for container in containers:
+                names = container.get("Names", []) or []
+                if not names:
+                    continue
+                name = names[0].strip("/")
+                if name == self._container_name:
+                    return container.get("Id")
+        except Exception:
             return None
+        return None
+
+    async def _ensure_container_bound(self) -> None:
+        try:
+            info = await self._api.get_container_info(self._endpoint_id, self._container_id)
+            if not info or not isinstance(info, dict) or not info.get("Id"):
+                new_id = await self._find_current_container_id()
+                if new_id and new_id != self._container_id:
+                    self._container_id = new_id
+        except Exception:
+            new_id = await self._find_current_container_id()
+            if new_id and new_id != self._container_id:
+                self._container_id = new_id
 
     @property
     def is_on(self):
-        """Return true if the container is running."""
-        try:
-            container_data = self._get_container_data()
-            if not container_data:
-                _LOGGER.warning("⚠️ No container data available for %s", self.container_id)
-                return False
-            
-            # Handle different state formats
-            container_state = container_data.get("State", {})
-            
-            if isinstance(container_state, dict):
-                # Standard format: {"Running": true, "Status": "running"}
-                is_running = container_state.get("Running", False)
-                _LOGGER.debug("🔍 Container %s Running state: %s", self.container_id, is_running)
-                return bool(is_running)
-            elif isinstance(container_state, str):
-                # String format: "running", "exited", etc.
-                is_running = container_state.lower() == "running"
-                _LOGGER.debug("🔍 Container %s string state: %s (running: %s)", 
-                             self.container_id, container_state, is_running)
-                return is_running
-            else:
-                _LOGGER.warning("⚠️ Unknown container state format for %s: %s (type: %s)", 
-                               self.container_id, container_state, type(container_state))
-                return False
-                
-        except Exception as e:
-            _LOGGER.error("❌ Error checking container state for %s: %s", self.container_id, e)
-            return False
+        return self._state is True
+
+    @property
+    def available(self):
+        return self._available
 
     @property
     def icon(self):
-        """Return the icon of the switch."""
-        return "mdi:docker" if self.is_on else "mdi:docker-outline"
+        return "mdi:power"
 
     @property
-    def device_class(self):
-        """Return the device class of the switch."""
-        from homeassistant.components.switch import SwitchDeviceClass
-        return SwitchDeviceClass.SWITCH
-
-    @property
-    def entity_category(self):
-        """Return the entity category."""
-        return EntityCategory.CONFIG
+    def device_info(self):
+        host_name = _get_host_display_name(self._api.base_url)
+        host_hash = _get_host_hash(self._api.base_url)
+        
+        if self._stack_info.get("is_stack_container"):
+            # For stack containers, use the stack as the device
+            stack_name = self._stack_info.get("stack_name", "unknown_stack")
+            # Use a more robust identifier that includes the entry_id, host hash, and host name to prevent duplicates
+            device_id = f"entry_{self._entry_id}_endpoint_{self._endpoint_id}_stack_{stack_name}_{host_hash}_{host_name.replace('.', '_').replace(':', '_')}"
+            return {
+                "identifiers": {(DOMAIN, device_id)},
+                "name": f"Stack: {stack_name} ({host_name})",
+                "manufacturer": "Docker via Portainer",
+                "model": "Docker Stack",
+                "configuration_url": f"{self._api.base_url}/#!/stacks/{stack_name}",
+            }
+        else:
+            # For standalone containers, use the container as the device
+            device_id = f"entry_{self._entry_id}_endpoint_{self._endpoint_id}_container_{self._container_id}_{host_hash}_{host_name.replace('.', '_').replace(':', '_')}"
+            return {
+                "identifiers": {(DOMAIN, device_id)},
+                "name": f"{self._container_name} ({host_name})",
+                "manufacturer": "Docker via Portainer",
+                "model": "Docker Container",
+                "configuration_url": f"{self._api.base_url}/#!/containers/{self._container_id}/details",
+            }
 
     async def async_turn_on(self, **kwargs):
-        """Turn the container on (start it)."""
-        try:
-            _LOGGER.info("▶️ Starting container %s", self.container_id)
-            
-            success = await self.coordinator.api.start_container(
-                self.coordinator.endpoint_id, 
-                self.container_id
-            )
-            
-            if success:
-                _LOGGER.info("✅ Successfully started container %s", self.container_id)
-                # Force immediate state update
-                self.async_write_ha_state()
-                # Request coordinator refresh
-                await self.coordinator.async_request_refresh()
-            else:
-                _LOGGER.error("❌ Failed to start container %s", self.container_id)
-                
-        except Exception as e:
-            _LOGGER.exception("❌ Error starting container %s: %s", self.container_id, e)
+        """Start the Docker container."""
+        await self._ensure_container_bound()
+        success = await self._api.start_container(self._endpoint_id, self._container_id)
+        if success:
+            self._state = True
+            self._available = True
+        else:
+            self._available = False
+        self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs):
-        """Turn the container off (stop it)."""
+        """Stop the Docker container."""
+        await self._ensure_container_bound()
+        success = await self._api.stop_container(self._endpoint_id, self._container_id)
+        if success:
+            self._state = False
+            self._available = True
+        else:
+            self._available = False
+        self.async_write_ha_state()
+
+    async def async_update(self):
+        """Update the current status of the container."""
         try:
-            _LOGGER.info("🛑 Stopping container %s", self.container_id)
-            
-            success = await self.coordinator.api.stop_container(
-                self.coordinator.endpoint_id, 
-                self.container_id
-            )
-            
-            if success:
-                _LOGGER.info("✅ Successfully stopped container %s", self.container_id)
-                # Force immediate state update
-                self.async_write_ha_state()
-                # Request coordinator refresh
-                await self.coordinator.async_request_refresh()
-            else:
-                _LOGGER.error("❌ Failed to stop container %s", self.container_id)
-                
+            await self._ensure_container_bound()
+            containers = await self._api.get_containers(self._endpoint_id)
+            for container in containers:
+                if container["Id"] == self._container_id:
+                    # Some APIs return State as dict or string; support both
+                    state_val = container.get("State")
+                    if isinstance(state_val, dict):
+                        self._state = state_val.get("Running") is True
+                    else:
+                        self._state = state_val == "running"
+                    self._available = True
+                    return
+            self._state = False
+            self._available = False
         except Exception as e:
-            _LOGGER.exception("❌ Error stopping container %s: %s", self.container_id, e)
+            _LOGGER.error("Failed to update status for %s: %s", self._container_name, e)
+            self._available = False
