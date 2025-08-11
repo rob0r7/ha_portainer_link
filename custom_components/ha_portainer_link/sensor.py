@@ -71,29 +71,40 @@ async def async_setup_entry(hass, entry, async_add_entities):
         created_for.add(container_id)
 
     # Create stack-level sensors if stack view is enabled
+    created_stacks: set[str] = set()
     if coordinator.is_stack_view_enabled():
         for stack_name, stack_data in coordinator.stacks.items():
             _LOGGER.debug("🔍 Creating stack sensors for: %s", stack_name)
             entities.append(StackStatusSensor(coordinator, entry_id, stack_name))
             entities.append(StackContainerCountSensor(coordinator, entry_id, stack_name))
+            created_stacks.add(stack_name)
     
     _LOGGER.info("✅ Created %d sensor entities", len(entities))
     # Register immediately; values will populate on next coordinator refresh
     async_add_entities(entities, update_before_add=False)
 
-    # Dynamically add sensors for newly discovered containers on future updates
-    def _add_new_containers() -> None:
+    # Dynamically add sensors for newly discovered containers and stacks on future updates
+    def _add_new_entities() -> None:
         new_entities: list = []
+        # Containers
         for container_id, container_data in coordinator.containers.items():
             if container_id not in created_for:
                 _LOGGER.info("➕ Discovered new container %s, creating sensors", container_id)
                 new_entities.extend(_create_container_sensors(container_id, container_data))
                 created_for.add(container_id)
+        # Stacks
+        if coordinator.is_stack_view_enabled():
+            for stack_name in coordinator.stacks.keys():
+                if stack_name not in created_stacks:
+                    _LOGGER.info("➕ Discovered new stack %s, creating sensors", stack_name)
+                    new_entities.append(StackStatusSensor(coordinator, entry_id, stack_name))
+                    new_entities.append(StackContainerCountSensor(coordinator, entry_id, stack_name))
+                    created_stacks.add(stack_name)
         if new_entities:
             async_add_entities(new_entities, update_before_add=False)
 
-    # Listen for coordinator updates to discover new containers
-    coordinator.async_add_listener(_add_new_containers)
+    # Listen for coordinator updates to discover new containers and stacks
+    coordinator.async_add_listener(_add_new_entities)
 
 class ContainerStatusSensor(BaseContainerEntity, SensorEntity):
     """Sensor for container status."""
