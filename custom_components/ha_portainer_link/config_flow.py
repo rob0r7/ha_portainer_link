@@ -34,8 +34,8 @@ class PortainerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_dashboard(self, user_input=None):
         if user_input is not None:
             create_dashboard = user_input.get("create_dashboard", True)
-            dashboard_path = user_input.get("dashboard_path", "ha-protainer-link")
-            dashboard_title = user_input.get("dashboard_title", "HA Protainer Link")
+            dashboard_path = user_input.get("dashboard_path", "ha-portainer-link")
+            dashboard_title = user_input.get("dashboard_title", "HA Portainer Link")
 
             data = dict(self._user_input or {})
             data.update({
@@ -47,8 +47,8 @@ class PortainerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         schema = vol.Schema({
             vol.Required("create_dashboard", default=True): bool,
-            vol.Optional("dashboard_title", default="HA Protainer Link"): str,
-            vol.Optional("dashboard_path", default="ha-protainer-link"): str,
+            vol.Optional("dashboard_title", default="HA Portainer Link"): str,
+            vol.Optional("dashboard_path", default="ha-portainer-link"): str,
         })
         return self.async_show_form(step_id="dashboard", data_schema=schema)
 

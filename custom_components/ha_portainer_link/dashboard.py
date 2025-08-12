@@ -8,8 +8,8 @@ from homeassistant.helpers import entity_registry as er, device_registry as dr
 
 _LOGGER = logging.getLogger(__name__)
 
-DASHBOARD_PATH_DEFAULT = "ha-protainer-link"
-DASHBOARD_TITLE_DEFAULT = "HA Protainer Link"
+DASHBOARD_PATH_DEFAULT = "ha-portainer-link"
+DASHBOARD_TITLE_DEFAULT = "HA Portainer Link"
 
 
 async def ensure_dashboard_exists(hass: HomeAssistant, *, title: str = DASHBOARD_TITLE_DEFAULT, url_path: str = DASHBOARD_PATH_DEFAULT) -> None:
