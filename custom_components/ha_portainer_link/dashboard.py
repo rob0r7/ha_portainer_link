@@ -4,6 +4,7 @@ import logging
 from typing import Any, Dict, List
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er, device_registry as dr
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -17,154 +18,179 @@ async def ensure_dashboard_exists(hass: HomeAssistant, *, title: str = DASHBOARD
     This uses the Lovelace storage collection to create/update a dashboard and set its config.
     The dashboard will contain:
       - A Home view with overview and global update count
-      - A Controls view with all container and stack control buttons
-      - A Containers view listing per-container: switch, Restart, Pull Update, Status, Update Available
-      - A Stacks view (if stack entities exist) with stack buttons
+      - One view per stack (plus a Standalone view) with controls and the two requested sensors
     Only the Status sensor and Update Available binary_sensor are included from sensors as requested.
     """
-    # Build entity lists from registry/state machine
-    container_switches: List[str] = []
-    container_restart_buttons: List[str] = []
-    container_pull_buttons: List[str] = []
-    container_status_sensors: List[str] = []
-    container_update_bin: List[str] = []
+    # Build entity lists grouped by stack device
+    ent_reg = er.async_get(hass)
+    dev_reg = dr.async_get(hass)
 
-    stack_start_buttons: List[str] = []
-    stack_stop_buttons: List[str] = []
-    stack_update_buttons: List[str] = []
+    def _group_name_for(state_obj) -> str:
+        entry = ent_reg.async_get(state_obj.entity_id)
+        if not entry or not entry.device_id:
+            return "Standalone"
+        device = dev_reg.async_get(entry.device_id)
+        if not device:
+            return "Standalone"
+        # Stack devices are created by this integration with model "Docker Stack" and name "Stack: {stack} ({host})"
+        name = device.name or ""
+        model = device.model or ""
+        if model == "Docker Stack" or name.startswith("Stack: "):
+            # Extract stack name from device name when possible
+            if name.startswith("Stack: ") and " (" in name:
+                return name[len("Stack: "): name.find(" (")]
+            return name or "Stack"
+        return "Standalone"
+
+    groups: Dict[str, Dict[str, List[str]]] = {}
+    def gkey(stack: str) -> Dict[str, List[str]]:
+        return groups.setdefault(stack, {
+            "switches": [],
+            "restart_buttons": [],
+            "pull_buttons": [],
+            "status_sensors": [],
+            "update_bin": [],
+            "stack_buttons": [],
+        })
 
     for state_obj in hass.states.async_all():
-        entity_id = state_obj.entity_id
-        domain = entity_id.split(".", 1)[0]
+        eid = state_obj.entity_id
+        domain = eid.split(".", 1)[0]
         name = state_obj.name or ""
+        grp = _group_name_for(state_obj)
+        bucket = gkey(grp)
         if domain == "switch" and name.endswith(" Switch"):
-            container_switches.append(entity_id)
+            bucket["switches"].append(eid)
+        elif domain == "button" and name.startswith("Stack: "):
+            bucket["stack_buttons"].append(eid)
         elif domain == "button" and name.endswith(" Restart"):
-            container_restart_buttons.append(entity_id)
+            bucket["restart_buttons"].append(eid)
         elif domain == "button" and name.endswith(" Pull Update"):
-            container_pull_buttons.append(entity_id)
+            bucket["pull_buttons"].append(eid)
         elif domain == "sensor" and name.endswith(" Status"):
-            container_status_sensors.append(entity_id)
+            bucket["status_sensors"].append(eid)
         elif domain == "binary_sensor" and name.endswith(" Update Available"):
-            container_update_bin.append(entity_id)
-        elif domain == "button" and name.startswith("Stack: ") and name.endswith(" Start"):
-            stack_start_buttons.append(entity_id)
-        elif domain == "button" and name.startswith("Stack: ") and name.endswith(" Stop"):
-            stack_stop_buttons.append(entity_id)
-        elif domain == "button" and name.startswith("Stack: ") and name.endswith(" Update"):
-            stack_update_buttons.append(entity_id)
+            bucket["update_bin"].append(eid)
 
-    # Sort for stable layout
-    container_switches.sort()
-    container_restart_buttons.sort()
-    container_pull_buttons.sort()
-    container_status_sensors.sort()
-    container_update_bin.sort()
+    # Sort entities for stable layouts
+    for bucket in groups.values():
+        for key in bucket:
+            bucket[key].sort()
 
-    stack_start_buttons.sort()
-    stack_stop_buttons.sort()
-    stack_update_buttons.sort()
-
-    # Global update count sensor via template (inline in card via jinja is not supported),
-    # so we will build a simple entities card grouping update binaries.
+    # Home view (overview)
+    all_updates = [eid for b in groups.values() for eid in b["update_bin"]]
     overview_cards: List[Dict[str, Any]] = []
-    if container_update_bin:
-        overview_cards.append({
-            "type": "entity",
-            "entity": container_update_bin[0],
-            "name": "Example: Update Available",
-            "icon": "mdi:update",
-        })
-        # Also show a glance of all update flags
+    if all_updates:
         overview_cards.append({
             "type": "glance",
             "title": "Container Updates",
-            "entities": container_update_bin[:30],
+            "entities": all_updates[:30],
             "show_name": True,
             "show_icon": True,
         })
+    else:
+        overview_cards.append({"type": "markdown", "content": "No Portainer entities found yet."})
 
-    # Controls view combines switches and buttons
-    controls_cards: List[Dict[str, Any]] = []
-    if container_switches:
-        controls_cards.append({
-            "type": "entities",
-            "title": "Container Switches",
-            "entities": container_switches,
-            "state_color": True,
-        })
-    if container_restart_buttons:
-        controls_cards.append({
-            "type": "entities",
-            "title": "Restart Buttons",
-            "entities": container_restart_buttons,
-        })
-    if container_pull_buttons:
-        controls_cards.append({
-            "type": "entities",
-            "title": "Pull Update Buttons",
-            "entities": container_pull_buttons,
-        })
+    # Build one view per stack plus a Standalone view
+    def _slugify(text: str) -> str:
+        return text.lower().replace(" ", "-").replace("/", "-")
 
-    # Containers view: per-container rows combining controls + status + update
-    # For simplicity, show grouped entities lists
-    container_cards: List[Dict[str, Any]] = []
-    if container_status_sensors:
-        container_cards.append({
-            "type": "entities",
-            "title": "Container Status",
-            "entities": container_status_sensors,
-        })
-    if container_update_bin:
-        container_cards.append({
-            "type": "entities",
-            "title": "Update Available",
-            "entities": container_update_bin,
-        })
-
-    # Stacks view
-    stacks_cards: List[Dict[str, Any]] = []
-    stack_entities: List[str] = []
-    stack_entities.extend(stack_start_buttons)
-    stack_entities.extend(stack_stop_buttons)
-    stack_entities.extend(stack_update_buttons)
-    if stack_entities:
-        stacks_cards.append({
-            "type": "entities",
-            "title": "Stack Controls",
-            "entities": stack_entities,
-        })
-
-    # Build views
     views: List[Dict[str, Any]] = []
     views.append({
         "title": "Home",
         "path": "home",
-        "cards": overview_cards or [{"type": "markdown", "content": "No Portainer entities found yet."}],
-        "theme": "",
+        "cards": overview_cards,
         "badges": [],
     })
 
-    if controls_cards:
-        views.append({
-            "title": "Controls",
-            "path": "controls",
-            "cards": controls_cards,
-        })
+    for stack_name in sorted([k for k in groups.keys() if k != "Standalone"], key=lambda s: s.lower()):
+        b = groups[stack_name]
+        cards: List[Dict[str, Any]] = []
+        if b["stack_buttons"]:
+            cards.append({
+                "type": "entities",
+                "title": "Stack Controls",
+                "entities": b["stack_buttons"],
+            })
+        if b["switches"]:
+            cards.append({
+                "type": "entities",
+                "title": "Container Switches",
+                "entities": b["switches"],
+                "state_color": True,
+            })
+        if b["restart_buttons"]:
+            cards.append({
+                "type": "entities",
+                "title": "Restart Buttons",
+                "entities": b["restart_buttons"],
+            })
+        if b["pull_buttons"]:
+            cards.append({
+                "type": "entities",
+                "title": "Pull Update Buttons",
+                "entities": b["pull_buttons"],
+            })
+        if b["status_sensors"]:
+            cards.append({
+                "type": "entities",
+                "title": "Status",
+                "entities": b["status_sensors"],
+            })
+        if b["update_bin"]:
+            cards.append({
+                "type": "entities",
+                "title": "Update Available",
+                "entities": b["update_bin"],
+            })
+        if cards:
+            views.append({
+                "title": f"Stack: {stack_name}",
+                "path": _slugify(stack_name),
+                "cards": cards,
+            })
 
-    if container_cards:
-        views.append({
-            "title": "Containers",
-            "path": "containers",
-            "cards": container_cards,
-        })
-
-    if stacks_cards:
-        views.append({
-            "title": "Stacks",
-            "path": "stacks",
-            "cards": stacks_cards,
-        })
+    # Standalone view last
+    if "Standalone" in groups:
+        b = groups["Standalone"]
+        cards: List[Dict[str, Any]] = []
+        if b["switches"]:
+            cards.append({
+                "type": "entities",
+                "title": "Container Switches",
+                "entities": b["switches"],
+                "state_color": True,
+            })
+        if b["restart_buttons"]:
+            cards.append({
+                "type": "entities",
+                "title": "Restart Buttons",
+                "entities": b["restart_buttons"],
+            })
+        if b["pull_buttons"]:
+            cards.append({
+                "type": "entities",
+                "title": "Pull Update Buttons",
+                "entities": b["pull_buttons"],
+            })
+        if b["status_sensors"]:
+            cards.append({
+                "type": "entities",
+                "title": "Status",
+                "entities": b["status_sensors"],
+            })
+        if b["update_bin"]:
+            cards.append({
+                "type": "entities",
+                "title": "Update Available",
+                "entities": b["update_bin"],
+            })
+        if cards:
+            views.append({
+                "title": "Standalone",
+                "path": "standalone",
+                "cards": cards,
+            })
 
     # Compose full dashboard config
     ll_config: Dict[str, Any] = {
@@ -177,18 +203,15 @@ async def ensure_dashboard_exists(hass: HomeAssistant, *, title: str = DASHBOARD
         from homeassistant.components.lovelace import dashboards as ll_dash
         store = ll_dash.LovelaceDashboards(hass)
 
-        # If exists, update; otherwise create
         existing = await store.async_get_dashboard(url_path)
         if existing is None:
             await store.async_create_dashboard(url_path=url_path, title=title, mode="storage", require_admin=False, show_in_sidebar=True, icon="mdi:docker")
             _LOGGER.info("Created dashboard '%s' at path '%s'", title, url_path)
         else:
-            # Update title/visibility if changed
             if existing.get("title") != title or not existing.get("show_in_sidebar", True):
                 await store.async_update_dashboard(url_path=url_path, title=title, show_in_sidebar=True, icon=existing.get("icon") or "mdi:docker")
                 _LOGGER.info("Updated dashboard meta for path '%s'", url_path)
 
-        # Now set dashboard content configuration
         await store.async_save_config(url_path=url_path, config=ll_config)
         _LOGGER.info("Saved dashboard config for '%s'", url_path)
     except Exception as e:  # noqa: BLE001
