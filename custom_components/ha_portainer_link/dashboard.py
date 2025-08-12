@@ -203,16 +203,42 @@ async def ensure_dashboard_exists(hass: HomeAssistant, *, title: str = DASHBOARD
         from homeassistant.components.lovelace import dashboards as ll_dash
         store = ll_dash.LovelaceDashboards(hass)
 
-        existing = await store.async_get_dashboard(url_path)
+        # Compatibility for method names across HA versions
+        get_method = getattr(store, "async_get", None) or getattr(store, "async_get_dashboard")
+        create_method = getattr(store, "async_create", None) or getattr(store, "async_create_dashboard")
+        update_method = getattr(store, "async_update", None) or getattr(store, "async_update_dashboard")
+
+        existing = await get_method(url_path)
         if existing is None:
-            await store.async_create_dashboard(url_path=url_path, title=title, mode="storage", require_admin=False, show_in_sidebar=True, icon="mdi:docker")
+            # Some HA versions do not accept a 'mode' parameter here
+            await create_method(
+                url_path=url_path,
+                title=title,
+                require_admin=False,
+                show_in_sidebar=True,
+                icon="mdi:docker",
+            )
             _LOGGER.info("Created dashboard '%s' at path '%s'", title, url_path)
         else:
+            # Keep metadata in sync
             if existing.get("title") != title or not existing.get("show_in_sidebar", True):
-                await store.async_update_dashboard(url_path=url_path, title=title, show_in_sidebar=True, icon=existing.get("icon") or "mdi:docker")
+                await update_method(
+                    url_path=url_path,
+                    title=title,
+                    show_in_sidebar=True,
+                    icon=existing.get("icon") or "mdi:docker",
+                )
                 _LOGGER.info("Updated dashboard meta for path '%s'", url_path)
 
-        await store.async_save_config(url_path=url_path, config=ll_config)
+        # Save the config using the method available in this HA version
+        if hasattr(store, "async_save_config"):
+            await store.async_save_config(url_path=url_path, config=ll_config)
+        elif hasattr(store, "async_save"):
+            # Older/newer core versions use a shorter name
+            await store.async_save(url_path=url_path, config=ll_config)
+        else:
+            raise AttributeError("No supported save method found for LovelaceDashboards")
+
         _LOGGER.info("Saved dashboard config for '%s'", url_path)
     except Exception as e:  # noqa: BLE001
-        _LOGGER.warning("Failed to create/update Lovelace dashboard: %s", e)
+        _LOGGER.exception("Failed to create/update Lovelace dashboard: %s", e)
