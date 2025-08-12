@@ -4,6 +4,7 @@
   "version": "0.5.7",
   "documentation": "https://github.com/rob0r7/ha_portainer_link",
   "dependencies": [],
+  "after_dependencies": ["lovelace"],
   "codeowners": ["@rob0r7"],
   "requirements": ["requests"],
   "iot_class": "local_polling",
