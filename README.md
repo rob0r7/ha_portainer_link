@@ -95,6 +95,46 @@ Portainer Endpoint
 └── Standalone Container: monitoring (switch, sensors, buttons)
 ```
 
+## 📊 Sensors
+
+### Container Sensors
+- **Status**: Running, stopped, paused
+- **CPU Usage**: Current CPU utilization
+- **Memory Usage**: Current memory consumption
+- **Uptime**: Container running time
+- **Image**: Current image name and tag
+- **Current Version**: Extracted version from image
+- **Available Version**: Latest available version (if enabled)
+- **Update Available**: Whether updates are available (if enabled)
+- **Current Digest**: Current image digest (first 12 characters of SHA256)
+- **Available Digest**: Available image digest from registry (if enabled)
+
+### Stack Sensors
+- **Status**: Overall stack status
+- **Container Count**: Number of containers in stack
+
+## 🔘 Switches & Buttons
+
+### Container Controls
+- **Container Switch**: Start/stop individual containers
+- **Restart Button**: Restart container (always enabled)
+- **Pull Update Button**: Pull latest image (always enabled)
+
+### Stack Controls
+- **Stack Start**: Start entire stack (enabled by default for stack containers)
+- **Stack Stop**: Stop entire stack (enabled by default for stack containers)
+- **Stack Update**: Comprehensive update with image pulling, container recreation, and robust error handling (enabled by default for stack containers)
+
+## 🛠️ Services
+
+### Available Services
+
+#### `ha_portainer_link.reload`
+Reload all Portainer integrations.
+
+#### `ha_portainer_link.refresh`
+Force refresh container data for all integrations.
+
 ## 🔍 Troubleshooting
 
 ### Common Issues
@@ -138,48 +178,8 @@ Enable debug logging in your `configuration.yaml`:
 ```yaml
 logger:
   logs:
-    custom_components.ha_portainer_link: debug
+    ha_portainer_link: debug
 ```
-
-## 🛠️ Services
-
-### Available Services
-
-#### `ha_portainer_link.reload`
-Reload all Portainer integrations.
-
-#### `ha_portainer_link.refresh`
-Force refresh container data for all integrations.
-
-## 📊 Sensors
-
-### Container Sensors
-- **Status**: Running, stopped, paused
-- **CPU Usage**: Current CPU utilization
-- **Memory Usage**: Current memory consumption
-- **Uptime**: Container running time
-- **Image**: Current image name and tag
-- **Current Version**: Extracted version from image
-- **Available Version**: Latest available version (if enabled)
-- **Update Available**: Whether updates are available (if enabled)
-- **Current Digest**: Current image digest (first 12 characters of SHA256)
-- **Available Digest**: Available image digest from registry (if enabled)
-
-### Stack Sensors
-- **Status**: Overall stack status
-- **Container Count**: Number of containers in stack
-
-## 🔘 Switches & Buttons
-
-### Container Controls
-- **Container Switch**: Start/stop individual containers
-- **Restart Button**: Restart container (always enabled)
-- **Pull Update Button**: Pull latest image (always enabled)
-
-### Stack Controls
-- **Stack Start**: Start entire stack (enabled by default for stack containers)
-- **Stack Stop**: Stop entire stack (enabled by default for stack containers)
-- **Stack Update**: Comprehensive update with image pulling, container recreation, and robust error handling (enabled by default for stack containers)
 
 ## 🔄 Recent Updates
 
@@ -247,11 +247,125 @@ Force refresh container data for all integrations.
 - Refactored to modular API architecture
 - Added DataUpdateCoordinator for better performance
 - Implemented automatic container discovery
-
-### v0.3.1
 - Complete rewrite with modern Home Assistant patterns
 - Added stack clustering and organization
 - Implemented comprehensive error handling
+
+## 🙌 How You Can Help Test
+
+A lightweight checklist for volunteers to validate the integration end-to-end before releases. Please **use a non-critical Portainer environment** (or a throwaway stack) because these tests start/stop/redeploy containers and stacks.
+
+### 0) Prerequisites (one-time)
+- Home Assistant **2023.8.0+**
+- Portainer CE/EE with API access; note your **Endpoint ID** (the number after `#!/` in Portainer's URL)
+- Network connectivity from Home Assistant → Portainer
+
+### 1) Install & Add the Integration
+1. Install via **HACS** (custom repo) *or* copy `custom_components/ha_portainer_link` into `config/custom_components/`, then restart HA.
+2. In HA: **Settings → Devices & Services → Add Integration → "HA Portainer Link."**
+3. Enter:
+   - **Portainer URL** (e.g., `https://<ip>:9443`)
+   - **Username/Password** or **API key**
+   - **Endpoint ID** from the Portainer URL (`#!/<id>/docker/...`)
+
+**Expected:** A "Portainer Endpoint" device appears, with child devices for stacks/containers (if any).
+
+### 2) Quick Sanity Checks
+- **Discovery:** Containers/stacks appear automatically as devices/entities.
+- **Sensors present:** status, uptime, image; and (by default) CPU, memory, version, digest, update flags.
+- **Controls present:** container **switch** (start/stop), **Restart**, **Pull Update**; stack **Start/Stop/Update** on stack containers.
+
+### 3) Sensor Validation
+For one **standalone container** and one **stack container**, verify:
+- **Status** changes between *running/stopped/paused* and matches Portainer.
+- **Uptime** increases while running and resets after restart.
+- **CPU/Memory** show activity under load.
+- **Image/Version/Digest**:
+  - *Current Version/Digest* reflect the running image.
+  - If you publish a newer image/tag, check **Available Version/Digest** and **Update Available**.
+
+### 4) Container Controls
+Pick a low-risk container:
+1. **Toggle the container switch OFF → ON.**  
+   **Expected:** Portainer shows the same state; HA sensors update after the next refresh.
+2. **Press "Restart."**  
+   **Expected:** Short downtime; uptime resets; status returns to *running*.
+3. **Press "Pull Update."** (if a newer tag exists)  
+   **Expected:** Latest image pulled; version/digest sensors change on refresh; container restarts if needed.
+
+### 5) Stack Controls (if you have stacks)
+Use a small test stack (e.g., `nginx` + `whoami`). Then:
+- **Start/Stop** the stack from HA.  
+  **Expected:** all stack containers start/stop together; stack status reflects reality.
+- **Update** the stack from HA.  
+  This triggers the enhanced update flow (fetch compose + env, stop, delete, redeploy, wait, with fallbacks).  
+  **Expected:** fresh containers are created with the latest images and the stack returns to *running*.
+
+**Minimal demo stack (optional)**
+```yaml
+version: "3.8"
+services:
+  whoami:
+    image: traefik/whoami:latest
+    ports: ["8000:80"]
+  nginx:
+    image: nginx:alpine
+    ports: ["8080:80"]
+```
+Deploy in Portainer, then test HA's Stack Start/Stop/Update buttons.
+
+### 6) Services
+In **Developer Tools → Services**:
+- Call `ha_portainer_link.refresh`  
+  **Expected:** entities refresh without errors; states/sensors re-pull from Portainer.
+- (If you manage multiple endpoints) Call `ha_portainer_link.reload`  
+  **Expected:** integrations reload cleanly.
+
+### 7) Common Failure Scenarios (please test!)
+- **Wrong Endpoint ID:** set an incorrect ID during setup.  
+  **Expected:** clear error ("Endpoint … not found (404)") with guidance to fix.
+- **SSL quirks:** self-signed certs should work (SSL verification disabled by default). If you enable verification manually, report any errors.
+- **Logger config typo:** using `custom_components.ha_portainer_link` under `logger:` should error; fix to `ha_portainer_link: info`.
+- **Stuck state:** if entities don't update after actions, call `ha_portainer_link.refresh` and re-check Portainer.
+
+### 8) Performance & Stability
+- Note the **update interval** you configured (current builds support 1–60 minutes).
+- Observe HA responsiveness and CPU/memory while sensors update under container load; report any spikes or slowdowns.
+
+### 9) What to Report (copy/paste)
+Please include:
+- **Environment:** HA version, Portainer version, endpoint type (Docker/Agent), Endpoint ID
+- **Install method:** HACS/manual
+- **What you tested:** e.g., "Container restart button on `my_app`" / "Stack update on `demo_stack`"
+- **Expected vs actual:** what you clicked, what happened in HA and in Portainer
+- **Logs:** enable debug and attach relevant snippets:
+  ```yaml
+  logger:
+    logs:
+      ha_portainer_link: debug
+  ```
+  Reproduce once and capture logs + timestamps.
+
+**Tips**
+- If a button appears to "do nothing," wait for the next coordinator refresh or run `ha_portainer_link.refresh`, then check Portainer directly.
+- For update tests, ensure there *is* a newer image/tag; otherwise "Update Available" will remain false.
+
+## ⚠️ Current Limitations
+
+### What's Not Yet Implemented
+- **Runtime Configuration**: Feature toggles and update intervals cannot be changed after installation
+- **SSL Configuration**: SSL verification is hardcoded to `ssl=False`
+- **Bulk Operations**: Start/stop all containers functionality is not implemented
+- **Container Logs**: Log viewing functionality is not implemented
+- **Health Monitoring**: Container health status tracking is not implemented
+- **Backup Management**: Container/stack backup functionality is not implemented
+
+### Workarounds
+- To change feature toggles: Remove and re-add the integration with new settings
+- To enable SSL verification: Modify the code in the respective API files
+- To enable disabled features: Modify the configuration in `coordinator.py`
+
+**Note**: This is a custom integration and not officially supported by Home Assistant. Use at your own risk.
 
 ## 🤝 Contributing
 
@@ -275,135 +389,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Portainer team for the excellent API
 - Home Assistant community for the amazing platform
 - All contributors and testers
-
----
-
-## ⚠️ Current Limitations
-
-### What's Not Yet Implemented
-- **Runtime Configuration**: Feature toggles and update intervals cannot be changed after installation
-- **SSL Configuration**: SSL verification is hardcoded to `ssl=False`
-- **Bulk Operations**: Start/stop all containers functionality is not implemented
-- **Container Logs**: Log viewing functionality is not implemented
-- **Health Monitoring**: Container health status tracking is not implemented
-- **Backup Management**: Container/stack backup functionality is not implemented
-
-### Workarounds
-- To change feature toggles: Remove and re-add the integration with new settings
-- To enable SSL verification: Modify the code in the respective API files
-- To enable disabled features: Modify the configuration in `coordinator.py`
-
-**Note**: This is a custom integration and not officially supported by Home Assistant. Use at your own risk.
-
-
-@@
- ## 🙏 Acknowledgments
- 
- - Portainer team for the excellent API
- - Home Assistant community for the amazing platform
- - All contributors and testers
- 
- ---
- 
-+## 🙌 How You Can Help Test
-+
-+A lightweight checklist for volunteers to validate the integration end-to-end before releases. Please **use a non-critical Portainer environment** (or a throwaway stack) because these tests start/stop/redeploy containers and stacks.
-+
-+### 0) Prereqs (one-time)
-+- Home Assistant **2023.8.0+**
-+- Portainer CE/EE with API access; note your **Endpoint ID** (the number after `#!/` in Portainer’s URL)
-+- Network connectivity from Home Assistant → Portainer
-+
-+### 1) Install & Add the Integration
-+1. Install via **HACS** (custom repo) *or* copy `custom_components/ha_portainer_link` into `config/custom_components/`, then restart HA.
-+2. In HA: **Settings → Devices & Services → Add Integration → “HA Portainer Link.”**
-+3. Enter:
-+   - **Portainer URL** (e.g., `https://<ip>:9443`)
-+   - **Username/Password** or **API key**
-+   - **Endpoint ID** from the Portainer URL (`#!/<id>/docker/...`)
-+
-+**Expected:** A “Portainer Endpoint” device appears, with child devices for stacks/containers (if any).
-+
-+### 2) Quick Sanity Checks
-+- **Discovery:** Containers/stacks appear automatically as devices/entities.
-+- **Sensors present:** status, uptime, image; and (by default) CPU, memory, version, digest, update flags.
-+- **Controls present:** container **switch** (start/stop), **Restart**, **Pull Update**; stack **Start/Stop/Update** on stack containers.
-+
-+### 3) Sensor Validation
-+For one **standalone container** and one **stack container**, verify:
-+- **Status** changes between *running/stopped/paused* and matches Portainer.
-+- **Uptime** increases while running and resets after restart.
-+- **CPU/Memory** show activity under load.
-+- **Image/Version/Digest**:
-+  - *Current Version/Digest* reflect the running image.
-+  - If you publish a newer image/tag, check **Available Version/Digest** and **Update Available**.
-+
-+### 4) Container Controls
-+Pick a low-risk container:
-+1. **Toggle the container switch OFF → ON.**  
-+   **Expected:** Portainer shows the same state; HA sensors update after the next refresh.
-+2. **Press “Restart.”**  
-+   **Expected:** Short downtime; uptime resets; status returns to *running*.
-+3. **Press “Pull Update.”** (if a newer tag exists)  
-+   **Expected:** Latest image pulled; version/digest sensors change on refresh; container restarts if needed.
-+
-+### 5) Stack Controls (if you have stacks)
-+Use a small test stack (e.g., `nginx` + `whoami`). Then:
-+- **Start/Stop** the stack from HA.  
-+  **Expected:** all stack containers start/stop together; stack status reflects reality.
-+- **Update** the stack from HA.  
-+  This triggers the enhanced update flow (fetch compose + env, stop, delete, redeploy, wait, with fallbacks).  
-+  **Expected:** fresh containers are created with the latest images and the stack returns to *running*.
-+
-+**Minimal demo stack (optional)**
-+```yaml
-+version: "3.8"
-+services:
-+  whoami:
-+    image: traefik/whoami:latest
-+    ports: ["8000:80"]
-+  nginx:
-+    image: nginx:alpine
-+    ports: ["8080:80"]
-+```
-+Deploy in Portainer, then test HA’s Stack Start/Stop/Update buttons.
-+
-+### 6) Services
-+In **Developer Tools → Services**:
-+- Call `ha_portainer_link.refresh`  
-+  **Expected:** entities refresh without errors; states/sensors re-pull from Portainer.
-+- (If you manage multiple endpoints) Call `ha_portainer_link.reload`  
-+  **Expected:** integrations reload cleanly.
-+
-+### 7) Common Failure Scenarios (please test!)
-+- **Wrong Endpoint ID:** set an incorrect ID during setup.  
-+  **Expected:** clear error (“Endpoint … not found (404)”) with guidance to fix.
-+- **SSL quirks:** self-signed certs should work (SSL verification disabled by default). If you enable verification manually, report any errors.
-+- **Logger config typo:** using `custom_components.ha_portainer_link` under `logger:` should error; fix to `ha_portainer_link: info`.
-+- **Stuck state:** if entities don’t update after actions, call `ha_portainer_link.refresh` and re-check Portainer.
-+
-+### 8) Performance & Stability
-+- Note the **update interval** you configured (current builds support 1–60 minutes).
-+- Observe HA responsiveness and CPU/memory while sensors update under container load; report any spikes or slowdowns.
-+
-+### 9) What to Report (copy/paste)
-+Please include:
-+- **Environment:** HA version, Portainer version, endpoint type (Docker/Agent), Endpoint ID
-+- **Install method:** HACS/manual
-+- **What you tested:** e.g., “Container restart button on `my_app`” / “Stack update on `demo_stack`”
-+- **Expected vs actual:** what you clicked, what happened in HA and in Portainer
-+- **Logs:** enable debug and attach relevant snippets:
-+  ```yaml
-+  logger:
-+    logs:
-+      custom_components.ha_portainer_link: debug
-+  ```
-+  Reproduce once and capture logs + timestamps.
-+
-+**Tips**
-+- If a button appears to “do nothing,” wait for the next coordinator refresh or run `ha_portainer_link.refresh`, then check Portainer directly.
-+- For update tests, ensure there *is* a newer image/tag; otherwise “Update Available” will remain false.
-+
- ## ⚠️ Current Limitations
 
 
