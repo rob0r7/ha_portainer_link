@@ -212,9 +212,19 @@ async def ensure_dashboard_exists(hass: HomeAssistant, *, title: str = DASHBOARD
             except Exception:  # noqa: BLE001
                 store = None
 
+        # Fallback: discover dashboards store from hass.data for newer HA versions
+        if store is None:
+            ll_data = hass.data.get("lovelace")
+            if isinstance(ll_data, dict):
+                for _key, _val in ll_data.items():
+                    if hasattr(_val, "async_get") and (hasattr(_val, "async_save_config") or hasattr(_val, "async_save")):
+                        store = _val
+                        break
+
         if store is None:
             _LOGGER.warning(
-                "Lovelace dashboards API not available on this HA version; skipping dashboard creation."
+                "Lovelace dashboards API not available; keys in hass.data.lovelace=%s",
+                list((hass.data.get("lovelace") or {}).keys()),
             )
             return
 
