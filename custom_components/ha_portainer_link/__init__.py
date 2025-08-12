@@ -18,8 +18,8 @@ async def async_setup(hass: HomeAssistant, config: dict):
         except Exception as e:  # noqa: BLE001
             _LOGGER.warning("Dashboard helper unavailable: %s", e)
             return
-        title = call.data.get("title") or "HA Protainer Link"
-        url_path = call.data.get("url_path") or "ha-protainer-link"
+        title = call.data.get("title") or "HA Portainer Link"
+        url_path = call.data.get("url_path") or "ha-portainer-link"
         try:
             await ensure_dashboard_exists(hass, title=title, url_path=url_path)
             _LOGGER.info("Dashboard '%s' ensured at /%s", title, url_path)
@@ -42,8 +42,8 @@ async def _maybe_create_dashboard(hass: HomeAssistant, entry: ConfigEntry) -> No
         _LOGGER.debug("Dashboard helper not available: %s", e)
         return
 
-    title: str = data.get("dashboard_title", "HA Protainer Link")
-    url_path: str = data.get("dashboard_path", "ha-protainer-link")
+    title: str = data.get("dashboard_title", "HA Portainer Link")
+    url_path: str = data.get("dashboard_path", "ha-portainer-link")
     try:
         await ensure_dashboard_exists(hass, title=title, url_path=url_path)
         _LOGGER.info("Ensured dashboard '%s' at /%s exists", title, url_path)
@@ -65,11 +65,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = entry.data
 
+    # Start dashboard creation concurrently so it's not blocked by platform setup
+    hass.async_create_task(_maybe_create_dashboard(hass, entry))
+
     # ✅ Richtiger Aufruf!
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
-    # Optionally create the Lovelace dashboard
-    await _maybe_create_dashboard(hass, entry)
 
     return True
 
