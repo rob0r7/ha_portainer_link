@@ -222,10 +222,21 @@ async def ensure_dashboard_exists(hass: HomeAssistant, *, title: str = DASHBOARD
                         break
 
         if store is None:
-            _LOGGER.warning(
-                "Lovelace dashboards API not available; keys in hass.data.lovelace=%s",
-                list((hass.data.get("lovelace") or {}).keys()),
-            )
+            # Handle different types of lovelace data structure
+            if ll_data is None:
+                _LOGGER.warning("Lovelace dashboards API not available; no lovelace data found")
+            elif hasattr(ll_data, 'keys'):
+                # Older HA versions where lovelace data is a dict
+                _LOGGER.warning(
+                    "Lovelace dashboards API not available; keys in hass.data.lovelace=%s",
+                    list(ll_data.keys()),
+                )
+            else:
+                # Newer HA versions where lovelace data is a LovelaceData object
+                _LOGGER.warning(
+                    "Lovelace dashboards API not available; lovelace data type: %s",
+                    type(ll_data).__name__
+                )
             return
 
         # Compatibility for method names across HA versions
