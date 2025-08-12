@@ -200,8 +200,23 @@ async def ensure_dashboard_exists(hass: HomeAssistant, *, title: str = DASHBOARD
 
     # Create or update the dashboard in storage
     try:
-        from homeassistant.components.lovelace import dashboards as ll_dash
-        store = ll_dash.LovelaceDashboards(hass)
+        # Try multiple import paths for Lovelace dashboards to support newer/older HA versions
+        store = None
+        try:
+            from homeassistant.components.lovelace import dashboards as ll_dash  # type: ignore
+            store = ll_dash.LovelaceDashboards(hass)
+        except Exception:  # noqa: BLE001
+            try:
+                from homeassistant.components.lovelace.dashboard import LovelaceDashboards as _LovelaceDashboards  # type: ignore[attr-defined]
+                store = _LovelaceDashboards(hass)
+            except Exception:  # noqa: BLE001
+                store = None
+
+        if store is None:
+            _LOGGER.warning(
+                "Lovelace dashboards API not available on this HA version; skipping dashboard creation."
+            )
+            return
 
         # Compatibility for method names across HA versions
         get_method = getattr(store, "async_get", None) or getattr(store, "async_get_dashboard")
