@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.7] - 2025-XX-XX
+## [0.5.7] - 2025-12-06
 
 ### Fixed
 - Improved dashboard creation compatibility with multiple Home Assistant versions
@@ -16,49 +16,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved dashboard creation logging and error messages
 - Enhanced compatibility detection for Lovelace dashboard API
 
-## [0.5.6] - 2025-XX-XX
+## [0.5.6] - 2025-12-05
 
 ### Fixed
 - Dashboard creation stability improvements
 - Fixed entity grouping for dashboard views
 - Improved stack detection in dashboard generation
 
-## [0.5.5] - 2025-XX-XX
+## [0.5.5] - 2025-12-04
 
 ### Fixed
 - Enhanced dashboard API detection for newer Home Assistant versions
 - Improved error recovery in dashboard creation process
 - Fixed dashboard metadata synchronization
 
-## [0.5.4] - 2025-XX-XX
+## [0.5.4] - 2025-12-03
 
 ### Fixed
 - Dashboard creation compatibility fixes for Home Assistant 2024.x
 - Improved Lovelace dashboard store detection
 - Enhanced fallback mechanisms for dashboard API access
 
-## [0.5.3] - 2025-XX-XX
+## [0.5.3] - 2025-12-02
 
 ### Fixed
 - Improved dashboard entity sorting and grouping
 - Fixed dashboard view slug generation
 - Enhanced error handling for missing entities in dashboard
 
-## [0.5.2] - 2025-XX-XX
+## [0.5.2] - 2025-12-01
 
 ### Fixed
 - Dashboard creation timing issues resolved
 - Improved delayed dashboard rebuild functionality
 - Enhanced entity discovery for dashboard generation
 
-## [0.5.1] - 2025-XX-XX
+## [0.5.1] - 2025-11-30
 
 ### Fixed
 - Dashboard creation service error handling improvements
 - Fixed dashboard path and title configuration
 - Enhanced logging for dashboard operations
 
-## [0.5.0] - 2025-XX-XX
+## [0.5.0] - 2025-11-25
 
 ### Added
 - Automatic Lovelace dashboard creation with organized views
@@ -76,7 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dashboard organizes containers by stack with dedicated views
 - Improved entity organization in dashboard views
 
-## [0.4.1] - 2025-XX-XX
+## [0.4.1] - 2025-11-15
 
 ### Fixed
 - Fixed excessive DNS queries from frequent update checks (GitHub issue #19)
