@@ -183,7 +183,12 @@ Force refresh container data for all integrations.
 
 ## 🔄 Recent Updates
 
-### v0.5.7 (Current)
+### v0.5.8 (Current)
+- 🔧 Fixed silent failures in automatic dashboard creation
+- 🔧 Improved error logging to make dashboard creation failures visible
+- 🔧 Enhanced diagnostic messages for troubleshooting dashboard creation issues
+
+### v0.5.7
 - 🔧 Improved dashboard creation compatibility with multiple Home Assistant versions
 - 🔧 Enhanced error handling in dashboard creation service
 - 🔧 Fixed dashboard rebuild logic for delayed entity loading

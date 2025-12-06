@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.8] - 2025-12-06
+
+### Fixed
+- Fixed silent failures in automatic dashboard creation
+- Improved error logging to make dashboard creation failures visible in logs
+- Changed debug/warning level logs to error level for dashboard creation issues
+- Added full exception stack traces to dashboard creation error logs
+- Enhanced error messages when Lovelace dashboard store cannot be found
+
+### Changed
+- Dashboard creation errors now log at ERROR level instead of WARNING/DEBUG for better visibility
+- Improved diagnostic messages to help identify dashboard creation failures
+
 ## [0.5.7] - 2025-12-06
 
 ### Fixed

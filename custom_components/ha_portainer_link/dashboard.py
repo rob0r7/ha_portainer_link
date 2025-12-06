@@ -21,6 +21,8 @@ async def ensure_dashboard_exists(hass: HomeAssistant, *, title: str = DASHBOARD
       - One view per stack (plus a Standalone view) with controls and the two requested sensors
     Only the Status sensor and Update Available binary_sensor are included from sensors as requested.
     """
+    _LOGGER.info("🔄 Starting dashboard creation/update for '%s' at path '%s'", title, url_path)
+    
     # Build entity lists grouped by stack device
     ent_reg = er.async_get(hass)
     dev_reg = dr.async_get(hass)
@@ -198,333 +200,115 @@ async def ensure_dashboard_exists(hass: HomeAssistant, *, title: str = DASHBOARD
         "views": views,
     }
 
-    # Create or update the dashboard in storage
+    # Create dashboard by writing storage files directly - much simpler and more reliable!
+    _LOGGER.info("Creating dashboard by writing storage files directly...")
+    
     try:
-        # Try multiple import paths for Lovelace dashboards to support newer/older HA versions
-        store = None
+        import json
+        from pathlib import Path
+        
+        # Get Home Assistant config directory
+        config_dir = Path(hass.config.config_dir)
+        storage_dir = config_dir / ".storage"
+        
+        # Dashboard metadata file (lovelace_dashboards.json)
+        dashboards_file = storage_dir / "lovelace_dashboards.json"
+        
+        # NEVER create lovelace as a directory - Home Assistant uses it as a JSON file!
+        # Clean up any incorrectly created directory FIRST, before any other operations
+        lovelace_path = storage_dir / "lovelace"
+        
+        def _cleanup_lovelace_directory():
+            if lovelace_path.exists() and lovelace_path.is_dir():
+                _LOGGER.warning("⚠️ Removing incorrectly created lovelace directory - Home Assistant expects this to be a JSON file, not a directory!")
+                import shutil
+                try:
+                    shutil.rmtree(lovelace_path)
+                    _LOGGER.info("✅ Successfully removed lovelace directory")
+                    return True
+                except Exception as e:
+                    _LOGGER.error("❌ Failed to remove lovelace directory: %s", e)
+                    return False
+            return True
+        
+        cleanup_success = await hass.async_add_executor_job(_cleanup_lovelace_directory)
+        if not cleanup_success:
+            _LOGGER.error("Could not clean up lovelace directory - dashboard creation may fail")
+        
+        # Store dashboard config in a safe location that won't conflict with Home Assistant files
+        # Use our own directory that won't interfere
+        config_file = storage_dir / "lovelace_dashboards_config" / f"{url_path}.json"
+        
+        # Read existing dashboards using async executor
+        def _read_dashboards():
+            if dashboards_file.exists():
+                try:
+                    with open(dashboards_file, 'r', encoding='utf-8') as f:
+                        return json.load(f)
+                except Exception as e:
+                    _LOGGER.warning("Could not read existing dashboards file: %s", e)
+            return {}
+        
+        dashboards_data = await hass.async_add_executor_job(_read_dashboards)
+        
+        # Ensure proper structure
+        if "data" not in dashboards_data:
+            dashboards_data = {"data": {"items": []}}
+        if "items" not in dashboards_data["data"]:
+            dashboards_data["data"]["items"] = []
+        
+        # Check if dashboard already exists
+        existing_dashboard = None
+        for item in dashboards_data["data"]["items"]:
+            if item.get("url_path") == url_path:
+                existing_dashboard = item
+                break
+        
+        # Create or update dashboard metadata
+        dashboard_meta = {
+            "url_path": url_path,
+            "title": title,
+            "icon": "mdi:docker",
+            "require_admin": False,
+            "show_in_sidebar": True,
+            "mode": "storage"
+        }
+        
+        if existing_dashboard:
+            # Update existing
+            existing_dashboard.update(dashboard_meta)
+            _LOGGER.info("Updated dashboard metadata for '%s'", url_path)
+        else:
+            # Add new dashboard
+            dashboards_data["data"]["items"].append(dashboard_meta)
+            _LOGGER.info("Added dashboard metadata for '%s'", url_path)
+        
+        # Write dashboard metadata file using async executor
+        def _write_dashboards():
+            storage_dir.mkdir(exist_ok=True)
+            with open(dashboards_file, 'w', encoding='utf-8') as f:
+                json.dump(dashboards_data, f, indent=2, ensure_ascii=False)
+        
+        await hass.async_add_executor_job(_write_dashboards)
+        _LOGGER.info("✅ Saved dashboard metadata to: %s", dashboards_file)
+        
+        # Write dashboard config file using async executor
+        def _write_config():
+            # Create parent directory safely - this is our dedicated directory, not lovelace
+            config_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(config_file, 'w', encoding='utf-8') as f:
+                json.dump(ll_config, f, indent=2, ensure_ascii=False)
+        
+        await hass.async_add_executor_job(_write_config)
+        _LOGGER.info("✅ Saved dashboard config to: %s", config_file)
+        _LOGGER.info("✅ Successfully created dashboard '%s' at /%s", title, url_path)
+        
+        # Try to reload Lovelace to pick up the new dashboard
         try:
-            from homeassistant.components.lovelace import dashboards as ll_dash  # type: ignore
-            store = ll_dash.LovelaceDashboards(hass)
-        except Exception:  # noqa: BLE001
-            try:
-                from homeassistant.components.lovelace.dashboard import LovelaceDashboards as _LovelaceDashboards  # type: ignore[attr-defined]
-                store = _LovelaceDashboards(hass)
-            except Exception:  # noqa: BLE001
-                try:
-                    # Try newer HA versions with different import path
-                    from homeassistant.components.lovelace.dashboard import LovelaceDashboards  # type: ignore
-                    store = LovelaceDashboards(hass)
-                except Exception:  # noqa: BLE001
-                    try:
-                                                 # Try to get from hass.data directly for newer versions
-                         from homeassistant.components.lovelace import LovelaceManager  # type: ignore
-                         potential_store = hass.data.get("lovelace")
-                         # Validate that the potential store is not a basic type
-                         if potential_store is not None and not isinstance(potential_store, (dict, list, str, int, float, bool)):
-                             store = potential_store
-                             _LOGGER.debug("Assigned store from hass.data.get('lovelace'): %s (type: %s)", store, type(store).__name__)
-                         else:
-                             _LOGGER.debug("Skipping hass.data.get('lovelace') - type: %s", type(potential_store).__name__ if potential_store is not None else "None")
-                    except Exception:  # noqa: BLE001
-                        store = None
-
-        # Fallback: discover dashboards store from hass.data for newer HA versions
-        if store is None:
-            ll_data = hass.data.get("lovelace")
-            _LOGGER.debug("Trying to find dashboard store in lovelace data: %s (type: %s)", ll_data, type(ll_data).__name__)
-            
-            if isinstance(ll_data, dict):
-                # Older HA versions where lovelace data is a dict
-                _LOGGER.debug("Lovelace data is a dict with keys: %s", list(ll_data.keys()))
-                for _key, _val in ll_data.items():
-                    # Only accept objects that have the essential dashboard methods and are not basic types
-                    if (not isinstance(_val, (dict, list, str, int, float, bool)) and
-                        hasattr(_val, "async_get") and 
-                        hasattr(_val, "async_create") and 
-                        hasattr(_val, "async_update")):
-                        store = _val
-                        _LOGGER.debug("Found store in dict key '%s': %s", _key, type(_val).__name__)
-                        _LOGGER.debug("Assigned store from dict key '%s': %s (type: %s)", _key, store, type(store).__name__)
-                        break
-                    else:
-                        _LOGGER.debug("Skipping dict key '%s' - type: %s, has methods: %s", 
-                                     _key, type(_val).__name__,
-                                     hasattr(_val, "async_get") and hasattr(_val, "async_create") and hasattr(_val, "async_update"))
-            elif ll_data is not None:
-                # Newer HA versions where lovelace data is a LovelaceData object
-                # Try to get the dashboards store from the LovelaceData object
-                try:
-                    _LOGGER.debug("Lovelace data is a %s object", type(ll_data).__name__)
-                    _LOGGER.debug("Available attributes: %s", [attr for attr in dir(ll_data) if not attr.startswith('_')])
-                    
-                    # Check if LovelaceData has a dashboards attribute
-                    if hasattr(ll_data, "dashboards"):
-                        potential_store = ll_data.dashboards
-                        _LOGGER.debug("Found dashboards attribute: %s (type: %s)", potential_store, type(potential_store).__name__)
-                        _LOGGER.debug("Dashboards object methods: %s", [attr for attr in dir(potential_store) if not attr.startswith('_') and callable(getattr(potential_store, attr, None))])
-                        
-                        # Be permissive: always try dashboards attribute first; method mapping is handled later
-                        if not isinstance(potential_store, (dict, list, str, int, float, bool)):
-                            store = potential_store
-                            _LOGGER.debug("Assigned store from dashboards attribute (permissive): %s (type: %s)", store, type(store).__name__)
-                        else:
-                            _LOGGER.debug("Dashboards attribute is a basic type (%s); will continue searching", type(potential_store).__name__)
-                    # Check if LovelaceData itself has the required methods
-                    if store is None and (
-                        hasattr(ll_data, "async_get") and 
-                          hasattr(ll_data, "async_create") and
-                          hasattr(ll_data, "async_update")
-                    ):
-                        # Validate that ll_data is not a basic type before using it
-                        if not isinstance(ll_data, (dict, list, str, int, float, bool)):
-                            store = ll_data
-                            _LOGGER.debug("Found store in LovelaceData object itself")
-                            _LOGGER.debug("Assigned store from LovelaceData object: %s (type: %s)", store, type(store).__name__)
-                        else:
-                            _LOGGER.debug("Skipping LovelaceData object itself - it's a basic type: %s", type(ll_data).__name__)
-                    if store is None:
-                        # Try to find dashboards store in LovelaceData attributes
-                        for attr_name in dir(ll_data):
-                            if not attr_name.startswith('_'):
-                                attr_value = getattr(ll_data, attr_name)
-                                if (
-                                    hasattr(attr_value, "async_get") or 
-                                    hasattr(attr_value, "async_get_dashboard") or
-                                    hasattr(attr_value, "async_create") or
-                                    hasattr(attr_value, "async_create_dashboard")
-                                ) and not isinstance(attr_value, (dict, list, str, int, float, bool)):
-                                    store = attr_value
-                                    _LOGGER.debug("Found store in attribute '%s': %s", attr_name, type(attr_value).__name__)
-                                    _LOGGER.debug("Assigned store from attribute '%s': %s (type: %s)", attr_name, store, type(store).__name__)
-                                    break
-                except Exception as e:
-                    _LOGGER.debug("Failed to extract store from LovelaceData: %s", e)
-
-        if store is None:
-            # Handle different types of lovelace data structure
-            ll_data = hass.data.get("lovelace")
-            if ll_data is None:
-                _LOGGER.warning("Lovelace dashboards API not available; no lovelace data found")
-            elif hasattr(ll_data, 'keys'):
-                # Older HA versions where lovelace data is a dict
-                _LOGGER.warning(
-                    "Lovelace dashboards API not available; keys in hass.data.lovelace=%s",
-                    list(ll_data.keys()),
-                )
-            else:
-                # Newer HA versions where lovelace data is a LovelaceData object
-                _LOGGER.warning(
-                    "Lovelace dashboards API not available; lovelace data type: %s, available attributes: %s",
-                    type(ll_data).__name__,
-                    [attr for attr in dir(ll_data) if not attr.startswith('_') and not callable(getattr(ll_data, attr, None))]
-                )
-                
-                # Try one more approach for newer HA versions - check if we can use the LovelaceData directly
-                _LOGGER.debug("Attempting to use LovelaceData directly - checking for dashboard methods")
-                try:
-                    if hasattr(ll_data, "async_create_dashboard"):
-                        # Validate that ll_data is not a basic type before using it
-                        if not isinstance(ll_data, (dict, list, str, int, float, bool)):
-                            _LOGGER.info("Found LovelaceData with async_create_dashboard method, attempting to use it directly")
-                            store = ll_data
-                            _LOGGER.debug("Assigned store from LovelaceData (async_create_dashboard): %s (type: %s)", store, type(store).__name__)
-                        else:
-                            _LOGGER.debug("Skipping LovelaceData (async_create_dashboard) - it's a basic type: %s", type(ll_data).__name__)
-                    elif hasattr(ll_data, "dashboards") and hasattr(ll_data.dashboards, "async_create_dashboard"):
-                        # Validate that dashboards is not a basic type before using it
-                        if not isinstance(ll_data.dashboards, (dict, list, str, int, float, bool)):
-                            # Check if it has all required methods before accepting it
-                            potential_store = ll_data.dashboards
-                            _LOGGER.debug("Found dashboards attribute with async_create_dashboard: %s (type: %s)", potential_store, type(potential_store).__name__)
-                            _LOGGER.debug("Dashboards object methods: %s", [attr for attr in dir(potential_store) if not attr.startswith('_') and callable(getattr(potential_store, attr, None))])
-                            
-                            # Check for required methods
-                            has_get = (hasattr(potential_store, "async_get") or 
-                                      hasattr(potential_store, "async_get_dashboard") or
-                                      hasattr(potential_store, "get") or
-                                      hasattr(potential_store, "get_dashboard"))
-                            has_create = (hasattr(potential_store, "async_create") or 
-                                        hasattr(potential_store, "async_create_dashboard") or
-                                        hasattr(potential_store, "create") or
-                                        hasattr(potential_store, "create_dashboard"))
-                            has_update = (hasattr(potential_store, "async_update") or 
-                                        hasattr(potential_store, "async_update_dashboard") or
-                                        hasattr(potential_store, "update") or
-                                        hasattr(potential_store, "update_dashboard"))
-                            
-                            _LOGGER.debug("Dashboards method check - get: %s, create: %s, update: %s", has_get, has_create, has_update)
-                            
-                            if has_get and has_create and has_update:
-                                _LOGGER.info("Found LovelaceData.dashboards with all required methods")
-                                store = potential_store
-                                _LOGGER.debug("Assigned store from LovelaceData.dashboards (async_create_dashboard): %s (type: %s)", store, type(store).__name__)
-                            else:
-                                _LOGGER.debug("Dashboards object missing required methods - get: %s, create: %s, update: %s", has_get, has_create, has_update)
-                        else:
-                            _LOGGER.debug("Skipping LovelaceData.dashboards - it's a basic type: %s", type(ll_data.dashboards).__name__)
-                        
-                    # Try to find dashboard store in other attributes
-                    if store is None:
-                        _LOGGER.debug("Checking other attributes for dashboard store")
-                        for attr_name in ['dashboards', 'yaml_dashboards', 'resources']:
-                            if hasattr(ll_data, attr_name):
-                                attr_value = getattr(ll_data, attr_name)
-                                _LOGGER.debug("Checking attribute '%s': %s (type: %s)", attr_name, attr_value, type(attr_value).__name__)
-                                
-                                # Only accept objects that are not basic types and have dashboard methods
-                                if (not isinstance(attr_value, (dict, list, str, int, float, bool)) and
-                                    (hasattr(attr_value, "async_get") or hasattr(attr_value, "async_get_dashboard"))):
-                                    _LOGGER.info("Found potential dashboard store in attribute '%s': %s", attr_name, type(attr_value).__name__)
-                                    store = attr_value
-                                    _LOGGER.debug("Assigned store from attribute '%s': %s (type: %s)", attr_name, store, type(store).__name__)
-                                    break
-                                else:
-                                    _LOGGER.debug("Skipping attribute '%s' - type: %s, has methods: %s", 
-                                                 attr_name, type(attr_value).__name__,
-                                                 hasattr(attr_value, "async_get") or hasattr(attr_value, "async_get_dashboard"))
-                            else:
-                                _LOGGER.debug("Attribute '%s' not found on LovelaceData", attr_name)
-                except Exception as e:
-                    _LOGGER.debug("Failed to use LovelaceData directly: %s", e)
-                    
-            if store is None:
-                _LOGGER.debug("No store found in LovelaceData fallback, returning early")
-                return
-
-        # Validate that the store has all required methods before proceeding
-        _LOGGER.info("Found dashboard store, proceeding with validation: %s (type: %s)", store, type(store).__name__)
-        _LOGGER.debug("Validating store object: %s (type: %s)", store, type(store).__name__)
+            await hass.services.async_call("lovelace", "reload", {}, blocking=False)
+            _LOGGER.info("Triggered Lovelace reload")
+        except Exception:
+            _LOGGER.debug("Could not trigger Lovelace reload service")
         
-        # Ensure store is not a basic type like dict, list, str, etc.
-        if isinstance(store, (dict, list, str, int, float, bool)):
-            _LOGGER.error("Store object is a basic type (%s), expected an object with dashboard methods", type(store).__name__)
-            return
-            
-        _LOGGER.debug("Store attributes: %s", [attr for attr in dir(store) if not attr.startswith('_') and not callable(getattr(store, attr, None))])
-        _LOGGER.debug("Store methods: %s", [attr for attr in dir(store) if not attr.startswith('_') and callable(getattr(store, attr, None))])
-        
-        # Check for various method name patterns that might exist
-        has_get = (hasattr(store, "async_get") or 
-                  hasattr(store, "async_get_dashboard") or
-                  hasattr(store, "get") or
-                  hasattr(store, "get_dashboard"))
-        has_create = (hasattr(store, "async_create") or 
-                    hasattr(store, "async_create_dashboard") or
-                    hasattr(store, "create") or
-                    hasattr(store, "create_dashboard"))
-        has_update = (hasattr(store, "async_update") or 
-                    hasattr(store, "async_update_dashboard") or
-                    hasattr(store, "update") or
-                    hasattr(store, "update_dashboard"))
-        
-        _LOGGER.debug("Method availability - get: %s, create: %s, update: %s", has_get, has_create, has_update)
-        
-        if not has_get:
-            _LOGGER.error("Store object missing required 'get' method: %s", type(store).__name__)
-            return
-        if not has_create:
-            _LOGGER.error("Store object missing required 'create' method: %s", type(store).__name__)
-            return
-        if not has_update:
-            _LOGGER.error("Store object missing required 'update' method: %s", type(store).__name__)
-            return
-            
-        # Compatibility for method names across HA versions
-        get_method = getattr(store, "async_get", None) or getattr(store, "async_get_dashboard")
-        create_method = getattr(store, "async_create", None) or getattr(store, "async_create_dashboard")
-        update_method = getattr(store, "async_update", None) or getattr(store, "async_update_dashboard")
-        
-        # Additional method name checks for newer HA versions
-        if get_method is None:
-            get_method = getattr(store, "get", None)
-        if create_method is None:
-            create_method = getattr(store, "create", None)
-        if update_method is None:
-            update_method = getattr(store, "update", None)
-            
-        _LOGGER.debug("Found methods - get: %s, create: %s, update: %s", 
-                     get_method.__name__ if get_method else None,
-                     create_method.__name__ if create_method else None,
-                     update_method.__name__ if update_method else None)
-
-        # Check if we have all required methods
-        if not all([get_method, create_method, update_method]):
-            missing_methods = []
-            if not get_method:
-                missing_methods.append("get")
-            if not create_method:
-                missing_methods.append("create")
-            if not update_method:
-                missing_methods.append("update")
-            _LOGGER.error("Missing required dashboard methods: %s", missing_methods)
-            return
-
-        existing = await get_method(url_path)
-        if existing is None:
-            # Some HA versions do not accept a 'mode' parameter here
-            await create_method(
-                url_path=url_path,
-                title=title,
-                require_admin=False,
-                show_in_sidebar=True,
-                icon="mdi:docker",
-            )
-            _LOGGER.info("Created dashboard '%s' at path '%s'", title, url_path)
-        else:
-            # Keep metadata in sync
-            if existing.get("title") != title or not existing.get("show_in_sidebar", True):
-                await update_method(
-                    url_path=url_path,
-                    title=title,
-                    show_in_sidebar=True,
-                    icon=existing.get("icon") or "mdi:docker",
-                )
-                _LOGGER.info("Updated dashboard meta for path '%s'", url_path)
-
-        # Save the config using the method available in this HA version
-        save_method = None
-        if hasattr(store, "async_save_config"):
-            save_method = store.async_save_config
-        elif hasattr(store, "async_save"):
-            # Older/newer core versions use a shorter name
-            save_method = store.async_save
-        elif hasattr(store, "save_config"):
-            # Some versions might use sync methods
-            save_method = store.save_config
-        elif hasattr(store, "save"):
-            # Some versions might use sync methods
-            save_method = store.save
-        
-        # Fallback: sometimes the save method lives on the parent LovelaceData
-        if save_method is None:
-            try:
-                ll_data_parent = hass.data.get("lovelace")
-                if ll_data_parent is not None:
-                    if hasattr(ll_data_parent, "async_save_config"):
-                        save_method = ll_data_parent.async_save_config
-                    elif hasattr(ll_data_parent, "async_save"):
-                        save_method = ll_data_parent.async_save
-                    elif hasattr(ll_data_parent, "save_config"):
-                        save_method = ll_data_parent.save_config
-                    elif hasattr(ll_data_parent, "save"):
-                        save_method = ll_data_parent.save
-            except Exception as e:
-                _LOGGER.debug("Error while finding save method on parent LovelaceData: %s", e)
-        
-        if save_method:
-            try:
-                if getattr(save_method, "__name__", "").startswith("async_"):
-                    await save_method(url_path=url_path, config=ll_config)
-                else:
-                    # Handle sync methods
-                    save_method(url_path=url_path, config=ll_config)
-            except Exception as e:
-                _LOGGER.error("Failed to save dashboard config: %s", e)
-                return
-        else:
-            _LOGGER.error("No supported save method found for LovelaceDashboards")
-            return
-
-        _LOGGER.info("Saved dashboard config for '%s'", url_path)
-    except Exception as e:  # noqa: BLE001
-        _LOGGER.exception("Failed to create/update Lovelace dashboard: %s", e)
+    except Exception as e:
+        _LOGGER.error("❌ Failed to create dashboard files: %s", e, exc_info=True)
