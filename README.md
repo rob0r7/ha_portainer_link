@@ -183,7 +183,19 @@ Force refresh container data for all integrations.
 
 ## 🔄 Recent Updates
 
-### v0.4.0 (Current)
+### v0.5.7 (Current)
+- 🔧 Improved dashboard creation compatibility with multiple Home Assistant versions
+- 🔧 Enhanced error handling in dashboard creation service
+- 🔧 Fixed dashboard rebuild logic for delayed entity loading
+
+### v0.5.0
+- 🚀 Automatic Lovelace dashboard creation with organized views
+- 🚀 Dashboard service for manual dashboard creation
+- 🚀 Home view with global container update overview
+- 🚀 Stack-specific views with container controls and status
+- 🚀 Configurable dashboard title and URL path during setup
+
+### v0.4.0
 - 🚀 Completely reworked stack update functionality with improved architecture
 - 🔧 Enhanced stack update with centralized request handling and SSL auto-fallback
 - 🔧 Added comprehensive error handling with detailed result reporting
