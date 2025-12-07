@@ -5,7 +5,115 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.0] - 2024-08-11
+## [0.5.9] - 2025-12-07
+
+### Removed
+- Removed automatic Lovelace dashboard creation functionality
+- Removed `ha_portainer_link.create_dashboard` service
+- Removed `ha_portainer_link.diagnose_dashboard` service
+- Removed dashboard configuration options from config flow
+- Removed dashboard-related code and dependencies
+
+### Changed
+- Simplified integration setup by removing dashboard creation step
+- Config flow now directly creates entry after basic configuration
+- Reduced codebase complexity by removing dashboard implementation
+
+## [0.5.8] - 2025-12-06
+
+### Fixed
+- Fixed silent failures in automatic dashboard creation
+- Improved error logging to make dashboard creation failures visible in logs
+- Changed debug/warning level logs to error level for dashboard creation issues
+- Added full exception stack traces to dashboard creation error logs
+- Enhanced error messages when Lovelace dashboard store cannot be found
+
+### Changed
+- Dashboard creation errors now log at ERROR level instead of WARNING/DEBUG for better visibility
+- Improved diagnostic messages to help identify dashboard creation failures
+
+## [0.5.7] - 2025-12-06
+
+### Fixed
+- Improved dashboard creation compatibility with multiple Home Assistant versions
+- Enhanced error handling in dashboard creation service
+- Fixed dashboard rebuild logic for delayed entity loading
+
+### Changed
+- Improved dashboard creation logging and error messages
+- Enhanced compatibility detection for Lovelace dashboard API
+
+## [0.5.6] - 2025-12-05
+
+### Fixed
+- Dashboard creation stability improvements
+- Fixed entity grouping for dashboard views
+- Improved stack detection in dashboard generation
+
+## [0.5.5] - 2025-12-04
+
+### Fixed
+- Enhanced dashboard API detection for newer Home Assistant versions
+- Improved error recovery in dashboard creation process
+- Fixed dashboard metadata synchronization
+
+## [0.5.4] - 2025-12-03
+
+### Fixed
+- Dashboard creation compatibility fixes for Home Assistant 2024.x
+- Improved Lovelace dashboard store detection
+- Enhanced fallback mechanisms for dashboard API access
+
+## [0.5.3] - 2025-12-02
+
+### Fixed
+- Improved dashboard entity sorting and grouping
+- Fixed dashboard view slug generation
+- Enhanced error handling for missing entities in dashboard
+
+## [0.5.2] - 2025-12-01
+
+### Fixed
+- Dashboard creation timing issues resolved
+- Improved delayed dashboard rebuild functionality
+- Enhanced entity discovery for dashboard generation
+
+## [0.5.1] - 2025-11-30
+
+### Fixed
+- Dashboard creation service error handling improvements
+- Fixed dashboard path and title configuration
+- Enhanced logging for dashboard operations
+
+## [0.5.0] - 2025-11-25
+
+### Added
+- Automatic Lovelace dashboard creation with organized views
+- Dashboard service `ha_portainer_link.create_dashboard` for manual dashboard creation
+- Automatic dashboard generation during integration setup
+- Home view with global container update overview
+- Stack-specific views with container controls and status
+- Standalone container view for non-stack containers
+- Configurable dashboard title and URL path during setup
+- Delayed dashboard rebuild to include all entities after initial load
+- Dashboard configuration options in config flow
+
+### Changed
+- Integration now automatically creates dashboard on setup (configurable)
+- Dashboard organizes containers by stack with dedicated views
+- Improved entity organization in dashboard views
+
+## [0.4.1] - 2025-11-15
+
+### Fixed
+- Fixed excessive DNS queries from frequent update checks (GitHub issue #19)
+- Implemented 5-minute minimum throttle for update checks in coordinator
+- Enhanced rate limiting and caching to prevent excessive registry queries
+- Reduced DNS query volume by throttling update checks to maximum once per 5 minutes
+- Minor bug fixes and stability improvements
+- Enhanced error messages for better troubleshooting
+
+## [0.4.0] - 2025-08-08
 
 ### Added
 - Comprehensive stack update functionality with multi-step process
@@ -22,6 +130,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated documentation to reflect new stack update capabilities
 
 ### Fixed
+- Fixed excessive DNS queries by implementing comprehensive session sharing across all API modules
+- Reduced DNS lookups through connection pooling and session reuse (addresses GitHub issue #19)
 - Entity category configuration for version sensors
 - Device registry warnings in Home Assistant logs
 - Integration mode handling and feature toggling

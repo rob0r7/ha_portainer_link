@@ -12,12 +12,12 @@ async def async_setup(hass: HomeAssistant, config: dict):
     """Set up HA Portainer Link from YAML."""
     return True
 
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up HA Portainer Link from a config entry."""
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = entry.data
 
-    # ✅ Richtiger Aufruf!
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True

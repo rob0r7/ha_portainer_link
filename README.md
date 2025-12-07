@@ -183,7 +183,34 @@ logger:
 
 ## 🔄 Recent Updates
 
-### v0.4.0 (Current - August 11, 2024)
+### v0.5.9 (Current)
+- 🔄 Removed automatic Lovelace dashboard creation functionality
+- 🔄 Removed dashboard services and configuration options
+- 🔄 Simplified integration setup process
+
+### v0.5.9
+- 🔄 Removed automatic Lovelace dashboard creation functionality
+- 🔄 Removed dashboard services and configuration options
+- 🔄 Simplified integration setup process
+
+### v0.5.8
+- 🔧 Fixed silent failures in automatic dashboard creation
+- 🔧 Improved error logging to make dashboard creation failures visible
+- 🔧 Enhanced diagnostic messages for troubleshooting dashboard creation issues
+
+### v0.5.7
+- 🔧 Improved dashboard creation compatibility with multiple Home Assistant versions
+- 🔧 Enhanced error handling in dashboard creation service
+- 🔧 Fixed dashboard rebuild logic for delayed entity loading
+
+### v0.5.0
+- 🚀 Automatic Lovelace dashboard creation with organized views
+- 🚀 Dashboard service for manual dashboard creation
+- 🚀 Home view with global container update overview
+- 🚀 Stack-specific views with container controls and status
+- 🚀 Configurable dashboard title and URL path during setup
+
+### v0.4.0
 - 🚀 Completely reworked stack update functionality with improved architecture
 - 🔧 Enhanced stack update with centralized request handling and SSL handling
 - 🔧 Added comprehensive error handling with detailed result reporting
