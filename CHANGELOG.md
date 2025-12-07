@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.9] - 2025-12-07
+
+### Removed
+- Removed automatic Lovelace dashboard creation functionality
+- Removed `ha_portainer_link.create_dashboard` service
+- Removed `ha_portainer_link.diagnose_dashboard` service
+- Removed dashboard configuration options from config flow
+- Removed dashboard-related code and dependencies
+
+### Changed
+- Simplified integration setup by removing dashboard creation step
+- Config flow now directly creates entry after basic configuration
+- Reduced codebase complexity by removing dashboard implementation
+
 ## [0.5.8] - 2025-12-06
 
 ### Fixed

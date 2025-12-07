@@ -8,21 +8,3 @@ refresh:
   description: "Force refresh container data for all Portainer integrations"
   fields: {}
 
-create_dashboard:
-  name: "Create HA Portainer Link Dashboard"
-  description: "Create or update the 'HA Portainer Link' Lovelace dashboard with views and entities"
-  fields:
-    title:
-      name: "Title"
-      description: "Dashboard title"
-      required: false
-      example: "HA Portainer Link"
-      selector:
-        text: {}
-    url_path:
-      name: "URL Path"
-      description: "Dashboard URL path (slug)"
-      required: false
-      example: "ha-portainer-link"
-      selector:
-        text: {}
