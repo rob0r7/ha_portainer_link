@@ -188,11 +188,6 @@ Force refresh container data for all integrations.
 - 🔄 Removed dashboard services and configuration options
 - 🔄 Simplified integration setup process
 
-### v0.5.9
-- 🔄 Removed automatic Lovelace dashboard creation functionality
-- 🔄 Removed dashboard services and configuration options
-- 🔄 Simplified integration setup process
-
 ### v0.5.8
 - 🔧 Fixed silent failures in automatic dashboard creation
 - 🔧 Improved error logging to make dashboard creation failures visible
