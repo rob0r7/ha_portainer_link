@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Centralized Portainer API/session lifecycle through one coordinator per config entry.
+- Removed entity-level polling that caused excessive DNS/API traffic.
+- Fixed stopped-container uptime to report not running instead of stale elapsed time.
+- Fixed documented reload and refresh services by registering service handlers.
+- Added stable container device identifiers that survive Docker container ID changes.
+- Added native update entities and corrected update availability to use cached coordinator image data.
+- Reworked update availability detection to compare full OCI manifest digests and avoid false positives for multi-arch images or images without local `RepoDigests`.
+
+### Changed
+- Added runtime options for feature toggles, polling intervals, update-check intervals, SSL verification, and optional notification target.
+- Enabled update sensors by default, with infrequent cached registry checks to avoid registry load.
+- Removed unused `requests` manifest requirement.
+
 ## [0.5.9] - 2025-12-07
 
 ### Removed

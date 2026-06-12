@@ -9,19 +9,20 @@ from .stack_api import PortainerStackAPI
 _LOGGER = logging.getLogger(__name__)
 
 class PortainerAPI:
-    def __init__(self, host, username=None, password=None, api_key=None):
+    def __init__(self, host, username=None, password=None, api_key=None, ssl_verify=True):
         self.base_url = host.rstrip("/")
         self.username = username
         self.password = password
         self.api_key = api_key
+        self.ssl_verify = ssl_verify
         self.token = None
         self.session = aiohttp.ClientSession()
         self.headers = {}
         # Initialize modular APIs (share session + headers via self)
         try:
-            self.images = PortainerImageAPI(self.base_url, self, ssl_verify=False, session=self.session)
-            self.containers = PortainerContainerAPI(self.base_url, self, ssl_verify=False, session=self.session)
-            self.stacks_api = PortainerStackAPI(self.base_url, self, ssl_verify=False, session=self.session)
+            self.images = PortainerImageAPI(self.base_url, self, ssl_verify=ssl_verify, session=self.session)
+            self.containers = PortainerContainerAPI(self.base_url, self, ssl_verify=ssl_verify, session=self.session)
+            self.stacks_api = PortainerStackAPI(self.base_url, self, ssl_verify=ssl_verify, session=self.session)
         except Exception as e:
             _LOGGER.exception("❌ Failed to initialize sub-APIs: %s", e)
 
@@ -37,9 +38,9 @@ class PortainerAPI:
             _LOGGER.error("[PortainerAPI] No credentials provided.")
         # Initialize modular APIs (share session + headers via self)
         try:
-            self.images = PortainerImageAPI(self.base_url, self, ssl_verify=False, session=self.session)
-            self.containers = PortainerContainerAPI(self.base_url, self, ssl_verify=False, session=self.session)
-            self.stacks_api = PortainerStackAPI(self.base_url, self, ssl_verify=False, session=self.session)
+            self.images = PortainerImageAPI(self.base_url, self, ssl_verify=self.ssl_verify, session=self.session)
+            self.containers = PortainerContainerAPI(self.base_url, self, ssl_verify=self.ssl_verify, session=self.session)
+            self.stacks_api = PortainerStackAPI(self.base_url, self, ssl_verify=self.ssl_verify, session=self.session)
         except Exception as e:
             _LOGGER.exception("❌ Failed to initialize sub-APIs: %s", e)
 
@@ -47,7 +48,7 @@ class PortainerAPI:
         url = f"{self.base_url}/api/auth"
         payload = {"Username": self.username, "Password": self.password}
         try:
-            async with self.session.post(url, json=payload, ssl=False) as resp:
+            async with self.session.post(url, json=payload, ssl=self.ssl_verify) as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     self.token = data.get("jwt")
@@ -554,6 +555,11 @@ class PortainerAPI:
         """Return current headers for API requests (used by sub-APIs)."""
         return self.headers
 
+    async def close(self):
+        """Close the shared aiohttp session."""
+        if self.session and not self.session.closed:
+            await self.session.close()
+
     async def update_stack(self, endpoint_id, stack_name, *, pull_image: bool = True, prune: bool = False, wait_timeout: float = 90.0, wait_interval: float = 2.0):
         """Update a stack by pulling latest images and redeploying the stack compose.
         Returns a result dict from the underlying stack API.
@@ -564,7 +570,7 @@ class PortainerAPI:
             _LOGGER.exception("❌ Failed to import PortainerStackAPI: %s", e)
             return {"ok": False, "error": str(e)}
 
-        stack_api = PortainerStackAPI(self.base_url, self, ssl_verify=False, session=self.session)
+        stack_api = PortainerStackAPI(self.base_url, self, ssl_verify=self.ssl_verify, session=self.session)
         try:
             result = await stack_api.update_stack(
                 endpoint_id,
