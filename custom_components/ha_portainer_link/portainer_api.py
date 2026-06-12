@@ -8,6 +8,13 @@ from .stack_api import PortainerStackAPI
 
 _LOGGER = logging.getLogger(__name__)
 
+PORTAINER_CLIENT_TIMEOUT = aiohttp.ClientTimeout(
+    total=30,
+    connect=10,
+    sock_connect=10,
+    sock_read=20,
+)
+
 class PortainerAPI:
     def __init__(self, host, username=None, password=None, api_key=None, ssl_verify=True):
         self.base_url = host.rstrip("/")
@@ -16,8 +23,10 @@ class PortainerAPI:
         self.api_key = api_key
         self.ssl_verify = ssl_verify
         self.token = None
-        self.session = aiohttp.ClientSession()
+        self.session = aiohttp.ClientSession(timeout=PORTAINER_CLIENT_TIMEOUT)
         self.headers = {}
+        self.last_error: str | None = None
+        self.last_error_class: str | None = None
         # Initialize modular APIs (share session + headers via self)
         try:
             self.images = PortainerImageAPI(self.base_url, self, ssl_verify=ssl_verify, session=self.session)
@@ -31,6 +40,7 @@ class PortainerAPI:
             self.headers = {
                 "X-API-Key": self.api_key,
                 "Content-Type": "application/json",
+                "Accept": "application/json, text/plain, */*",
             }
         elif self.username and self.password:
             await self.authenticate()
@@ -55,6 +65,7 @@ class PortainerAPI:
                     self.headers = {
                         "Authorization": f"Bearer {self.token}",
                         "Content-Type": "application/json",
+                        "Accept": "application/json, text/plain, */*",
                     }
                     _LOGGER.info("[PortainerAPI] Authentifiziert.")
                 else:
@@ -551,6 +562,16 @@ class PortainerAPI:
     # ---------------------------
     # Added helpers for stack update integration
     # ---------------------------
+    def record_error(self, err: Exception | str) -> None:
+        """Remember the latest API failure for diagnostics."""
+        self.last_error_class = err.__class__.__name__ if isinstance(err, Exception) else "Error"
+        self.last_error = str(err)
+
+    def clear_error(self) -> None:
+        """Clear the latest API failure after a successful refresh."""
+        self.last_error = None
+        self.last_error_class = None
+
     def get_headers(self):
         """Return current headers for API requests (used by sub-APIs)."""
         return self.headers

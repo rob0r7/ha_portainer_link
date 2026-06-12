@@ -72,6 +72,19 @@ class ContainerUpdateEntity(BaseContainerEntity, UpdateEntity):
         return None
 
     @property
+    def extra_state_attributes(self):
+        data = self._image_data
+        container_id = self.current_container_id
+        return {
+            "current_digest": data.get("current_digest"),
+            "available_digest": data.get("available_digest"),
+            "last_checked": data.get("last_checked"),
+            "detection_method": data.get("detection_method"),
+            "update_reason": data.get("update_reason")
+            or self.coordinator.last_update_reasons.get(container_id or ""),
+        }
+
+    @property
     def _image_data(self) -> dict:
         container_id = self.current_container_id
         return self.coordinator.image_data.get(container_id or "", {})

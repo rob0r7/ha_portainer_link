@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Added redacted Home Assistant diagnostics for coordinator state, update counts, registry timing, and latest API error class.
+- Added update entity attributes for digest values, last check time, detection method, and update reason.
+
+### Changed
+- Added central Portainer HTTP client timeouts.
+- Made Docker stats parsing more defensive for CPU schema variants and memory cache data.
+
 ## [0.6.0] - 2026-06-12
 
 ### Fixed

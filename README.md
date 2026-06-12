@@ -14,6 +14,7 @@ The integration is designed to be conservative with network traffic. Runtime con
 - Binary update-available sensors for automations and dashboards.
 - Configurable polling intervals, update-check intervals, feature toggles, notification target, and SSL verification.
 - Stable entity and device identifiers that survive Docker container recreation.
+- Home Assistant diagnostics with redacted config and coordinator/cache state.
 
 ## Requirements
 
@@ -79,6 +80,8 @@ Update availability is derived from cached image metadata:
 - Tags such as `latest`, `lts`, or custom release tags are not treated as semantic versions.
 - If a reliable local digest is not available, the integration avoids guessing and does not report a false update.
 
+Native update entities expose diagnostic attributes such as current digest, available digest, last check time, detection method, and update reason.
+
 Explicit user actions can still pull images and recreate containers or stacks:
 
 - Container pull/update button.
@@ -123,6 +126,10 @@ Reloads all loaded HA Portainer Link config entries.
 ### Updates are not shown immediately
 
 Normal container data refreshes every 5 minutes by default. Registry/update checks run every 360 minutes by default to avoid DNS and registry load. Call `ha_portainer_link.refresh` to force an immediate coordinator refresh.
+
+### Diagnostics
+
+Use Home Assistant's integration diagnostics download to inspect redacted config, coordinator state, entity counts, update counts, registry check timing, and the latest API error class. API keys and passwords are redacted.
 
 ### Logger configuration
 

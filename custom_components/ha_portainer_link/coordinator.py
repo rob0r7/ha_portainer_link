@@ -57,6 +57,9 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
         self.image_data: dict[str, dict[str, Any]] = {}
         self.update_availability: dict[str, bool] = {}
         self._last_registry_check = 0.0
+        self.last_success: dt.datetime | None = None
+        self.last_registry_check: dt.datetime | None = None
+        self.last_update_reasons: dict[str, str] = {}
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch fresh data from Portainer."""
@@ -77,6 +80,8 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
                 self.metrics = {}
 
             await self._refresh_image_data_if_due()
+            self.last_success = dt.datetime.now(dt.timezone.utc)
+            self.api.clear_error()
 
             return {
                 "containers": self.containers,
@@ -87,6 +92,7 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
                 "update_availability": self.update_availability,
             }
         except Exception as err:
+            self.api.record_error(err)
             raise UpdateFailed(f"Failed to update Portainer data: {err}") from err
 
     def _process_containers(self, containers: list[dict[str, Any]]) -> None:
@@ -143,19 +149,31 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
         parsed: dict[str, Any] = {}
         cpu_stats = stats.get("cpu_stats") or {}
         precpu_stats = stats.get("precpu_stats") or {}
-        cpu_total = ((cpu_stats.get("cpu_usage") or {}).get("total_usage") or 0)
-        precpu_total = ((precpu_stats.get("cpu_usage") or {}).get("total_usage") or 0)
-        system_total = cpu_stats.get("system_cpu_usage") or 0
-        pre_system_total = precpu_stats.get("system_cpu_usage") or 0
-        system_delta = system_total - pre_system_total
-        cpu_delta = cpu_total - precpu_total
+
+        cpu_usage = cpu_stats.get("cpu_usage") or {}
+        precpu_usage = precpu_stats.get("cpu_usage") or {}
+        cpu_total = cpu_usage.get("total_usage") or cpu_usage.get("total") or 0
+        precpu_total = precpu_usage.get("total_usage") or precpu_usage.get("total") or 0
+        system_total = cpu_stats.get("system_cpu_usage") or cpu_stats.get("system_usage") or 0
+        pre_system_total = precpu_stats.get("system_cpu_usage") or precpu_stats.get("system_usage") or 0
+        system_delta = max(0, system_total - pre_system_total)
+        cpu_delta = max(0, cpu_total - precpu_total)
         if system_delta > 0 and cpu_delta >= 0:
-            online_cpus = cpu_stats.get("online_cpus") or 1
+            online_cpus = (
+                cpu_stats.get("online_cpus")
+                or len(cpu_usage.get("percpu_usage") or [])
+                or 1
+            )
             parsed["cpu_percent"] = round((cpu_delta / system_delta) * online_cpus * 100.0, 2)
 
-        memory_usage = (stats.get("memory_stats") or {}).get("usage")
+        memory_stats = stats.get("memory_stats") or {}
+        memory_usage = memory_stats.get("usage")
         if memory_usage is not None:
             parsed["memory_mb"] = round(memory_usage / (1024 * 1024), 2)
+            memory_detail = memory_stats.get("stats") or {}
+            cache = memory_detail.get("inactive_file") or memory_detail.get("cache") or 0
+            if cache and memory_usage:
+                parsed["memory_effective_mb"] = round(max(0, memory_usage - cache) / (1024 * 1024), 2)
         return parsed
 
     async def _get_started_at(self, container_id: str) -> dt.datetime | None:
@@ -184,14 +202,17 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
         include_registry = registry_data_enabled and (now - self._last_registry_check >= max(interval, 60))
         if include_registry:
             self._last_registry_check = now
+            self.last_registry_check = dt.datetime.now(dt.timezone.utc)
 
         image_data: dict[str, dict[str, Any]] = {}
         update_availability = dict(self.update_availability)
+        update_reasons = dict(self.last_update_reasons)
         semaphore = asyncio.Semaphore(3)
 
         async def refresh_one(container_id: str) -> None:
             async with semaphore:
                 data: dict[str, Any] = {}
+                reason = "disabled" if not self.is_update_sensors_enabled() else "remote_digest_unknown"
                 try:
                     info = await self.api.inspect_container(self.endpoint_id, container_id)
                     image_name = ((info or {}).get("Config") or {}).get("Image")
@@ -205,19 +226,37 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
                         current_digest = await self.api.get_current_digest(self.endpoint_id, container_id)
                         if current_digest:
                             data["current_digest"] = current_digest
-                    if include_registry and image_name:
-                        available_digest = await self.api.get_available_digest(self.endpoint_id, container_id)
-                        if available_digest and not str(available_digest).startswith("unknown"):
-                            data["available_digest"] = available_digest
+                        if include_registry and image_name:
+                            data["last_checked"] = dt.datetime.now(dt.timezone.utc).isoformat()
+                            data["detection_method"] = "digest"
+                            available_digest = await self.api.get_available_digest(self.endpoint_id, container_id)
+                            if available_digest and not str(available_digest).startswith("unknown"):
+                                data["available_digest"] = available_digest
                             current_digest = data.get("current_digest")
-                            update_availability[container_id] = bool(
+                            has_update = bool(
                                 current_digest
                                 and not str(current_digest).startswith("unknown")
+                                and available_digest
+                                and not str(available_digest).startswith("unknown")
                                 and current_digest != available_digest
                             )
-                        data["available_version"] = await self.api.get_available_version(self.endpoint_id, image_name)
+                            update_availability[container_id] = has_update
+                            if not current_digest or str(current_digest).startswith("unknown"):
+                                reason = "local_digest_unknown"
+                            elif not available_digest or str(available_digest).startswith("unknown"):
+                                reason = "remote_digest_unknown"
+                            elif has_update:
+                                reason = "digest_changed"
+                            else:
+                                reason = "digest_matches"
+                            data["update_reason"] = reason
+                            update_reasons[container_id] = reason
+                            data["available_version"] = await self.api.get_available_version(self.endpoint_id, image_name)
                 except Exception as err:
-                    _LOGGER.debug("Failed to refresh image data for %s: %s", container_id, err)
+                    _LOGGER.debug("Failed refresh image data for %s: %s", container_id, err)
+                    reason = "registry_unreachable" if include_registry else reason
+                    data["update_reason"] = reason
+                    update_reasons[container_id] = reason
                 image_data[container_id] = {**self.image_data.get(container_id, {}), **data}
 
         await asyncio.gather(*(refresh_one(container_id) for container_id in self.containers))
@@ -227,8 +266,13 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
                 container_id: bool(update_availability.get(container_id, False))
                 for container_id in self.containers
             }
+            self.last_update_reasons = {
+                container_id: update_reasons.get(container_id, "remote_digest_unknown")
+                for container_id in self.containers
+            }
         elif not self.is_update_sensors_enabled():
             self.update_availability = {}
+            self.last_update_reasons = {}
 
     def get_container(self, container_id: str | None) -> dict[str, Any] | None:
         return self.containers.get(container_id or "")
