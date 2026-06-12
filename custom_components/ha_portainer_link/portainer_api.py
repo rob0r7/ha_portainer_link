@@ -182,82 +182,16 @@ class PortainerAPI:
     # Image helpers (delegated to PortainerImageAPI)
     # ---------------------------
     async def check_image_updates(self, endpoint_id, container_id):
-        """Check if a container's image has updates available without pulling images."""
+        """Check image updates without pulling images."""
         try:
             if hasattr(self, "images") and self.images:
                 return await self.images.check_image_updates(endpoint_id, container_id)
-        except Exception as e:
-            _LOGGER.debug("Image sub-API check failed, falling back to legacy pull-based method: %s", e)
-        # Legacy pull-based fallback
-        try:
-            # Get container inspection data
-            container_info = await self.inspect_container(endpoint_id, container_id)
-            if not container_info:
-                _LOGGER.debug("No container info found for %s", container_id)
-                return False
-            
-            # Extract image information
-            image_name = container_info.get("Config", {}).get("Image")
-            if not image_name:
-                _LOGGER.debug("No image name found for container %s", container_id)
-                return False
-            
-            _LOGGER.debug("🔍 Checking updates for container %s with image: %s", container_id, image_name)
-            
-            # Get current image digest
-            current_image_id = container_info.get("Image")
-            if not current_image_id:
-                _LOGGER.debug("No current image ID found for container %s", container_id)
-                return False
-            
-            # Get current image details
-            current_image_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/{current_image_id}/json"
-            async with self.session.get(current_image_url, headers=self.headers, ssl=False) as resp:
-                if resp.status != 200:
-                    _LOGGER.debug("Could not get current image info: %s", resp.status)
-                    return False
-                current_image_data = await resp.json()
-                current_digest = current_image_data.get("Id", "")
-            
-            _LOGGER.debug("Current image digest: %s", current_digest[:12] if current_digest else "unknown")
-            
-            # Try to pull the latest image from registry
-            pull_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/create"
-            params = {"fromImage": image_name}
-            
-            _LOGGER.debug("📥 Pulling latest image from registry: %s", image_name)
-            async with self.session.post(pull_url, headers=self.headers, params=params, ssl=False) as resp:
-                if resp.status == 200:
-                    _LOGGER.debug("✅ Successfully pulled image from registry")
-                    
-                    # Get the newly pulled image digest
-                    images_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/json"
-                    async with self.session.get(images_url, headers=self.headers, ssl=False) as resp2:
-                        if resp2.status == 200:
-                            images_data = await resp2.json()
-                            # Find the image with the same name but potentially different digest
-                            for image in images_data:
-                                repo_tags = image.get("RepoTags", [])
-                                if image_name in repo_tags:
-                                    new_digest = image.get("Id", "")
-                                    _LOGGER.debug("New image digest: %s", new_digest[:12] if new_digest else "unknown")
-                                    
-                                    # Compare digests to see if there's an update
-                                    has_update = new_digest != current_digest
-                                    _LOGGER.info("Update check for %s: %s (current: %s, new: %s)", 
-                                               image_name, has_update, 
-                                               current_digest[:12] if current_digest else "unknown",
-                                               new_digest[:12] if new_digest else "unknown")
-                                    return has_update
-                    _LOGGER.warning("⚠️ Could not find image %s after pull", image_name)
-                    return False
-                else:
-                    _LOGGER.warning("⚠️ Failed to pull image %s: HTTP %s", image_name, resp.status)
-                    return False
-        except Exception as e:
-            _LOGGER.exception("❌ Error checking image updates for container %s: %s", container_id, e)
+        except Exception as err:
+            _LOGGER.debug("Image update check failed for container %s: %s", container_id, err)
             return False
 
+        _LOGGER.debug("Image sub-API unavailable; skipping update check for container %s", container_id)
+        return False
     async def pull_image_update(self, endpoint_id, container_id):
         """Pull the latest image for a container."""
         try:
