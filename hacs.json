@@ -1,7 +1,7 @@
 {
   "name": "HA Portainer Link",
   "render_readme": true,
-  "domains": ["sensor", "switch", "button", "binary_sensor"],
+  "domains": ["sensor", "switch", "button", "binary_sensor", "update"],
   "homeassistant": "2023.8.0",
   "iot_class": "Local Polling"
 }

@@ -7,11 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-12
+
 ### Fixed
 - Centralized Portainer API/session lifecycle through one coordinator per config entry.
 - Removed entity-level polling that caused excessive DNS/API traffic.
-- Fixed stopped-container uptime to report not running instead of stale elapsed time.
+- Fixed stopped-container uptime to report not running/unknown instead of stale elapsed time.
 - Fixed documented reload and refresh services by registering service handlers.
+- Fixed Home Assistant 2026 options-flow compatibility.
 - Added stable container device identifiers that survive Docker container ID changes.
 - Added native update entities and corrected update availability to use cached coordinator image data.
 - Reworked update availability detection to compare full OCI manifest digests and avoid false positives for multi-arch images or images without local `RepoDigests`.
