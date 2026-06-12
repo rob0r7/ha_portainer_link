@@ -1,212 +1,239 @@
-import logging
-import hashlib
-from typing import Optional, Dict, Any
-from homeassistant.helpers.entity import Entity
+"""Shared entity helpers for HA Portainer Link."""
+
+from __future__ import annotations
+
+import re
+from typing import Any
+from urllib.parse import urlparse
+
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
-from .coordinator import PortainerDataUpdateCoordinator
-from . import create_portainer_device_info, create_stack_device_info, create_container_device_info
 
-_LOGGER = logging.getLogger(__name__)
 
-def _get_host_display_name(base_url: str) -> str:
-    """Extract a clean host name from the base URL for display purposes."""
-    # Remove protocol and common ports
-    host = base_url.replace("https://", "").replace("http://", "")
-    # Remove trailing slash if present
-    host = host.rstrip("/")
-    # Remove common ports
-    for port in [":9000", ":9443", ":80", ":443"]:
-        if host.endswith(port):
-            host = host[:-len(port)]
-    
-    # If the host is an IP address, keep it as is
-    # If it's a domain, try to extract a meaningful name
-    if host.replace('.', '').replace('-', '').replace('_', '').isdigit():
-        # It's an IP address, keep as is
-        return host
-    else:
-        # It's a domain, extract the main part
-        parts = host.split('.')
-        if len(parts) >= 2:
-            # Use the main domain part (e.g., "portainer" from "portainer.example.com")
-            return parts[0]
-        else:
-            return host
+def sanitize(value: Any) -> str:
+    """Return a stable identifier-safe string."""
+    text = str(value or "unknown").strip().strip("/")
+    text = re.sub(r"[^A-Za-z0-9_]+", "_", text)
+    text = re.sub(r"_+", "_", text).strip("_")
+    return text.lower() or "unknown"
 
-def _get_simple_device_id(entry_id: str, endpoint_id: int, host_name: str, container_or_stack_name: str) -> str:
-    """Generate a simple, predictable device ID."""
-    # Use a simple format: entry_endpoint_host_container
-    sanitized_host = host_name.replace('.', '_').replace(':', '_').replace('-', '_')
-    sanitized_name = container_or_stack_name.replace('-', '_').replace(' ', '_')
-    return f"{entry_id}_{endpoint_id}_{sanitized_host}_{sanitized_name}"
 
-def _get_stable_entity_id(entry_id: str, endpoint_id: int, container_name: str, stack_info: Dict[str, Any], entity_type: str) -> str:
-    """Generate a stable entity ID that doesn't change when container is recreated."""
-    # For stack containers, use stack_name + service_name
+def host_display_name(base_url: str) -> str:
+    """Return a concise display name for the Portainer host."""
+    parsed = urlparse(base_url if "://" in base_url else f"http://{base_url}")
+    host = parsed.hostname or base_url
+    return host.split(".")[0] if not host.replace(".", "").isdigit() else host
+
+
+def host_key(base_url: str) -> str:
+    """Return a stable host key for identifiers."""
+    parsed = urlparse(base_url if "://" in base_url else f"http://{base_url}")
+    host = parsed.netloc or parsed.path or base_url
+    return sanitize(host)
+
+
+def container_name(container: dict[str, Any]) -> str:
+    """Extract the first Docker container name."""
+    names = container.get("Names") or []
+    if names:
+        return str(names[0]).strip("/")
+    return container.get("Name", "unknown").strip("/")
+
+
+def is_container_running(container: dict[str, Any] | None) -> bool:
+    """Return whether a container list/inspect payload represents a running container."""
+    if not container:
+        return False
+    state = container.get("State")
+    if isinstance(state, dict):
+        return bool(state.get("Running")) or state.get("Status") == "running"
+    return str(state or "").lower() == "running"
+
+
+def stack_info_from_container(container: dict[str, Any]) -> dict[str, Any]:
+    """Extract compose stack metadata from container labels."""
+    labels = container.get("Labels") or {}
+    if not isinstance(labels, dict):
+        labels = {}
+    stack_name = labels.get("com.docker.compose.project")
+    service_name = labels.get("com.docker.compose.service")
+    container_number = labels.get("com.docker.compose.container-number")
+    return {
+        "stack_name": stack_name,
+        "service_name": service_name,
+        "container_number": container_number,
+        "is_stack_container": bool(stack_name),
+    }
+
+
+def stable_container_key(container_name_value: str, stack_info: dict[str, Any]) -> str:
+    """Return a stable key that survives Docker container ID changes."""
     if stack_info.get("is_stack_container"):
-        stack_name = stack_info.get("stack_name", "unknown")
-        service_name = stack_info.get("service_name", container_name)
-        # Use stack and service name for stability
-        stable_id = f"{stack_name}_{service_name}"
-    else:
-        # For standalone containers, use container name
-        stable_id = container_name
-    
-    # Sanitize the stable ID
-    sanitized_id = stable_id.replace('-', '_').replace(' ', '_').replace('/', '_')
-    return f"entry_{entry_id}_endpoint_{endpoint_id}_{sanitized_id}_{entity_type}"
+        parts = [
+            stack_info.get("stack_name"),
+            stack_info.get("service_name") or container_name_value,
+            stack_info.get("container_number") or container_name_value,
+        ]
+        return "stack_" + "_".join(sanitize(part) for part in parts if part)
+    return "container_" + sanitize(container_name_value)
 
-def _get_container_stable_id(container_name: str, stack_info: Dict[str, Any]) -> str:
-    """Generate a stable container identifier that doesn't change when container is recreated."""
-    if stack_info.get("is_stack_container"):
-        stack_name = stack_info.get("stack_name", "unknown")
-        service_name = stack_info.get("service_name", container_name)
-        return f"{stack_name}_{service_name}"
-    else:
-        return container_name
+
+def stack_key(stack_name: str) -> str:
+    """Return a stable stack key."""
+    return "stack_" + sanitize(stack_name)
+
+
+def container_unique_id(entry_id: str, endpoint_id: int, stable_key: str, suffix: str) -> str:
+    """Return a stable unique_id for a container entity."""
+    return f"entry_{entry_id}_endpoint_{endpoint_id}_{sanitize(stable_key)}_{sanitize(suffix)}"
+
+
+def stack_unique_id(entry_id: str, endpoint_id: int, name: str, suffix: str) -> str:
+    """Return a stable unique_id for a stack entity."""
+    return f"entry_{entry_id}_endpoint_{endpoint_id}_{stack_key(name)}_{sanitize(suffix)}"
+
+
+def container_device_info(
+    entry_id: str,
+    endpoint_id: int,
+    base_url: str,
+    stable_key: str,
+    name: str,
+    container_id: str | None,
+) -> dict[str, Any]:
+    """Return Home Assistant device info for a standalone container."""
+    host_name = host_display_name(base_url)
+    device_id = f"{entry_id}_{endpoint_id}_{host_key(base_url)}_{sanitize(stable_key)}"
+    return {
+        "identifiers": {(DOMAIN, device_id)},
+        "name": f"{name} ({host_name})",
+        "manufacturer": "Docker via Portainer",
+        "model": "Docker Container",
+        "configuration_url": (
+            f"{base_url}/#!/containers/{container_id}/details" if container_id else base_url
+        ),
+    }
+
+
+def stack_device_info(
+    entry_id: str,
+    endpoint_id: int,
+    base_url: str,
+    name: str,
+) -> dict[str, Any]:
+    """Return Home Assistant device info for a Docker stack."""
+    host_name = host_display_name(base_url)
+    device_id = f"{entry_id}_{endpoint_id}_{host_key(base_url)}_{stack_key(name)}"
+    return {
+        "identifiers": {(DOMAIN, device_id)},
+        "name": f"Stack: {name} ({host_name})",
+        "manufacturer": "Docker via Portainer",
+        "model": "Docker Stack",
+        "configuration_url": f"{base_url}/#!/stacks/{name}",
+    }
+
 
 class BasePortainerEntity(CoordinatorEntity):
-    """Base class for all Portainer entities bound to the data update coordinator."""
+    """Base class for coordinator-backed Portainer entities."""
 
-    def __init__(self, coordinator: PortainerDataUpdateCoordinator, entry_id: str):
-        """Initialize the base entity."""
+    _attr_should_poll = False
+
+    def __init__(self, coordinator, entry_id: str) -> None:
         super().__init__(coordinator)
-        self.coordinator = coordinator
         self.entry_id = entry_id
-        self._attr_should_poll = False
+        self.endpoint_id = coordinator.endpoint_id
 
     @property
     def available(self) -> bool:
-        """Return True if entity is available."""
-        return self.coordinator.last_update_success
+        return bool(self.coordinator.last_update_success)
+
 
 class BaseContainerEntity(BasePortainerEntity):
-    """Base class for container-specific entities."""
+    """Base class for container-backed entities."""
+
+    entity_suffix = "entity"
 
     def __init__(
-        self, 
-        coordinator: PortainerDataUpdateCoordinator, 
-        entry_id: str, 
-        container_id: str, 
-        container_name: str, 
-        stack_info: Dict[str, Any]
-    ):
-        """Initialize the container entity."""
+        self,
+        coordinator,
+        entry_id: str,
+        container_id: str,
+        name: str,
+        stack_info: dict[str, Any],
+    ) -> None:
         super().__init__(coordinator, entry_id)
         self.container_id = container_id
-        self.container_name = container_name
+        self.container_name = name
         self.stack_info = stack_info
-        self.stable_container_id = _get_container_stable_id(container_name, stack_info)
-        self._attr_unique_id = _get_stable_entity_id(
-            entry_id, 
-            coordinator.endpoint_id, 
-            container_name, 
-            stack_info, 
-            self.entity_type
+        self.stable_key = stable_container_key(name, stack_info)
+        self._attr_unique_id = container_unique_id(
+            entry_id,
+            coordinator.endpoint_id,
+            self.stable_key,
+            self.entity_suffix,
         )
 
     @property
-    def entity_type(self) -> str:
-        """Return the entity type for unique ID generation."""
-        raise NotImplementedError
-
-    def update_container_id(self, new_container_id: str) -> None:
-        """Update the container ID when container is recreated."""
-        if new_container_id != self.container_id:
-            _LOGGER.info("🔄 Updating container ID for %s: %s -> %s", 
-                        self.container_name, self.container_id[:12], new_container_id[:12])
-            self.container_id = new_container_id
-
-    def _find_current_container_id(self) -> Optional[str]:
-        """Find the current container ID for this entity based on stable ID."""
-        # Use coordinator's stable container map if available
-        if hasattr(self.coordinator, 'get_container_by_stable_id'):
-            current_container_id = self.coordinator.get_container_by_stable_id(self.stable_container_id)
-            if current_container_id:
-                return current_container_id
-        
-        # Fallback: search through all containers
-        for container_id, container_data in self.coordinator.containers.items():
-            container_name = container_data.get("Names", ["unknown"])[0].strip("/")
-            stack_info = self.coordinator.get_container_stack_info(container_id) or {
-                "stack_name": None,
-                "service_name": None,
-                "container_number": None,
-                "is_stack_container": False
-            }
-            stable_id = _get_container_stable_id(container_name, stack_info)
-            if stable_id == self.stable_container_id:
-                return container_id
-        return None
-
-    def _get_container_data(self) -> Optional[Dict[str, Any]]:
-        """Get current container data from coordinator."""
-        # First try the stored container ID
-        container_data = self.coordinator.get_container(self.container_id)
-        if container_data:
-            return container_data
-        
-        # If not found, try to find the current container ID
-        current_container_id = self._find_current_container_id()
-        if current_container_id:
-            self.update_container_id(current_container_id)
-            return self.coordinator.get_container(current_container_id)
-        
-        return None
+    def current_container_id(self) -> str | None:
+        current = self.coordinator.get_container_by_stable_id(self.stable_key)
+        if current:
+            self.container_id = current
+            return current
+        return self.container_id if self.container_id in self.coordinator.containers else None
 
     @property
-    def device_info(self) -> Dict[str, Any]:
-        """Return device info."""
-        host_name = _get_host_display_name(self.coordinator.api.base_url)
-        
-        if self.stack_info.get("is_stack_container"):
-            # For stack containers, use the stack as the parent device
-            stack_name = self.stack_info.get("stack_name", "unknown_stack")
-            stack_id = self.stack_info.get("stack_id", stack_name)
-            return create_stack_device_info(self.entry_id, stack_id, stack_name)
-        else:
-            # For standalone containers, use the container as the device
-            return create_container_device_info(self.entry_id, self.container_id, self.container_name, self.stack_info)
+    def container(self) -> dict[str, Any] | None:
+        container_id = self.current_container_id
+        return self.coordinator.get_container(container_id) if container_id else None
 
-    def _get_container_name_display(self) -> str:
-        """Get display name for the container."""
+    @property
+    def available(self) -> bool:
+        return super().available and self.container is not None
+
+    @property
+    def device_info(self) -> dict[str, Any]:
         if self.stack_info.get("is_stack_container"):
-            service_name = self.stack_info.get("service_name", self.container_name)
-            return f"{service_name}"
-        else:
-            return self.container_name
+            return stack_device_info(
+                self.entry_id,
+                self.endpoint_id,
+                self.coordinator.api.base_url,
+                self.stack_info.get("stack_name") or self.container_name,
+            )
+        return container_device_info(
+            self.entry_id,
+            self.endpoint_id,
+            self.coordinator.api.base_url,
+            self.stable_key,
+            self.container_name,
+            self.current_container_id,
+        )
+
 
 class BaseStackEntity(BasePortainerEntity):
-    """Base class for stack-specific entities."""
+    """Base class for stack-backed entities."""
 
-    def __init__(
-        self, 
-        coordinator: PortainerDataUpdateCoordinator, 
-        entry_id: str, 
-        stack_name: str
-    ):
-        """Initialize the stack entity."""
+    entity_suffix = "stack_entity"
+
+    def __init__(self, coordinator, entry_id: str, stack_name_value: str) -> None:
         super().__init__(coordinator, entry_id)
-        self.stack_name = stack_name
-        self._attr_unique_id = f"entry_{entry_id}_endpoint_{coordinator.endpoint_id}_stack_{stack_name}_{self.entity_type}"
+        self.stack_name = stack_name_value
+        self._attr_unique_id = stack_unique_id(
+            entry_id,
+            coordinator.endpoint_id,
+            stack_name_value,
+            self.entity_suffix,
+        )
 
     @property
-    def entity_type(self) -> str:
-        """Return the entity type for unique ID generation."""
-        raise NotImplementedError
+    def available(self) -> bool:
+        return super().available and bool(self.coordinator.get_stack_containers(self.stack_name))
 
     @property
-    def device_info(self) -> Dict[str, Any]:
-        """Return device info."""
-        return create_stack_device_info(self.entry_id, self.stack_name, self.stack_name)
-
-    def _get_stack_data(self) -> Optional[Dict[str, Any]]:
-        """Get current stack data from coordinator."""
-        return self.coordinator.get_stack(self.stack_name)
-
-    def _get_stack_containers(self) -> list:
-        """Get all containers belonging to this stack."""
-        return self.coordinator.get_stack_containers(self.stack_name)
+    def device_info(self) -> dict[str, Any]:
+        return stack_device_info(
+            self.entry_id,
+            self.endpoint_id,
+            self.coordinator.api.base_url,
+            self.stack_name,
+        )
