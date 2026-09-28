@@ -130,7 +130,7 @@ def _cleanup_empty_devices(hass: HomeAssistant, entry: ConfigEntry) -> None:
     device_registry = dr.async_get(hass)
     entity_registry = er.async_get(hass)
     for device in dr.async_entries_for_config_entry(device_registry, entry.entry_id):
-        entities = er.async_entries_for_device(entity_registry, device.id)
+        entities = er.async_entries_for_device(entity_registry, device.id, include_disabled_entities=True)
         if not entities:
             device_registry.async_remove_device(device.id)
 
