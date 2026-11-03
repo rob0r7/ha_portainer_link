@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import logging
 
+from aiohttp import ClientError
+from aiohttp.client_exceptions import ClientConnectorCertificateError
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from .const import (
@@ -19,10 +22,11 @@ from .const import (
     DATA_COORDINATOR,
     DEFAULT_OPTIONS,
     DOMAIN,
+    SSL_VERIFY_FAILED_MESSAGE,
 )
 from .coordinator import PortainerDataUpdateCoordinator
 from .entity import container_name, container_unique_id, stable_container_key, sanitize
-from .portainer_api import PortainerAPI
+from .portainer_api import PortainerAPI, PortainerAuthError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,6 +54,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     try:
         await api.initialize()
+    except ClientConnectorCertificateError as err:
+        await api.close()
+        raise ConfigEntryNotReady(SSL_VERIFY_FAILED_MESSAGE) from err
+    except PortainerAuthError as err:
+        await api.close()
+        raise ConfigEntryError(f"{err}. Check the Portainer username and password.") from err
+    except (ClientError, TimeoutError) as err:
+        await api.close()
+        raise ConfigEntryNotReady(f"Cannot reach Portainer: {err}") from err
+
+    try:
         coordinator = PortainerDataUpdateCoordinator(
             hass,
             api,
@@ -57,6 +72,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             config,
         )
         await coordinator.async_config_entry_first_refresh()
+    except ClientConnectorCertificateError as err:
+        await api.close()
+        raise ConfigEntryNotReady(SSL_VERIFY_FAILED_MESSAGE) from err
     except Exception:
         await api.close()
         raise

@@ -1,12 +1,22 @@
 import logging
 import asyncio
+import json
+
 import aiohttp
+from aiohttp.client_exceptions import ClientConnectorCertificateError
 
 from .image_api import PortainerImageAPI
 from .container_api import PortainerContainerAPI
 from .stack_api import PortainerStackAPI
 
 _LOGGER = logging.getLogger(__name__)
+
+PULL_TIMEOUT = aiohttp.ClientTimeout(total=None, sock_connect=30, sock_read=600)
+
+
+class PortainerAuthError(Exception):
+    """Raised when Portainer rejects the configured credentials."""
+
 
 class PortainerAPI:
     def __init__(self, host, username=None, password=None, api_key=None, ssl_verify=True):
@@ -18,6 +28,7 @@ class PortainerAPI:
         self.token = None
         self.session = aiohttp.ClientSession()
         self.headers = {}
+        self._auth_lock = asyncio.Lock()
         # Initialize modular APIs (share session + headers via self)
         try:
             self.images = PortainerImageAPI(self.base_url, self, ssl_verify=ssl_verify, session=self.session)
@@ -45,22 +56,46 @@ class PortainerAPI:
             _LOGGER.exception("❌ Failed to initialize sub-APIs: %s", e)
 
     async def authenticate(self):
+        """Log in with username/password and store the JWT.
+
+        Raises PortainerAuthError when Portainer rejects the credentials; network
+        errors propagate so callers can retry later.
+        """
         url = f"{self.base_url}/api/auth"
         payload = {"Username": self.username, "Password": self.password}
-        try:
-            async with self.session.post(url, json=payload, ssl=self.ssl_verify) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    self.token = data.get("jwt")
-                    self.headers = {
-                        "Authorization": f"Bearer {self.token}",
-                        "Content-Type": "application/json",
-                    }
-                    _LOGGER.info("[PortainerAPI] Authentifiziert.")
-                else:
-                    _LOGGER.error("[PortainerAPI] Authentifizierung fehlgeschlagen: %s", resp.status)
-        except Exception as e:
-            _LOGGER.exception("[PortainerAPI] Fehler bei Authentifizierung: %s", e)
+        async with self.session.post(url, json=payload, ssl=self.ssl_verify) as resp:
+            if resp.status != 200:
+                raise PortainerAuthError(f"Portainer authentication failed: HTTP {resp.status}")
+            data = await resp.json()
+        token = data.get("jwt")
+        if not token:
+            raise PortainerAuthError("Portainer authentication returned no token")
+        self.token = token
+        self.headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "application/json",
+        }
+        _LOGGER.debug("[PortainerAPI] Authenticated")
+
+    async def request(self, method, url, **kwargs):
+        """Send an authenticated Portainer request.
+
+        Portainer JWTs expire (8 hours by default), so a 401 with username/password
+        credentials triggers one re-login and retry. API keys do not expire this way.
+        """
+        kwargs.setdefault("ssl", self.ssl_verify)
+        extra_headers = kwargs.pop("headers", None) or {}
+        token_before = self.token
+        resp = await self.session.request(method, url, headers={**self.headers, **extra_headers}, **kwargs)
+        if resp.status != 401 or self.api_key or not (self.username and self.password):
+            return resp
+        resp.release()
+        async with self._auth_lock:
+            # Concurrent requests may all see the 401; only the first one logs in again.
+            if self.token == token_before:
+                _LOGGER.debug("[PortainerAPI] Token rejected, re-authenticating")
+                await self.authenticate()
+        return await self.session.request(method, url, headers={**self.headers, **extra_headers}, **kwargs)
 
     async def get_containers(self, endpoint_id):
         # Prefer modular API if available
@@ -72,7 +107,7 @@ class PortainerAPI:
             _LOGGER.debug("Falling back to legacy get_containers due to: %s", e)
         url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/json?all=1"
         try:
-            async with self.session.get(url, headers=self.headers, ssl=False) as resp:
+            async with await self.request("GET", url) as resp:
                 if resp.status == 200:
                     return await resp.json()
                 else:
@@ -85,7 +120,7 @@ class PortainerAPI:
     async def restart_container(self, endpoint_id, container_id):
         url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/restart"
         try:
-            async with self.session.post(url, headers=self.headers, ssl=False) as resp:
+            async with await self.request("POST", url) as resp:
                 return resp.status == 204
         except Exception as e:
             _LOGGER.exception("[PortainerAPI] Fehler beim Neustart von Container %s: %s", container_id, e)
@@ -101,7 +136,7 @@ class PortainerAPI:
             _LOGGER.debug("Falling back to legacy inspect_container due to: %s", e)
         url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/json"
         try:
-            async with self.session.get(url, headers=self.headers, ssl=False) as resp:
+            async with await self.request("GET", url) as resp:
                 if resp.status == 200:
                     container_data = await resp.json()
                     _LOGGER.debug("✅ Successfully inspected container %s", container_id)
@@ -123,7 +158,7 @@ class PortainerAPI:
             pass
         url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/stats?stream=false"
         try:
-            async with self.session.get(url, headers=self.headers, ssl=False) as resp:
+            async with await self.request("GET", url) as resp:
                 if resp.status == 200:
                     return await resp.json()
                 else:
@@ -142,7 +177,7 @@ class PortainerAPI:
             pass
         url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/start"
         try:
-            async with self.session.post(url, headers=self.headers, ssl=False) as resp:
+            async with await self.request("POST", url) as resp:
                 return resp.status == 204
         except Exception as e:
             _LOGGER.exception("Exception while starting container %s: %s", container_id, e)
@@ -157,7 +192,7 @@ class PortainerAPI:
             pass
         url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/stop"
         try:
-            async with self.session.post(url, headers=self.headers, ssl=False) as resp:
+            async with await self.request("POST", url) as resp:
                 return resp.status == 204
         except Exception as e:
             _LOGGER.exception("Exception while stopping container %s: %s", container_id, e)
@@ -201,7 +236,7 @@ class PortainerAPI:
             
             # Get current image details
             current_image_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/{current_image_id}/json"
-            async with self.session.get(current_image_url, headers=self.headers, ssl=False) as resp:
+            async with await self.request("GET", current_image_url) as resp:
                 if resp.status != 200:
                     _LOGGER.debug("Could not get current image info: %s", resp.status)
                     return False
@@ -215,13 +250,13 @@ class PortainerAPI:
             params = {"fromImage": image_name}
             
             _LOGGER.debug("📥 Pulling latest image from registry: %s", image_name)
-            async with self.session.post(pull_url, headers=self.headers, params=params, ssl=False) as resp:
+            async with await self.request("POST", pull_url, params=params) as resp:
                 if resp.status == 200:
                     _LOGGER.debug("✅ Successfully pulled image from registry")
                     
                     # Get the newly pulled image digest
                     images_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/json"
-                    async with self.session.get(images_url, headers=self.headers, ssl=False) as resp2:
+                    async with await self.request("GET", images_url) as resp2:
                         if resp2.status == 200:
                             images_data = await resp2.json()
                             # Find the image with the same name but potentially different digest
@@ -268,13 +303,25 @@ class PortainerAPI:
             url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/create"
             params = {"fromImage": image_name}
             
-            async with self.session.post(url, headers=self.headers, params=params, ssl=False) as resp:
-                if resp.status == 200:
-                    _LOGGER.info("✅ Successfully pulled image update for container %s (%s)", container_id, image_name)
-                    return True
-                else:
+            async with await self.request("POST", url, params=params, timeout=PULL_TIMEOUT) as resp:
+                if resp.status != 200:
                     _LOGGER.error("❌ Failed to pull image update for container %s: %s", container_id, resp.status)
                     return False
+                # Docker streams JSON progress lines and reports failures inside the stream.
+                # Read it to the end: closing early can cancel the pull.
+                error = None
+                async for line in resp.content:
+                    try:
+                        message = json.loads(line)
+                    except ValueError:
+                        continue
+                    if isinstance(message, dict) and message.get("error"):
+                        error = message["error"]
+                if error:
+                    _LOGGER.error("❌ Failed to pull image for container %s (%s): %s", container_id, image_name, error)
+                    return False
+                _LOGGER.info("✅ Successfully pulled image update for container %s (%s)", container_id, image_name)
+                return True
         except Exception as e:
             _LOGGER.exception("❌ Error pulling image update for container %s: %s", container_id, e)
             return False
@@ -290,7 +337,7 @@ class PortainerAPI:
             pass
         # Legacy fallback
         url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/{image_id}/json"
-        async with self.session.get(url, headers=self.headers, ssl=False) as resp:
+        async with await self.request("GET", url) as resp:
             if resp.status == 200:
                 return await resp.json()
             return None
@@ -336,7 +383,7 @@ class PortainerAPI:
         # Legacy fallback
         _LOGGER.debug("🔍 Checking available version for %s", image_name)
         images_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/json"
-        async with self.session.get(images_url, headers=self.headers, ssl=False) as resp:
+        async with await self.request("GET", images_url) as resp:
             if resp.status == 200:
                 images_data = await resp.json()
                 for image in images_data:
@@ -360,7 +407,7 @@ class PortainerAPI:
             if not current_image_id:
                 return "unknown"
             current_image_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/{current_image_id}/json"
-            async with self.session.get(current_image_url, headers=self.headers, ssl=False) as resp:
+            async with await self.request("GET", current_image_url) as resp:
                 if resp.status != 200:
                     return "unknown"
                 current_image_data = await resp.json()
@@ -391,7 +438,7 @@ class PortainerAPI:
         # Legacy fallback (all stacks, not filtered)
         try:
             stacks_url = f"{self.base_url}/api/stacks"
-            async with self.session.get(stacks_url, headers=self.headers, ssl=False) as resp:
+            async with await self.request("GET", stacks_url) as resp:
                 if resp.status == 200:
                     stacks = await resp.json()
                     # Filter by endpoint if possible
@@ -457,7 +504,7 @@ class PortainerAPI:
             
             # Get all containers in the stack
             containers_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/json?all=1"
-            async with self.session.get(containers_url, headers=self.headers, ssl=False) as resp:
+            async with await self.request("GET", containers_url) as resp:
                 if resp.status != 200:
                     _LOGGER.error("Could not get containers list: %s", resp.status)
                     return False
@@ -482,7 +529,7 @@ class PortainerAPI:
                 for container_id in stack_containers:
                     try:
                         stop_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/stop"
-                        async with self.session.post(stop_url, headers=self.headers, ssl=False) as stop_resp:
+                        async with await self.request("POST", stop_url) as stop_resp:
                             if stop_resp.status == 204:
                                 success_count += 1
                                 _LOGGER.debug("✅ Stopped container %s", container_id)
@@ -506,7 +553,7 @@ class PortainerAPI:
             
             # Get all containers in the stack
             containers_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/json?all=1"
-            async with self.session.get(containers_url, headers=self.headers, ssl=False) as resp:
+            async with await self.request("GET", containers_url) as resp:
                 if resp.status != 200:
                     _LOGGER.error("Could not get containers list: %s", resp.status)
                     return False
@@ -531,7 +578,7 @@ class PortainerAPI:
                 for container_id in stack_containers:
                     try:
                         start_url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/start"
-                        async with self.session.post(start_url, headers=self.headers, ssl=False) as start_resp:
+                        async with await self.request("POST", start_url) as start_resp:
                             if start_resp.status == 204:
                                 success_count += 1
                                 _LOGGER.debug("✅ Started container %s", container_id)
@@ -554,6 +601,23 @@ class PortainerAPI:
     def get_headers(self):
         """Return current headers for API requests (used by sub-APIs)."""
         return self.headers
+
+    async def recreate_container(self, endpoint_id, container_id, *, pull_image=True):
+        """Recreate a container through Portainer, optionally pulling its image first.
+
+        Uses Portainer's container recreate endpoint (Portainer 2.19+). Returns True on
+        success, False on failure and None when this Portainer version lacks the endpoint.
+        """
+        url = f"{self.base_url}/api/docker/{endpoint_id}/containers/{container_id}/recreate"
+        async with await self.request("POST", url, json={"PullImage": pull_image}, timeout=PULL_TIMEOUT) as resp:
+            if resp.status == 200:
+                _LOGGER.info("✅ Recreated container %s", container_id)
+                return True
+            if resp.status in (404, 405):
+                _LOGGER.warning("Portainer does not support container recreate (HTTP %s)", resp.status)
+                return None
+            _LOGGER.error("❌ Failed to recreate container %s: HTTP %s %s", container_id, resp.status, await resp.text())
+            return False
 
     async def close(self):
         """Close the shared aiohttp session."""

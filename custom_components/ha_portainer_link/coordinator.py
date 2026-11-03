@@ -8,6 +8,7 @@ import logging
 import time
 from typing import Any
 
+from aiohttp.client_exceptions import ClientConnectorCertificateError
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -21,8 +22,15 @@ from .const import (
     CONF_UPDATE_CHECK_INTERVAL,
     CONF_UPDATE_INTERVAL,
     DEFAULT_OPTIONS,
+    SSL_VERIFY_FAILED_MESSAGE,
 )
-from .entity import container_name, is_container_running, stable_container_key, stack_info_from_container
+from .entity import (
+    container_name,
+    is_container_running,
+    is_portainer_image,
+    stable_container_key,
+    stack_info_from_container,
+)
 from .portainer_api import PortainerAPI
 
 _LOGGER = logging.getLogger(__name__)
@@ -48,6 +56,10 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
         )
         self.api = api
         self.endpoint_id = endpoint_id
+        if api.images:
+            # Expire remote digests just before the next due check so the configured interval is honoured.
+            check_interval = int(self.config.get(CONF_UPDATE_CHECK_INTERVAL, DEFAULT_OPTIONS[CONF_UPDATE_CHECK_INTERVAL]))
+            api.images.set_cache_duration((max(check_interval, 60) - 1) * 60)
         self.containers: dict[str, dict[str, Any]] = {}
         self.stacks: dict[str, dict[str, Any]] = {}
         self.container_stack_map: dict[str, str] = {}
@@ -56,6 +68,7 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
         self.metrics: dict[str, dict[str, Any]] = {}
         self.image_data: dict[str, dict[str, Any]] = {}
         self.update_availability: dict[str, bool] = {}
+        self._image_info_cache: dict[str, dict[str, Any]] = {}
         self._last_registry_check = 0.0
 
     async def _async_update_data(self) -> dict[str, Any]:
@@ -71,12 +84,14 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
             self._process_containers(containers or [])
             self.stacks = {stack.get("Name"): stack for stack in (stacks or []) if stack.get("Name")}
 
+            inspect_data = await self._inspect_containers()
+
             if self.is_resource_sensors_enabled():
-                await self._refresh_metrics()
+                await self._refresh_metrics(inspect_data)
             else:
                 self.metrics = {}
 
-            await self._refresh_image_data_if_due()
+            await self._refresh_image_data_if_due(inspect_data)
 
             return {
                 "containers": self.containers,
@@ -86,6 +101,8 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
                 "image_data": self.image_data,
                 "update_availability": self.update_availability,
             }
+        except ClientConnectorCertificateError as err:
+            raise UpdateFailed(SSL_VERIFY_FAILED_MESSAGE) from err
         except Exception as err:
             raise UpdateFailed(f"Failed to update Portainer data: {err}") from err
 
@@ -116,7 +133,35 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
                 self.container_stack_map[container_id] = stack_info["stack_name"]
             self.stable_container_map[stable_container_key(name, stack_info)] = container_id
 
-    async def _refresh_metrics(self) -> None:
+    async def _inspect_containers(self) -> dict[str, dict[str, Any]]:
+        """Inspect each needed container once per refresh; shared by metrics and image data."""
+        need_image_data = self.is_version_sensors_enabled() or self.is_update_sensors_enabled()
+        need_metrics = self.is_resource_sensors_enabled()
+        if not (need_image_data or need_metrics):
+            return {}
+
+        targets = [
+            container_id
+            for container_id, container in self.containers.items()
+            if need_image_data or is_container_running(container)
+        ]
+        results: dict[str, dict[str, Any]] = {}
+        semaphore = asyncio.Semaphore(4)
+
+        async def inspect_one(container_id: str) -> None:
+            async with semaphore:
+                try:
+                    info = await self.api.inspect_container(self.endpoint_id, container_id)
+                except Exception as err:
+                    _LOGGER.debug("Failed to inspect container %s: %s", container_id, err)
+                    return
+                if info:
+                    results[container_id] = info
+
+        await asyncio.gather(*(inspect_one(container_id) for container_id in targets))
+        return results
+
+    async def _refresh_metrics(self, inspect_data: dict[str, dict[str, Any]]) -> None:
         """Refresh resource metrics with bounded concurrency."""
         metrics: dict[str, dict[str, Any]] = {}
         semaphore = asyncio.Semaphore(4)
@@ -127,7 +172,7 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
                 if is_container_running(container):
                     stats = await self.api.get_container_stats(self.endpoint_id, container_id)
                     item.update(self._parse_stats(stats or {}))
-                    started_at = await self._get_started_at(container_id)
+                    started_at = self._parse_started_at(inspect_data.get(container_id))
                     if started_at:
                         item["uptime_s"] = max(0, int((dt.datetime.now(dt.timezone.utc) - started_at).total_seconds()))
                 else:
@@ -158,32 +203,34 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
             parsed["memory_mb"] = round(memory_usage / (1024 * 1024), 2)
         return parsed
 
-    async def _get_started_at(self, container_id: str) -> dt.datetime | None:
-        """Return StartedAt for a running container."""
+    @staticmethod
+    def _parse_started_at(info: dict[str, Any] | None) -> dt.datetime | None:
+        """Return StartedAt from container inspect data."""
         try:
-            info = await self.api.inspect_container(self.endpoint_id, container_id)
             started_at = ((info or {}).get("State") or {}).get("StartedAt")
             if not started_at or started_at.startswith("0001-"):
                 return None
             parsed = dt.datetime.fromisoformat(started_at.replace("Z", "+00:00"))
             return parsed if parsed.tzinfo else parsed.replace(tzinfo=dt.timezone.utc)
         except Exception as err:
-            _LOGGER.debug("Failed to parse uptime for %s: %s", container_id, err)
+            _LOGGER.debug("Failed to parse container uptime: %s", err)
             return None
 
-    async def _refresh_image_data_if_due(self) -> None:
+    async def _refresh_image_data_if_due(self, inspect_data: dict[str, dict[str, Any]]) -> None:
         """Refresh image metadata and optional registry data."""
         if not (self.is_version_sensors_enabled() or self.is_update_sensors_enabled()):
             self.image_data = {}
             self.update_availability = {}
+            self._image_info_cache = {}
             return
 
         now = time.monotonic()
         interval = int(self.config.get(CONF_UPDATE_CHECK_INTERVAL, DEFAULT_OPTIONS[CONF_UPDATE_CHECK_INTERVAL]))
-        registry_data_enabled = self.is_version_sensors_enabled() or self.is_update_sensors_enabled()
-        include_registry = registry_data_enabled and (now - self._last_registry_check >= max(interval, 60))
+        include_registry = now - self._last_registry_check >= max(interval, 60)
         if include_registry:
             self._last_registry_check = now
+
+        await self._refresh_image_info_cache(inspect_data, force=include_registry)
 
         image_data: dict[str, dict[str, Any]] = {}
         update_availability = dict(self.update_availability)
@@ -193,20 +240,18 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
             async with semaphore:
                 data: dict[str, Any] = {}
                 try:
-                    info = await self.api.inspect_container(self.endpoint_id, container_id)
-                    image_name = ((info or {}).get("Config") or {}).get("Image")
-                    image_id = (info or {}).get("Image")
+                    info = inspect_data.get(container_id) or {}
+                    image_name = (info.get("Config") or {}).get("Image")
+                    image_id = info.get("Image")
                     if image_name:
                         data["image_name"] = image_name
-                    if image_id:
-                        image_info = await self.api.get_image_info(self.endpoint_id, image_id)
-                        if image_info:
-                            data["current_version"] = self.api.extract_version_from_image(image_info)
-                        current_digest = await self.api.get_current_digest(self.endpoint_id, container_id)
-                        if current_digest:
-                            data["current_digest"] = current_digest
+                    if image_info := self._image_info_cache.get(image_id or ""):
+                        data["current_version"] = self.api.extract_version_from_image(image_info)
+                        data["current_digest"] = self.api.images.get_local_digest(image_info, image_name)
                     if include_registry and image_name:
-                        available_digest = await self.api.get_available_digest(self.endpoint_id, container_id)
+                        available_digest = await self.api.images.get_available_digest_for_image(
+                            image_name, data.get("current_digest")
+                        )
                         if available_digest and not str(available_digest).startswith("unknown"):
                             data["available_digest"] = available_digest
                             current_digest = data.get("current_digest")
@@ -230,6 +275,35 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
         elif not self.is_update_sensors_enabled():
             self.update_availability = {}
 
+    async def _refresh_image_info_cache(self, inspect_data: dict[str, dict[str, Any]], *, force: bool) -> None:
+        """Fetch local image metadata once per image ID.
+
+        Image IDs are content addressed, so cached entries are reused between polls and
+        only re-fetched together with the registry check or when a new image ID appears.
+        """
+        image_ids = {info.get("Image") for info in inspect_data.values() if info.get("Image")}
+        cache: dict[str, dict[str, Any]] = {}
+        if not force:
+            cache = {
+                image_id: self._image_info_cache[image_id]
+                for image_id in image_ids
+                if image_id in self._image_info_cache
+            }
+        semaphore = asyncio.Semaphore(3)
+
+        async def fetch_one(image_id: str) -> None:
+            async with semaphore:
+                try:
+                    image_info = await self.api.get_image_info(self.endpoint_id, image_id)
+                except Exception as err:
+                    _LOGGER.debug("Failed to get image info for %s: %s", image_id, err)
+                    return
+                if image_info:
+                    cache[image_id] = image_info
+
+        await asyncio.gather(*(fetch_one(image_id) for image_id in image_ids if image_id not in cache))
+        self._image_info_cache = cache
+
     def get_container(self, container_id: str | None) -> dict[str, Any] | None:
         return self.containers.get(container_id or "")
 
@@ -244,6 +318,12 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
 
     def get_update_availability(self, container_id: str | None) -> bool:
         return bool(self.update_availability.get(container_id or "", False))
+
+    def is_portainer_container(self, container_id: str | None) -> bool:
+        """Return whether a container runs Portainer or its agent; it must not be recreated via the API."""
+        container = self.get_container(container_id) or {}
+        image_name = self.image_data.get(container_id or "", {}).get("image_name") or container.get("Image")
+        return is_portainer_image(image_name)
 
     def get_container_by_stable_id(self, stable_id: str) -> str | None:
         return self.stable_container_map.get(stable_id)

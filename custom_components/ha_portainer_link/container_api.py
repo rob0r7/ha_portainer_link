@@ -15,15 +15,8 @@ class PortainerContainerAPI:
         self.session = session  # Use shared session from main API
 
     async def _request(self, method: str, url: str, **kwargs) -> aiohttp.ClientResponse:
-        headers = kwargs.pop("headers", None) or self.auth.get_headers()
-        ssl = kwargs.pop("ssl", self.ssl_verify)
-        session = self.session or self.auth.session
-        try:
-            return await session.request(method, url, headers=headers, ssl=ssl, **kwargs)
-        except ClientConnectorCertificateError as e:
-            _LOGGER.info("🔧 SSL certificate error, retrying with SSL disabled: %s", e)
-            self.ssl_verify = False
-            return await session.request(method, url, headers=headers, ssl=False, **kwargs)
+        kwargs.setdefault("ssl", self.ssl_verify)
+        return await self.auth.request(method, url, **kwargs)
 
     async def _check_endpoint_exists_simple(self, endpoint_id: int) -> bool:
         url = f"{self.base_url}/api/endpoints/{endpoint_id}"
@@ -107,104 +100,22 @@ class PortainerContainerAPI:
         except Exception:
             return {"stack_name": None, "service_name": None, "container_number": None, "is_stack_container": False}
 
-    async def get_available_endpoints(self) -> List[Dict[str, Any]]:
-        """Get all available endpoints to help debug 404 errors."""
-        url = f"{self.base_url}/api/endpoints"
-        
-        try:
-            _LOGGER.info("🔍 Getting available endpoints from: %s", url)
-            
-            # Try with current SSL setting first
-            try:
-                session = self.session or self.auth.session
-                async with session.get(url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
-                    if resp.status == 200:
-                        endpoints = await resp.json()
-                        _LOGGER.info("✅ Found %d available endpoints:", len(endpoints))
-                        for endpoint in endpoints:
-                            endpoint_id = endpoint.get("Id")
-                            endpoint_name = endpoint.get("Name", "Unknown")
-                            endpoint_type = endpoint.get("Type", "Unknown")
-                            _LOGGER.info("   - ID: %s, Name: %s, Type: %s", endpoint_id, endpoint_name, endpoint_type)
-                        return endpoints
-                    else:
-                        _LOGGER.error("❌ Failed to get endpoints: HTTP %s", resp.status)
-                        return []
-            except ClientConnectorCertificateError as e:
-                _LOGGER.info("🔧 SSL certificate error, retrying with SSL disabled: %s", e)
-                # Retry with SSL disabled
-                try:
-                    session = self.session or self.auth.session
-                    async with session.get(url, headers=self.auth.get_headers(), ssl=False) as resp:
-                        if resp.status == 200:
-                            _LOGGER.info("✅ Successfully connected with SSL disabled")
-                            # Update SSL setting for future calls
-                            self.ssl_verify = False
-                            endpoints = await resp.json()
-                            _LOGGER.info("✅ Found %d available endpoints:", len(endpoints))
-                            for endpoint in endpoints:
-                                endpoint_id = endpoint.get("Id")
-                                endpoint_name = endpoint.get("Name", "Unknown")
-                                endpoint_type = endpoint.get("Type", "Unknown")
-                                _LOGGER.info("   - ID: %s, Name: %s, Type: %s", endpoint_id, endpoint_name, endpoint_type)
-                            return endpoints
-                        else:
-                            _LOGGER.error("❌ Failed to get endpoints: HTTP %s", resp.status)
-                            return []
-                except Exception as retry_e:
-                    _LOGGER.exception("❌ Error getting endpoints with SSL disabled: %s", retry_e)
-                    return []
-                    
-        except Exception as e:
-            _LOGGER.exception("❌ Error getting endpoints: %s", e)
-            return []
-
     async def check_endpoint_exists(self, endpoint_id: int) -> bool:
-        """Check if a specific endpoint exists."""
+        """Check if a specific endpoint exists. TLS certificate errors are re-raised."""
         url = f"{self.base_url}/api/endpoints/{endpoint_id}"
-        
         try:
-            _LOGGER.info("🔍 Checking if endpoint %s exists: %s", endpoint_id, url)
-            
-            # Try with current SSL setting first
-            try:
-                session = self.session or self.auth.session
-                async with session.get(url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
-                    if resp.status == 200:
-                        endpoint_data = await resp.json()
-                        endpoint_name = endpoint_data.get("Name", "Unknown")
-                        _LOGGER.info("✅ Endpoint %s exists: %s", endpoint_id, endpoint_name)
-                        return True
-                    elif resp.status == 404:
-                        _LOGGER.error("❌ Endpoint %s does not exist (404)", endpoint_id)
-                        return False
-                    else:
-                        _LOGGER.error("❌ Failed to check endpoint %s: HTTP %s", endpoint_id, resp.status)
-                        return False
-            except ClientConnectorCertificateError as e:
-                _LOGGER.info("🔧 SSL certificate error, retrying with SSL disabled: %s", e)
-                # Retry with SSL disabled
-                try:
-                    session = self.session or self.auth.session
-                    async with session.get(url, headers=self.auth.get_headers(), ssl=False) as resp:
-                        if resp.status == 200:
-                            _LOGGER.info("✅ Successfully connected with SSL disabled")
-                            # Update SSL setting for future calls
-                            self.ssl_verify = False
-                            endpoint_data = await resp.json()
-                            endpoint_name = endpoint_data.get("Name", "Unknown")
-                            _LOGGER.info("✅ Endpoint %s exists: %s", endpoint_id, endpoint_name)
-                            return True
-                        elif resp.status == 404:
-                            _LOGGER.error("❌ Endpoint %s does not exist (404) even with SSL disabled", endpoint_id)
-                            return False
-                        else:
-                            _LOGGER.error("❌ Failed to check endpoint %s: HTTP %s", endpoint_id, resp.status)
-                            return False
-                except Exception as retry_e:
-                    _LOGGER.exception("❌ Error checking endpoint with SSL disabled: %s", retry_e)
+            async with await self._request("GET", url) as resp:
+                if resp.status == 200:
+                    endpoint_data = await resp.json()
+                    _LOGGER.debug("Endpoint %s exists: %s", endpoint_id, endpoint_data.get("Name", "Unknown"))
+                    return True
+                if resp.status == 404:
+                    _LOGGER.error("❌ Endpoint %s does not exist (404)", endpoint_id)
                     return False
-                    
+                _LOGGER.error("❌ Failed to check endpoint %s: HTTP %s", endpoint_id, resp.status)
+                return False
+        except ClientConnectorCertificateError:
+            raise
         except Exception as e:
             _LOGGER.exception("❌ Error checking endpoint %s: %s", endpoint_id, e)
             return False

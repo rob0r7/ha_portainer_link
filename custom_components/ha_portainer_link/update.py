@@ -8,10 +8,11 @@ except ImportError:
     from homeassistant.components.update import UpdateEntity
 
     UpdateEntityFeature = None
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import EntityCategory
 
 from .const import DATA_COORDINATOR, DOMAIN
-from .entity import BaseContainerEntity, container_name
+from .entity import PORTAINER_SELF_UPDATE_MESSAGE, BaseContainerEntity, container_name
 
 
 async def async_setup_entry(hass, entry, async_add_entities) -> None:
@@ -43,6 +44,7 @@ class ContainerUpdateEntity(BaseContainerEntity, UpdateEntity):
     def __init__(self, coordinator, entry_id, container_id, name, stack_info) -> None:
         super().__init__(coordinator, entry_id, container_id, name, stack_info)
         self._attr_name = f"{name} Update"
+        self._attr_in_progress = False
 
     @property
     def installed_version(self):
@@ -59,11 +61,16 @@ class ContainerUpdateEntity(BaseContainerEntity, UpdateEntity):
         return self.installed_version
 
     @property
-    def in_progress(self) -> bool:
-        return False
+    def supported_features(self):
+        # No install action for Portainer itself: the update is still shown, but must be applied on the host.
+        if self.coordinator.is_portainer_container(self.current_container_id):
+            return UpdateEntityFeature(0) if UpdateEntityFeature else 0
+        return self._attr_supported_features
 
     @property
     def release_summary(self):
+        if self.coordinator.is_portainer_container(self.current_container_id):
+            return PORTAINER_SELF_UPDATE_MESSAGE
         data = self._image_data
         current_digest = data.get("current_digest")
         available_digest = data.get("available_digest")
@@ -85,9 +92,24 @@ class ContainerUpdateEntity(BaseContainerEntity, UpdateEntity):
         return self.coordinator.get_update_availability(self.current_container_id)
 
     async def async_install(self, version: str | None, backup: bool, **kwargs) -> None:
-        """Pull the latest image explicitly."""
+        """Pull the latest image and recreate the container with it."""
         container_id = self.current_container_id
         if not container_id:
-            return
-        await self.coordinator.api.pull_image_update(self.endpoint_id, container_id)
+            raise HomeAssistantError(f"Container {self.container_name} is not available")
+        if self.coordinator.is_portainer_container(container_id):
+            raise HomeAssistantError(PORTAINER_SELF_UPDATE_MESSAGE)
+        self._attr_in_progress = True
+        self.async_write_ha_state()
+        try:
+            result = await self.coordinator.api.recreate_container(self.endpoint_id, container_id, pull_image=True)
+        finally:
+            self._attr_in_progress = False
+            self.async_write_ha_state()
         await self.coordinator.async_request_refresh()
+        if result is None:
+            raise HomeAssistantError(
+                "This Portainer version cannot recreate containers via the API (requires Portainer 2.19+). "
+                "Pull the image and recreate the container in Portainer."
+            )
+        if not result:
+            raise HomeAssistantError(f"Failed to update container {self.container_name}; see the log for details")

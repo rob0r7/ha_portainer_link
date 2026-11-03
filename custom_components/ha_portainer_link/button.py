@@ -5,7 +5,7 @@ from __future__ import annotations
 from homeassistant.components.button import ButtonEntity
 
 from .const import CONF_NOTIFY_SERVICE, DATA_COORDINATOR, DOMAIN
-from .entity import BaseContainerEntity, BaseStackEntity, container_name
+from .entity import PORTAINER_SELF_UPDATE_MESSAGE, BaseContainerEntity, BaseStackEntity, container_name
 
 
 async def async_setup_entry(hass, entry, async_add_entities) -> None:
@@ -152,6 +152,12 @@ class StackUpdateButton(StackButton):
     _attr_icon = "mdi:update"
 
     async def async_press(self) -> None:
+        if any(
+            self.coordinator.is_portainer_container(container.get("Id"))
+            for container in self.coordinator.get_stack_containers(self.stack_name)
+        ):
+            await self._notify("Stack Update Blocked", f"Stack {self.stack_name}: {PORTAINER_SELF_UPDATE_MESSAGE}")
+            return
         result = await self.coordinator.api.update_stack(self.endpoint_id, self.stack_name)
         await self.coordinator.async_request_refresh()
         if isinstance(result, dict):

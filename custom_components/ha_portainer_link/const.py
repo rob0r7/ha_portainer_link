@@ -36,3 +36,8 @@ DEFAULT_OPTIONS = {
 
 DATA_API = "api"
 DATA_COORDINATOR = "coordinator"
+
+SSL_VERIFY_FAILED_MESSAGE = (
+    "Portainer TLS certificate verification failed. If Portainer uses a self-signed "
+    "certificate, disable 'SSL verification' in the integration options."
+)

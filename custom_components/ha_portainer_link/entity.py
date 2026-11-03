@@ -51,6 +51,30 @@ def is_container_running(container: dict[str, Any] | None) -> bool:
     return str(state or "").lower() == "running"
 
 
+PORTAINER_SELF_REPOSITORIES = (
+    "portainer/portainer-ce",
+    "portainer/portainer-ee",
+    "portainer/portainer",
+    "portainer/agent",
+)
+
+PORTAINER_SELF_UPDATE_MESSAGE = (
+    "Portainer cannot update itself through its own API: recreating the Portainer or "
+    "Portainer agent container stops the API in the middle of the operation and leaves "
+    "Portainer down. Update it on the Docker host instead."
+)
+
+
+def is_portainer_image(image_name: str | None) -> bool:
+    """Return whether an image reference is Portainer itself or its agent."""
+    if not image_name:
+        return False
+    ref = str(image_name).strip().lower().split("@", 1)[0]
+    if ":" in ref.rsplit("/", 1)[-1]:
+        ref = ref.rsplit(":", 1)[0]
+    return any(ref == repo or ref.endswith(f"/{repo}") for repo in PORTAINER_SELF_REPOSITORIES)
+
+
 def stack_info_from_container(container: dict[str, Any]) -> dict[str, Any]:
     """Extract compose stack metadata from container labels."""
     labels = container.get("Labels") or {}
