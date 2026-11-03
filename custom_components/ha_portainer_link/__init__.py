@@ -87,6 +87,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     _register_services(hass)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    _remove_legacy_devices(hass, entry)
     _cleanup_empty_devices(hass, entry)
     return True
 
@@ -141,6 +142,36 @@ def _unregister_services(hass: HomeAssistant) -> None:
         if hass.services.has_service(DOMAIN, service):
             hass.services.async_remove(DOMAIN, service)
     hass.data.setdefault(DOMAIN, {})["_services_registered"] = False
+
+
+def _remove_legacy_devices(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Remove devices left over from the pre-0.6 identifier format.
+
+    Those devices (identifier "entry_<entry_id>_endpoint_...") only hold entities whose
+    unique IDs are no longer provided: every current entity is moved to its current
+    device during platform setup. They show up as same-named duplicates with
+    unavailable entities, so remove them together with their orphaned entities.
+    """
+    legacy_prefix = f"entry_{entry.entry_id}_endpoint_"
+    device_registry = dr.async_get(hass)
+    entity_registry = er.async_get(hass)
+    removed_devices = 0
+    removed_entities = 0
+    for device in dr.async_entries_for_config_entry(device_registry, entry.entry_id):
+        identifiers = [value for domain, value in device.identifiers if domain == DOMAIN]
+        if not identifiers or not all(value.startswith(legacy_prefix) for value in identifiers):
+            continue
+        for entity in er.async_entries_for_device(entity_registry, device.id, include_disabled_entities=True):
+            entity_registry.async_remove(entity.entity_id)
+            removed_entities += 1
+        device_registry.async_remove_device(device.id)
+        removed_devices += 1
+    if removed_devices:
+        _LOGGER.info(
+            "Removed %d legacy devices with %d orphaned entities from an older identifier format",
+            removed_devices,
+            removed_entities,
+        )
 
 
 def _cleanup_empty_devices(hass: HomeAssistant, entry: ConfigEntry) -> None:

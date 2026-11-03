@@ -251,7 +251,11 @@ class BaseStackEntity(BasePortainerEntity):
 
     @property
     def available(self) -> bool:
-        return super().available and bool(self.coordinator.get_stack_containers(self.stack_name))
+        # A stopped Portainer stack has no containers but must still be startable.
+        return super().available and (
+            self.coordinator.get_stack(self.stack_name) is not None
+            or bool(self.coordinator.get_stack_containers(self.stack_name))
+        )
 
     @property
     def device_info(self) -> dict[str, Any]:
