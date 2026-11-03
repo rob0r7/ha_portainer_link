@@ -8,6 +8,7 @@ except ImportError:
     from homeassistant.components.update import UpdateEntity
 
     UpdateEntityFeature = None
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import EntityCategory
 
 from .const import DATA_COORDINATOR, DOMAIN
@@ -43,6 +44,7 @@ class ContainerUpdateEntity(BaseContainerEntity, UpdateEntity):
     def __init__(self, coordinator, entry_id, container_id, name, stack_info) -> None:
         super().__init__(coordinator, entry_id, container_id, name, stack_info)
         self._attr_name = f"{name} Update"
+        self._attr_in_progress = False
 
     @property
     def installed_version(self):
@@ -57,10 +59,6 @@ class ContainerUpdateEntity(BaseContainerEntity, UpdateEntity):
         if self.coordinator.get_update_availability(self.current_container_id):
             return data.get("available_digest") or data.get("available_version")
         return self.installed_version
-
-    @property
-    def in_progress(self) -> bool:
-        return False
 
     @property
     def release_summary(self):
@@ -85,9 +83,22 @@ class ContainerUpdateEntity(BaseContainerEntity, UpdateEntity):
         return self.coordinator.get_update_availability(self.current_container_id)
 
     async def async_install(self, version: str | None, backup: bool, **kwargs) -> None:
-        """Pull the latest image explicitly."""
+        """Pull the latest image and recreate the container with it."""
         container_id = self.current_container_id
         if not container_id:
-            return
-        await self.coordinator.api.pull_image_update(self.endpoint_id, container_id)
+            raise HomeAssistantError(f"Container {self.container_name} is not available")
+        self._attr_in_progress = True
+        self.async_write_ha_state()
+        try:
+            result = await self.coordinator.api.recreate_container(self.endpoint_id, container_id, pull_image=True)
+        finally:
+            self._attr_in_progress = False
+            self.async_write_ha_state()
         await self.coordinator.async_request_refresh()
+        if result is None:
+            raise HomeAssistantError(
+                "This Portainer version cannot recreate containers via the API (requires Portainer 2.19+). "
+                "Pull the image and recreate the container in Portainer."
+            )
+        if not result:
+            raise HomeAssistantError(f"Failed to update container {self.container_name}; see the log for details")

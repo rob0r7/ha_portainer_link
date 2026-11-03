@@ -81,9 +81,9 @@ Update availability is derived from cached image metadata:
 
 Explicit user actions can still pull images and recreate containers or stacks:
 
-- Container pull/update button.
-- Stack update button.
-- Native `update` entity install action.
+- Container pull/update button: pulls the latest image only. The running container keeps its current image until it is recreated.
+- Stack update button: redeploys the Portainer stack with freshly pulled images. Containers are not deleted beforehand, so anonymous volumes are kept.
+- Native `update` entity install action: pulls the image and recreates the container through Portainer's recreate API (Portainer 2.19 or newer).
 
 ## Services
 

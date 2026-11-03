@@ -8,8 +8,6 @@ import re
 import time
 from typing import Any
 
-from aiohttp.client_exceptions import ClientConnectorCertificateError
-
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -62,7 +60,9 @@ class PortainerImageAPI:
 
         parts = ref.split("/")
         first = parts[0] if parts else ""
-        if "." in first or ":" in first or first == "localhost":
+        # Only a leading segment followed by a path can be a registry host; otherwise
+        # "nginx:latest" would be parsed as host "nginx" with port "latest".
+        if len(parts) > 1 and ("." in first or ":" in first or first == "localhost"):
             registry = first
             repository = "/".join(parts[1:])
         else:
@@ -94,13 +94,9 @@ class PortainerImageAPI:
         }
 
     async def _request(self, method: str, url: str, **kwargs):
+        """Send a registry request. Registry TLS is always verified; verify_ssl only applies to Portainer."""
         session = self.session or self.auth.session
-        try:
-            return await session.request(method, url, ssl=self.ssl_verify, **kwargs)
-        except ClientConnectorCertificateError as err:
-            _LOGGER.info("Registry SSL certificate error, retrying with SSL disabled: %s", err)
-            self.ssl_verify = False
-            return await session.request(method, url, ssl=False, **kwargs)
+        return await session.request(method, url, **kwargs)
 
     async def _get_registry_auth_token(self, authenticate_header: str | None) -> str | None:
         """Fetch a Bearer token from a registry WWW-Authenticate header."""
@@ -117,12 +113,7 @@ class PortainerImageAPI:
             params["scope"] = scope
         session = self.session or self.auth.session
         try:
-            async with session.get(realm, params=params, ssl=self.ssl_verify) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    return data.get("token") or data.get("access_token")
-        except ClientConnectorCertificateError:
-            async with session.get(realm, params=params, ssl=False) as resp:
+            async with session.get(realm, params=params) as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     return data.get("token") or data.get("access_token")
@@ -204,6 +195,9 @@ class PortainerImageAPI:
         if registry == "registry-1.docker.io":
             candidates.add(f"docker.io/{repository}")
             candidates.add(f"index.docker.io/{repository}")
+            # Docker reports official images as e.g. "nginx@sha256:..." without "library/".
+            if repository.startswith("library/"):
+                candidates.add(repository.split("/", 1)[1])
         return repo_part in candidates or repo_part.endswith(f"/{repository}")
 
     def _local_repo_digest(self, image_data: dict[str, Any], image_name: str | None = None) -> str | None:
@@ -238,8 +232,7 @@ class PortainerImageAPI:
                 return False
             url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/create"
             params = {"fromImage": image_name}
-            session = self.session or self.auth.session
-            async with session.post(url, params=params, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
+            async with await self.auth.request("POST", url, params=params, ssl=self.ssl_verify) as resp:
                 return resp.status == 200
         except Exception as err:
             _LOGGER.exception("Error pulling image update for container %s: %s", container_id, err)
@@ -249,15 +242,8 @@ class PortainerImageAPI:
         """Get detailed information about a local Docker image."""
         try:
             url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/images/{image_id}/json"
-            session = self.session or self.auth.session
-            async with session.get(url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
+            async with await self.auth.request("GET", url, ssl=self.ssl_verify) as resp:
                 if resp.status == 200:
-                    return await resp.json()
-        except ClientConnectorCertificateError:
-            session = self.session or self.auth.session
-            async with session.get(url, headers=self.auth.get_headers(), ssl=False) as resp:
-                if resp.status == 200:
-                    self.ssl_verify = False
                     return await resp.json()
         except Exception as err:
             _LOGGER.debug("Failed to get image info for %s: %s", image_id, err)
@@ -316,31 +302,42 @@ class PortainerImageAPI:
         self._check_count += 1
         return True
 
+    def get_local_digest(self, image_info: dict[str, Any] | None, image_name: str | None) -> str:
+        """Return the local manifest digest from already fetched image data, or unknown."""
+        if not image_info:
+            return "unknown"
+        # Do not compare remote manifest digests with local image IDs; they are different objects.
+        return self._local_repo_digest(image_info, image_name) or "unknown"
+
     async def get_current_digest(self, endpoint_id: int, container_id: str) -> str:
         """Return the local manifest digest for a container image, or unknown."""
+        container_info = await self._get_container_info(endpoint_id, container_id)
+        return await self._current_digest_from_info(endpoint_id, container_info)
+
+    async def _current_digest_from_info(self, endpoint_id: int, container_info: dict[str, Any] | None) -> str:
         try:
-            container_info = await self._get_container_info(endpoint_id, container_id)
             image_name = ((container_info or {}).get("Config") or {}).get("Image")
             image_id = (container_info or {}).get("Image")
             if not image_id:
                 return "unknown"
             image_info = await self.get_image_info(endpoint_id, image_id)
-            if not image_info:
-                return "unknown"
-            repo_digest = self._local_repo_digest(image_info, image_name)
-            if repo_digest:
-                return repo_digest
-            # Do not compare remote manifest digests with local image IDs; they are different objects.
-            return "unknown"
+            return self.get_local_digest(image_info, image_name)
         except Exception as err:
-            _LOGGER.debug("Failed to get current digest for %s: %s", container_id, err)
+            _LOGGER.debug("Failed to get current digest: %s", err)
             return "unknown"
 
     async def get_available_digest(self, endpoint_id: int, container_id: str) -> str:
         """Return the remote manifest digest for a container image, or unknown."""
+        container_info = await self._get_container_info(endpoint_id, container_id)
+        image_name = ((container_info or {}).get("Config") or {}).get("Image")
+        if not image_name:
+            return "unknown"
+        current = await self._current_digest_from_info(endpoint_id, container_info)
+        return await self.get_available_digest_for_image(image_name, current)
+
+    async def get_available_digest_for_image(self, image_name: str, current_digest: str | None = None) -> str:
+        """Return the cached or remote manifest digest for an image reference, or unknown."""
         try:
-            container_info = await self._get_container_info(endpoint_id, container_id)
-            image_name = ((container_info or {}).get("Config") or {}).get("Image")
             if not image_name:
                 return "unknown"
             if image_name in self._digest_cache:
@@ -349,32 +346,24 @@ class PortainerImageAPI:
                     return cached
             if not self._check_rate_limit():
                 return "unknown"
-            current = await self.get_current_digest(endpoint_id, container_id)
             primary, remote_digests = await self._get_remote_manifest_digests(image_name)
-            if current != "unknown" and current in remote_digests:
-                value = current
+            if current_digest and current_digest != "unknown" and current_digest in remote_digests:
+                value = current_digest
             else:
                 value = primary or "unknown"
             if value != "unknown":
                 self._digest_cache[image_name] = (value, time.time())
             return value
         except Exception as err:
-            _LOGGER.debug("Failed to get available digest for %s: %s", container_id, err)
+            _LOGGER.debug("Failed to get available digest for %s: %s", image_name, err)
             return "unknown"
 
     async def _get_container_info(self, endpoint_id: int, container_id: str) -> dict[str, Any] | None:
         """Get container inspection data."""
         try:
             url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/json"
-            session = self.session or self.auth.session
-            async with session.get(url, headers=self.auth.get_headers(), ssl=self.ssl_verify) as resp:
+            async with await self.auth.request("GET", url, ssl=self.ssl_verify) as resp:
                 if resp.status == 200:
-                    return await resp.json()
-        except ClientConnectorCertificateError:
-            session = self.session or self.auth.session
-            async with session.get(url, headers=self.auth.get_headers(), ssl=False) as resp:
-                if resp.status == 200:
-                    self.ssl_verify = False
                     return await resp.json()
         except Exception as err:
             _LOGGER.debug("Failed to get container info for %s: %s", container_id, err)

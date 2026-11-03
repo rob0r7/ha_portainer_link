@@ -5,7 +5,6 @@ import asyncio
 from typing import List, Dict, Any, Optional, Tuple
 
 import aiohttp
-from aiohttp.client_exceptions import ClientConnectorCertificateError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -23,22 +22,9 @@ class PortainerStackAPI:
     # Small request helper
     # ---------------------------
     async def _request(self, method: str, url: str, **kwargs) -> aiohttp.ClientResponse:
-        """Centralized request to toggle SSL on cert errors (reduces repetitive try/except).
-        Why: Portainer CE on LAN often uses self‑signed certs; we fail open by retrying with ssl=False.
-        """
-        headers = kwargs.pop("headers", None) or self.auth.get_headers()
-        ssl = kwargs.pop("ssl", self.ssl_verify)
-        session = self.session or self.auth.session
-
-        try:
-            resp = await session.request(method, url, headers=headers, ssl=ssl, **kwargs)
-            return resp
-        except ClientConnectorCertificateError as e:
-            _LOGGER.info("🔧 SSL certificate error, retrying with SSL disabled: %s", e)
-            # Persist choice to avoid future failures.
-            self.ssl_verify = False
-            resp = await session.request(method, url, headers=headers, ssl=False, **kwargs)
-            return resp
+        """Centralized authenticated request using the configured SSL verification setting."""
+        kwargs.setdefault("ssl", self.ssl_verify)
+        return await self.auth.request(method, url, **kwargs)
 
     # ---------------------------
     # Read helpers
@@ -147,9 +133,8 @@ class PortainerStackAPI:
         _LOGGER.info("🔄 Starting comprehensive update for stack %s", stack_name)
         
         result: Dict[str, Any] = {
+            "ok": False,
             "stack": stack_name,
-            "stopped": False,
-            "deleted": [],
             "update_put": None,
             "started": False,
             "wait_ready": False,
@@ -221,26 +206,9 @@ class PortainerStackAPI:
             result["compose_retrieved"] = True
             _LOGGER.info("✅ Successfully retrieved compose content for %s (length: %d)", stack_name, len(compose))
 
-        # Stop containers (best effort)
-        await self.stop_stack(endpoint_id, stack_name)
-        result["stopped"] = True
-
-        # Delete existing containers to force recreation
-        deleted: List[str] = []
-        ids = await self._list_stack_container_ids(endpoint_id, stack_name)
-        _LOGGER.info("🔄 Deleting %d containers for stack %s", len(ids), stack_name)
-        for cid in ids:
-            url = f"{self.base_url}/api/endpoints/{endpoint_id}/docker/containers/{cid}?force=1&v=1"
-            async with await self._request("DELETE", url) as resp:
-                if resp.status in (204, 200, 404):  # 404 means already gone
-                    deleted.append(cid)
-                    _LOGGER.debug("✅ Deleted container %s", cid)
-                else:
-                    _LOGGER.warning("⚠️ Failed to delete %s: HTTP %s", cid, resp.status)
-        result["deleted"] = deleted
-        _LOGGER.info("✅ Deleted %d/%d containers for stack %s", len(deleted), len(ids), stack_name)
-
-        # PUT update (pull fresh images + redeploy)
+        # PUT update (pull fresh images + redeploy). Containers are not stopped or
+        # deleted first: Portainer recreates changed containers itself, and deleting
+        # them with v=1 would destroy anonymous volumes that compose carries over.
         put_url = f"{self.base_url}/api/stacks/{stack_id}?endpointId={endpoint_id}"
         payload = {
             "prune": prune,
@@ -276,6 +244,7 @@ class PortainerStackAPI:
                         _LOGGER.error("❌ All attempts to start stack %s failed", stack_name)
                         return result
             else:
+                result["ok"] = True
                 _LOGGER.info("✅ Stack update PUT successful for %s", stack_name)
 
         # After successful PUT (or fallback start), wait for containers to be healthy/running

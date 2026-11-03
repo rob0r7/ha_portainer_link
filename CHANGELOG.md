@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Each container is now inspected once per poll and shared by metrics and image data; local image metadata is cached per image ID and only re-fetched with the registry check. This cuts per-poll Portainer requests from roughly six to two per container.
+- The SSL verification option is now honoured everywhere. Certificate errors no longer silently retry with verification disabled, and legacy code paths no longer hardcode `ssl=False`.
+- Stack update no longer stops and force-deletes stack containers with `v=1` before redeploying, which destroyed anonymous volumes (for example database data without a named volume).
+- Stack update no longer reports "Stack Update Failed" after every successful update.
+- Username/password installs re-authenticate when the Portainer JWT expires (8 hours by default) instead of failing until reload. Rejected credentials now fail setup with a clear error, and the config flow reports `invalid_auth`.
+- Update detection now works for official Docker Hub images with a tag, such as `nginx:latest` or `postgres:16`. These were parsed as a registry host and never matched their local digest.
+- Image pulls read Docker's progress stream to completion and report errors from it, instead of treating HTTP 200 as success and closing the connection early.
+- The native update entity's install action now recreates the container with the pulled image (Portainer 2.19+) and reports failures in the UI. Previously it only pulled, so the update stayed pending.
+
+### Changed
+- If Portainer uses a self-signed certificate while SSL verification is enabled, setup now fails with a clear hint to disable **SSL verification** in the integration options instead of downgrading silently. Existing installs that relied on the silent fallback must disable the option.
+- Registry manifest requests always verify TLS, independent of the Portainer SSL option.
+- Removed the duplicate, unused `get_available_endpoints` implementation in the container API.
+
 ## [0.6.0] - 2026-06-12
 
 ### Fixed

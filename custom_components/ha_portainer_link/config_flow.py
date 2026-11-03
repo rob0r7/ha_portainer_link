@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from urllib.parse import urlparse
 
 import voluptuous as vol
+from aiohttp.client_exceptions import ClientConnectorCertificateError
 from homeassistant import config_entries
 from homeassistant.core import callback
 
@@ -26,8 +28,11 @@ from .const import (
     CONF_VERIFY_SSL,
     DEFAULT_OPTIONS,
     DOMAIN,
+    SSL_VERIFY_FAILED_MESSAGE,
 )
-from .portainer_api import PortainerAPI
+from .portainer_api import PortainerAPI, PortainerAuthError
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class PortainerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -45,11 +50,11 @@ class PortainerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._abort_if_unique_id_configured()
 
             user_input = {**user_input, CONF_HOST: normalized_host, CONF_ENDPOINT_ID: endpoint_id}
-            valid = await _validate_connection(user_input)
-            if valid:
+            error = await _validate_connection(user_input)
+            if error is None:
                 title = f"Portainer {urlparse(normalized_host).hostname or normalized_host} ({endpoint_id})"
                 return self.async_create_entry(title=title, data=user_input, options=DEFAULT_OPTIONS)
-            errors["base"] = "cannot_connect"
+            errors["base"] = error
 
         return self.async_show_form(
             step_id="user",
@@ -130,10 +135,13 @@ def _normalize_host(host: str) -> str:
     return host
 
 
-async def _validate_connection(config: dict) -> bool:
-    """Validate credentials and endpoint access without logging secrets."""
+async def _validate_connection(config: dict) -> str | None:
+    """Validate credentials and endpoint access without logging secrets.
+
+    Returns None on success, otherwise a config flow error key.
+    """
     if not config.get(CONF_API_KEY) and not (config.get(CONF_USERNAME) and config.get(CONF_PASSWORD)):
-        return False
+        return "invalid_auth"
 
     api = PortainerAPI(
         config[CONF_HOST],
@@ -145,8 +153,18 @@ async def _validate_connection(config: dict) -> bool:
     try:
         await api.initialize()
         if api.containers:
-            return bool(await api.containers.check_endpoint_exists(int(config[CONF_ENDPOINT_ID])))
-        containers = await api.get_containers(int(config[CONF_ENDPOINT_ID]))
-        return containers is not None
+            exists = await api.containers.check_endpoint_exists(int(config[CONF_ENDPOINT_ID]))
+        else:
+            exists = await api.get_containers(int(config[CONF_ENDPOINT_ID])) is not None
+        return None if exists else "cannot_connect"
+    except ClientConnectorCertificateError:
+        _LOGGER.warning(SSL_VERIFY_FAILED_MESSAGE)
+        return "cannot_connect"
+    except PortainerAuthError as err:
+        _LOGGER.warning("%s", err)
+        return "invalid_auth"
+    except Exception as err:
+        _LOGGER.warning("Cannot connect to Portainer: %s", err)
+        return "cannot_connect"
     finally:
         await api.close()
