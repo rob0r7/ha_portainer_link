@@ -15,8 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Username/password installs re-authenticate when the Portainer JWT expires (8 hours by default) instead of failing until reload. Rejected credentials now fail setup with a clear error, and the config flow reports `invalid_auth`.
 - Update detection now works for official Docker Hub images with a tag, such as `nginx:latest` or `postgres:16`. These were parsed as a registry host and never matched their local digest.
 - Image pulls read Docker's progress stream to completion and report errors from it, instead of treating HTTP 200 as success and closing the connection early.
+- Removed duplicate devices left over from the pre-0.6 identifier format (`entry_<id>_endpoint_...`). They appeared next to the current device with the same name, holding only unavailable entities that the integration no longer provides.
+- Stack buttons stay available for stopped Portainer stacks that have no containers, and **Start** then starts the stack through Portainer instead of failing.
 - Portainer and Portainer agent containers can no longer be updated through the integration. Recreating them via the Portainer API stops the API mid-operation and leaves Portainer down. Their update entity has no install action, and stack updates that include them are blocked with a notification.
 - The native update entity's install action now recreates the container with the pulled image (Portainer 2.19+) and reports failures in the UI. Previously it only pulled, so the update stayed pending.
+
+### Added
+- Diagnostics download (**Download diagnostics** on the integration). It shows the containers, compose labels, stack mapping, registered devices and entities, and coordinator errors the integration sees, with credentials redacted.
 
 ### Changed
 - Setup and options dialogs now have English and German labels, help texts and error messages instead of raw keys. Intervals are number fields with a minutes unit instead of an unlabeled slider, secrets use password fields, and the notification service is a dropdown of available `notify` services that also accepts custom values. Certificate failures get their own `ssl_error` message.

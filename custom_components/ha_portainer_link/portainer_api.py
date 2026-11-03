@@ -568,11 +568,12 @@ class PortainerAPI:
                         stack_containers.append(container["Id"])
                 
                 if not stack_containers:
-                    _LOGGER.warning("No containers found for stack %s", stack_name)
-                    return False
-                
+                    # A stopped Portainer stack has no containers; let Portainer deploy it again.
+                    _LOGGER.info("No containers found for stack %s, starting it through Portainer", stack_name)
+                    return await self.stacks_api.start_stack(endpoint_id, stack_name)
+
                 _LOGGER.info("Found %d containers in stack %s", len(stack_containers), stack_name)
-                
+
                 # Start each container in the stack
                 success_count = 0
                 for container_id in stack_containers:
