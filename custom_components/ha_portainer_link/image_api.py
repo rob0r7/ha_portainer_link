@@ -29,6 +29,10 @@ class PortainerImageAPI:
         self._last_check_window = time.time()
         self._check_count = 0
 
+    def set_cache_duration(self, seconds: float) -> None:
+        """Set how long remote digests are reused; must be shorter than the update check interval."""
+        self._cache_duration = max(float(seconds), 60.0)
+
     @staticmethod
     def _normalize_digest(value: str | None) -> str | None:
         """Normalize a digest-like value to sha256:... where possible."""

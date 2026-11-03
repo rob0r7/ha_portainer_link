@@ -1,0 +1,66 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Mit Portainer verbinden",
+        "description": "Gib die Adresse von Portainer und entweder einen API-Schlüssel (empfohlen) oder Benutzername und Passwort an.",
+        "data": {
+          "host": "Portainer-URL",
+          "api_key": "API-Schlüssel",
+          "username": "Benutzername",
+          "password": "Passwort",
+          "endpoint_id": "Environment-ID",
+          "verify_ssl": "SSL-Zertifikat prüfen"
+        },
+        "data_description": {
+          "host": "Zum Beispiel https://192.168.1.100:9443. Ohne Schema wird http:// verwendet.",
+          "api_key": "Wird in Portainer unter „My account“ → „Access tokens“ erstellt. Leer lassen, um Benutzername und Passwort zu verwenden.",
+          "username": "Nur ohne API-Schlüssel nötig.",
+          "password": "Nur ohne API-Schlüssel nötig.",
+          "endpoint_id": "Die Zahl in Portainer-URLs wie #!/1/docker/containers (hier: 1).",
+          "verify_ssl": "Ausschalten, wenn Portainer ein selbstsigniertes Zertifikat verwendet."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Portainer ist nicht erreichbar oder die Environment-ID existiert nicht.",
+      "invalid_auth": "Ungültige Zugangsdaten. Gib einen API-Schlüssel oder Benutzername und Passwort an.",
+      "ssl_error": "Das SSL-Zertifikat konnte nicht geprüft werden. Schalte „SSL-Zertifikat prüfen“ aus, wenn Portainer ein selbstsigniertes Zertifikat verwendet."
+    },
+    "abort": {
+      "already_configured": "Diese Portainer-Umgebung ist bereits eingerichtet."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Portainer-Optionen",
+        "description": "Änderungen laden die Integration neu.",
+        "data": {
+          "update_interval": "Abfrageintervall",
+          "update_check_interval": "Intervall für Image-Update-Prüfung",
+          "enable_stack_view": "Container nach Stack gruppieren",
+          "enable_stack_buttons": "Stack-Buttons",
+          "enable_container_buttons": "Container-Buttons",
+          "enable_resource_sensors": "Ressourcen-Sensoren",
+          "enable_version_sensors": "Versions-Sensoren",
+          "enable_update_sensors": "Update-Entitäten",
+          "verify_ssl": "SSL-Zertifikat prüfen",
+          "notify_service": "Benachrichtigungsdienst"
+        },
+        "data_description": {
+          "update_interval": "Wie oft Status, CPU und Speicher der Container von Portainer gelesen werden.",
+          "update_check_interval": "Wie oft die Registries auf neue Image-Versionen geprüft werden. Docker Hub begrenzt anonyme Abfragen, daher lieber hoch lassen.",
+          "enable_stack_view": "Zeigt Compose-Stacks als eigene Geräte. Ein Umschalten legt die Container-Entitäten neu an.",
+          "enable_stack_buttons": "Start-, Stopp- und Update-Buttons pro Stack.",
+          "enable_container_buttons": "Buttons zum Neustarten und Image-Pullen pro Container.",
+          "enable_resource_sensors": "CPU, Speicher und Laufzeit pro laufendem Container. Kostet pro Container und Abfrage eine zusätzliche Anfrage.",
+          "enable_version_sensors": "Aktuelle und verfügbare Version und Digest pro Container.",
+          "enable_update_sensors": "Update-Entitäten und Sensoren „Update verfügbar“. Portainer selbst lässt sich hierüber nicht aktualisieren.",
+          "verify_ssl": "Ausschalten, wenn Portainer ein selbstsigniertes Zertifikat verwendet.",
+          "notify_service": "Wohin Ergebnisse von Aktionen gemeldet werden, z. B. notify.mobile_app_handy. Leer lassen für dauerhafte Benachrichtigungen."
+        }
+      }
+    }
+  }
+}

@@ -85,6 +85,8 @@ Explicit user actions can still pull images and recreate containers or stacks:
 - Stack update button: redeploys the Portainer stack with freshly pulled images. Containers are not deleted beforehand, so anonymous volumes are kept.
 - Native `update` entity install action: pulls the image and recreates the container through Portainer's recreate API (Portainer 2.19 or newer).
 
+Portainer itself (`portainer/portainer-ce`, `portainer/portainer-ee`) and the Portainer agent are excluded from these actions. Updates for them are still shown, but must be applied on the Docker host, because recreating them through their own API stops Portainer partway through.
+
 ## Services
 
 The integration registers these Home Assistant services:

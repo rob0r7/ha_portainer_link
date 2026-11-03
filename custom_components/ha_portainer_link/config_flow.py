@@ -9,6 +9,18 @@ import voluptuous as vol
 from aiohttp.client_exceptions import ClientConnectorCertificateError
 from homeassistant import config_entries
 from homeassistant.core import callback
+from homeassistant.helpers.selector import (
+    BooleanSelector,
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 
 from .const import (
     CONF_API_KEY,
@@ -33,6 +45,17 @@ from .const import (
 from .portainer_api import PortainerAPI, PortainerAuthError
 
 _LOGGER = logging.getLogger(__name__)
+
+TEXT = TextSelector()
+PASSWORD = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))
+BOOLEAN = BooleanSelector()
+ENDPOINT_ID = NumberSelector(NumberSelectorConfig(min=1, step=1, mode=NumberSelectorMode.BOX))
+UPDATE_INTERVAL = NumberSelector(
+    NumberSelectorConfig(min=1, max=60, step=1, unit_of_measurement="min", mode=NumberSelectorMode.BOX)
+)
+UPDATE_CHECK_INTERVAL = NumberSelector(
+    NumberSelectorConfig(min=60, max=43200, step=30, unit_of_measurement="min", mode=NumberSelectorMode.BOX)
+)
 
 
 class PortainerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -60,12 +83,12 @@ class PortainerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_HOST): str,
-                    vol.Optional(CONF_USERNAME): str,
-                    vol.Optional(CONF_PASSWORD): str,
-                    vol.Optional(CONF_API_KEY): str,
-                    vol.Required(CONF_ENDPOINT_ID): int,
-                    vol.Optional(CONF_VERIFY_SSL, default=DEFAULT_OPTIONS[CONF_VERIFY_SSL]): bool,
+                    vol.Required(CONF_HOST): TEXT,
+                    vol.Optional(CONF_API_KEY): PASSWORD,
+                    vol.Optional(CONF_USERNAME): TEXT,
+                    vol.Optional(CONF_PASSWORD): PASSWORD,
+                    vol.Required(CONF_ENDPOINT_ID, default=1): ENDPOINT_ID,
+                    vol.Optional(CONF_VERIFY_SSL, default=DEFAULT_OPTIONS[CONF_VERIFY_SSL]): BOOLEAN,
                 }
             ),
             errors=errors,
@@ -85,44 +108,54 @@ class PortainerOptionsFlowHandler(config_entries.OptionsFlow):
 
     async def async_step_init(self, user_input=None):
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            options = {**user_input}
+            # Number selectors return floats; the rest of the integration expects whole minutes.
+            options[CONF_UPDATE_INTERVAL] = int(options[CONF_UPDATE_INTERVAL])
+            options[CONF_UPDATE_CHECK_INTERVAL] = int(options[CONF_UPDATE_CHECK_INTERVAL])
+            # An emptied optional field is omitted; store "" so persistent notifications are used.
+            options[CONF_NOTIFY_SERVICE] = (options.get(CONF_NOTIFY_SERVICE) or "").strip()
+            return self.async_create_entry(title="", data=options)
 
         current = {**DEFAULT_OPTIONS, **self._config_entry.options}
+        notify_services = sorted(f"notify.{name}" for name in self.hass.services.async_services().get("notify", {}))
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
-                    vol.Required(
-                        CONF_UPDATE_INTERVAL,
-                        default=current[CONF_UPDATE_INTERVAL],
-                    ): vol.All(vol.Coerce(int), vol.Range(min=1, max=60)),
+                    vol.Required(CONF_UPDATE_INTERVAL, default=current[CONF_UPDATE_INTERVAL]): UPDATE_INTERVAL,
                     vol.Required(
                         CONF_UPDATE_CHECK_INTERVAL,
                         default=current[CONF_UPDATE_CHECK_INTERVAL],
-                    ): vol.All(vol.Coerce(int), vol.Range(min=60, max=86400)),
-                    vol.Required(CONF_ENABLE_STACK_VIEW, default=current[CONF_ENABLE_STACK_VIEW]): bool,
-                    vol.Required(
-                        CONF_ENABLE_RESOURCE_SENSORS,
-                        default=current[CONF_ENABLE_RESOURCE_SENSORS],
-                    ): bool,
-                    vol.Required(
-                        CONF_ENABLE_VERSION_SENSORS,
-                        default=current[CONF_ENABLE_VERSION_SENSORS],
-                    ): bool,
-                    vol.Required(
-                        CONF_ENABLE_UPDATE_SENSORS,
-                        default=current[CONF_ENABLE_UPDATE_SENSORS],
-                    ): bool,
-                    vol.Required(
-                        CONF_ENABLE_STACK_BUTTONS,
-                        default=current[CONF_ENABLE_STACK_BUTTONS],
-                    ): bool,
+                    ): UPDATE_CHECK_INTERVAL,
+                    vol.Required(CONF_ENABLE_STACK_VIEW, default=current[CONF_ENABLE_STACK_VIEW]): BOOLEAN,
+                    vol.Required(CONF_ENABLE_STACK_BUTTONS, default=current[CONF_ENABLE_STACK_BUTTONS]): BOOLEAN,
                     vol.Required(
                         CONF_ENABLE_CONTAINER_BUTTONS,
                         default=current[CONF_ENABLE_CONTAINER_BUTTONS],
-                    ): bool,
-                    vol.Required(CONF_VERIFY_SSL, default=current[CONF_VERIFY_SSL]): bool,
-                    vol.Optional(CONF_NOTIFY_SERVICE, default=current[CONF_NOTIFY_SERVICE]): str,
+                    ): BOOLEAN,
+                    vol.Required(
+                        CONF_ENABLE_RESOURCE_SENSORS,
+                        default=current[CONF_ENABLE_RESOURCE_SENSORS],
+                    ): BOOLEAN,
+                    vol.Required(
+                        CONF_ENABLE_VERSION_SENSORS,
+                        default=current[CONF_ENABLE_VERSION_SENSORS],
+                    ): BOOLEAN,
+                    vol.Required(
+                        CONF_ENABLE_UPDATE_SENSORS,
+                        default=current[CONF_ENABLE_UPDATE_SENSORS],
+                    ): BOOLEAN,
+                    vol.Required(CONF_VERIFY_SSL, default=current[CONF_VERIFY_SSL]): BOOLEAN,
+                    vol.Optional(
+                        CONF_NOTIFY_SERVICE,
+                        description={"suggested_value": current[CONF_NOTIFY_SERVICE] or None},
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=notify_services,
+                            custom_value=True,
+                            mode=SelectSelectorMode.DROPDOWN,
+                        )
+                    ),
                 }
             ),
         )
@@ -159,7 +192,7 @@ async def _validate_connection(config: dict) -> str | None:
         return None if exists else "cannot_connect"
     except ClientConnectorCertificateError:
         _LOGGER.warning(SSL_VERIFY_FAILED_MESSAGE)
-        return "cannot_connect"
+        return "ssl_error"
     except PortainerAuthError as err:
         _LOGGER.warning("%s", err)
         return "invalid_auth"

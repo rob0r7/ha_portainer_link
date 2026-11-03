@@ -1,0 +1,66 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Portainer",
+        "description": "Enter your Portainer address and either an API key (recommended) or a username and password.",
+        "data": {
+          "host": "Portainer URL",
+          "api_key": "API key",
+          "username": "Username",
+          "password": "Password",
+          "endpoint_id": "Environment ID",
+          "verify_ssl": "Verify SSL certificate"
+        },
+        "data_description": {
+          "host": "For example https://192.168.1.100:9443. Without a scheme, http:// is used.",
+          "api_key": "Create one in Portainer under My account → Access tokens. Leave empty to use username and password.",
+          "username": "Only needed without an API key.",
+          "password": "Only needed without an API key.",
+          "endpoint_id": "The number in Portainer URLs such as #!/1/docker/containers (here: 1).",
+          "verify_ssl": "Turn off if Portainer uses a self-signed certificate."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot reach Portainer or the environment ID does not exist.",
+      "invalid_auth": "Invalid credentials. Enter an API key or both username and password.",
+      "ssl_error": "The SSL certificate could not be verified. Turn off \"Verify SSL certificate\" if Portainer uses a self-signed certificate."
+    },
+    "abort": {
+      "already_configured": "This Portainer environment is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Portainer options",
+        "description": "Changes reload the integration.",
+        "data": {
+          "update_interval": "Polling interval",
+          "update_check_interval": "Image update check interval",
+          "enable_stack_view": "Group containers by stack",
+          "enable_stack_buttons": "Stack buttons",
+          "enable_container_buttons": "Container buttons",
+          "enable_resource_sensors": "Resource sensors",
+          "enable_version_sensors": "Version sensors",
+          "enable_update_sensors": "Update entities",
+          "verify_ssl": "Verify SSL certificate",
+          "notify_service": "Notification service"
+        },
+        "data_description": {
+          "update_interval": "How often container status, CPU and memory are read from Portainer.",
+          "update_check_interval": "How often image registries are checked for new versions. Docker Hub limits anonymous requests, so keep this high.",
+          "enable_stack_view": "Shows compose stacks as their own devices. Changing this recreates the container entities.",
+          "enable_stack_buttons": "Start, stop and update buttons per stack.",
+          "enable_container_buttons": "Restart and pull image buttons per container.",
+          "enable_resource_sensors": "CPU, memory and uptime per running container. Costs one extra request per container and poll.",
+          "enable_version_sensors": "Current and available version and digest per container.",
+          "enable_update_sensors": "Update entities and \"update available\" sensors. Portainer itself cannot be updated from here.",
+          "verify_ssl": "Turn off if Portainer uses a self-signed certificate.",
+          "notify_service": "Where action results are sent, for example notify.mobile_app_phone. Leave empty for persistent notifications."
+        }
+      }
+    }
+  }
+}

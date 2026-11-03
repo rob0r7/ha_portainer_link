@@ -24,7 +24,13 @@ from .const import (
     DEFAULT_OPTIONS,
     SSL_VERIFY_FAILED_MESSAGE,
 )
-from .entity import container_name, is_container_running, stable_container_key, stack_info_from_container
+from .entity import (
+    container_name,
+    is_container_running,
+    is_portainer_image,
+    stable_container_key,
+    stack_info_from_container,
+)
 from .portainer_api import PortainerAPI
 
 _LOGGER = logging.getLogger(__name__)
@@ -50,6 +56,10 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
         )
         self.api = api
         self.endpoint_id = endpoint_id
+        if api.images:
+            # Expire remote digests just before the next due check so the configured interval is honoured.
+            check_interval = int(self.config.get(CONF_UPDATE_CHECK_INTERVAL, DEFAULT_OPTIONS[CONF_UPDATE_CHECK_INTERVAL]))
+            api.images.set_cache_duration((max(check_interval, 60) - 1) * 60)
         self.containers: dict[str, dict[str, Any]] = {}
         self.stacks: dict[str, dict[str, Any]] = {}
         self.container_stack_map: dict[str, str] = {}
@@ -308,6 +318,12 @@ class PortainerDataUpdateCoordinator(DataUpdateCoordinator):
 
     def get_update_availability(self, container_id: str | None) -> bool:
         return bool(self.update_availability.get(container_id or "", False))
+
+    def is_portainer_container(self, container_id: str | None) -> bool:
+        """Return whether a container runs Portainer or its agent; it must not be recreated via the API."""
+        container = self.get_container(container_id) or {}
+        image_name = self.image_data.get(container_id or "", {}).get("image_name") or container.get("Image")
+        return is_portainer_image(image_name)
 
     def get_container_by_stable_id(self, stable_id: str) -> str | None:
         return self.stable_container_map.get(stable_id)
