@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-03
+
 ### Fixed
 - Each container is now inspected once per poll and shared by metrics and image data; local image metadata is cached per image ID and only re-fetched with the registry check. This cuts per-poll Portainer requests from roughly six to two per container.
 - The SSL verification option is now honoured everywhere. Certificate errors no longer silently retry with verification disabled, and legacy code paths no longer hardcode `ssl=False`.
