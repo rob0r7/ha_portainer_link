@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Portainer and Portainer agent containers can no longer be updated through the integration. Recreating them via the Portainer API stops the API mid-operation and leaves Portainer down. Their update entity has no install action, and stack updates that include them are blocked with a notification.
 - The native update entity's install action now recreates the container with the pulled image (Portainer 2.19+) and reports failures in the UI. Previously it only pulled, so the update stayed pending.
 
+### Added
+- Diagnostics download (**Download diagnostics** on the integration). It shows the containers, compose labels, stack mapping, registered devices and entities, and coordinator errors the integration sees, with credentials redacted.
+
 ### Changed
 - Setup and options dialogs now have English and German labels, help texts and error messages instead of raw keys. Intervals are number fields with a minutes unit instead of an unlabeled slider, secrets use password fields, and the notification service is a dropdown of available `notify` services that also accepts custom values. Certificate failures get their own `ssl_error` message.
 - The image update check interval option now takes effect below 6 hours; remote digests were previously cached for a fixed 6 hours.
